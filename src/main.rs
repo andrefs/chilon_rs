@@ -1,7 +1,5 @@
-//extern crate bzip2;
-
 use clap::Parser;
-use rio_api::{model::Triple, parser::TriplesParser};
+use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
     path::PathBuf,
