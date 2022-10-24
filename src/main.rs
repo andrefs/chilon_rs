@@ -52,8 +52,8 @@ fn main() {
         }
     }
 
-    println!("\nResource Trie\n{}", res_trie.pp());
-    println!("\nPrefix Trie\n{}", pref_trie.pp());
+    println!("\nResource Trie\n{}", res_trie.pp(false));
+    println!("\nPrefix Trie\n{}", pref_trie.pp(true));
 }
 
 fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
