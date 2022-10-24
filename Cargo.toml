@@ -1,0 +1,15 @@
+[package]
+name = "chilon_rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+trie-generic = "*"
+rio_turtle = "0.7.1"
+rio_api = "0.7.1"
+bzip2 = "0.4.3"
+clap = {version = "4.0.18", features = ["derive"]}
+num_cpus = "1.13.1"
+threadpool = "1.8.1"
