@@ -1,21 +1,20 @@
 //extern crate bzip2;
 
-use bzip2::bufread::BzDecoder;
 use clap::Parser;
 use rio_api::parser::TriplesParser;
-use rio_turtle::{TurtleError, TurtleParser};
-use std::fs::File;
-use std::io;
-use std::io::BufReader;
-use std::io::Write;
+use rio_turtle::TurtleError;
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 mod args;
 use args::Cli;
+mod extract;
+mod parse;
+use parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
 
 pub enum Message {
     Resource { iri: String },
+    PrefixDecl { namespace: String, alias: String },
     Finished,
 }
 
@@ -29,14 +28,8 @@ fn main() {
     for path in cli.files.to_vec() {
         let tx = tx.clone();
         pool.execute(move || {
-            let file = File::open(&path).unwrap();
-            let buf_reader = BufReader::new(file);
-            let dec = BzDecoder::new(buf_reader);
-            let stream = BufReader::new(dec);
-
-            let mut count = 0;
-
-            TurtleParser::new(stream, None)
+            let mut parser = parse(&path);
+            parser
                 .parse_all(&mut |t| {
                     if let Subject::NamedNode(NamedNode { iri }) = t.subject {
                         tx.send(Message::Resource {
@@ -55,20 +48,24 @@ fn main() {
                         .unwrap();
                     }
 
-                    count += 1;
-                    if count % 10000 == 0 {
-                        eprint!(".");
-                        io::stdout().flush().unwrap();
-                    }
                     Ok(()) as Result<(), TurtleError>
                 })
                 .unwrap();
-            eprintln!("\nThread for {:?} finished", path);
+            println!("\nThread for {:?} finished", path);
+            println!("PREFIXES : {:?}", parser.prefixes());
+            for (alias, namespace) in parser.prefixes().iter() {
+                tx.send(Message::PrefixDecl {
+                    namespace: namespace.to_string(),
+                    alias: alias.to_string(),
+                })
+                .unwrap()
+            }
             tx.send(Message::Finished).unwrap();
         })
     }
     let mut running = cli.files.len();
-    let mut t = trie_generic::Trie::<i32>::new(None);
+    let mut res_trie = trie_generic::Trie::<i32>::new(None);
+    let mut pref_trie = trie_generic::Trie::<String>::new(None);
 
     loop {
         if running == 0 {
@@ -76,7 +73,10 @@ fn main() {
         }
         if let Ok(message) = rx.recv() {
             match message {
-                Message::Resource { iri } => t.add(&iri, Some(1)),
+                Message::Resource { iri } => res_trie.add(&iri, Some(1)),
+                Message::PrefixDecl { namespace, alias } => {
+                    pref_trie.add(&namespace, Some(alias.to_owned()));
+                }
                 Message::Finished => {
                     running -= 1;
                 }
@@ -84,28 +84,6 @@ fn main() {
         }
     }
 
-    eprintln!("\nTrie\n{}", t.pp());
+    println!("\nResource Trie\n{}", res_trie.pp());
+    println!("\nPrefix Trie\n{}", pref_trie.pp());
 }
-
-//fn main() {
-//    //let file = File::open("../wn.ttl.bz2").unwrap();
-//    let file = File::open("../infobox-properties_lang_en.ttl.bz2").unwrap();
-//    let buf_reader = BufReader::new(file);
-//    let dec = BzDecoder::new(buf_reader);
-//    let stream = BufReader::new(dec);
-//    //stream.read_to_end(&mut buffer).unwrap();
-//    //println!("{}", String::from_utf8(buffer).unwrap());
-//
-//    let mut count = 0;
-//    TurtleParser::new(stream, None)
-//        .parse_all(&mut |_| {
-//            if count % 10000 == 0 {
-//                print!(".");
-//                io::stdout().flush().unwrap();
-//            }
-//            count += 1;
-//            Ok(()) as Result<(), TurtleError>
-//        })
-//        .unwrap();
-//    println!("\nbench_rio_turtle {count}");
-//}
