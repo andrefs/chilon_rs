@@ -1,9 +1,12 @@
 //extern crate bzip2;
 
 use clap::Parser;
-use rio_api::parser::TriplesParser;
+use rio_api::{model::Triple, parser::TriplesParser};
 use rio_turtle::TurtleError;
-use std::sync::mpsc::channel;
+use std::{
+    path::PathBuf,
+    sync::mpsc::{channel, Sender},
+};
 use threadpool::ThreadPool;
 mod args;
 use args::Cli;
@@ -22,46 +25,11 @@ fn main() {
     let cli = Cli::parse();
 
     let n_workers = std::cmp::min(cli.files.len(), num_cpus::get() - 2);
-    let pool = ThreadPool::new(n_workers);
+    let pool: ThreadPool = ThreadPool::new(n_workers);
     let (tx, rx) = channel::<Message>();
 
     for path in cli.files.to_vec() {
-        let tx = tx.clone();
-        pool.execute(move || {
-            let mut parser = parse(&path);
-            parser
-                .parse_all(&mut |t| {
-                    if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-                        tx.send(Message::Resource {
-                            iri: iri.to_owned(),
-                        })
-                        .unwrap();
-                    }
-                    tx.send(Message::Resource {
-                        iri: t.predicate.iri.to_owned(),
-                    })
-                    .unwrap();
-                    if let Term::NamedNode(NamedNode { iri }) = t.object {
-                        tx.send(Message::Resource {
-                            iri: iri.to_owned(),
-                        })
-                        .unwrap();
-                    }
-
-                    Ok(()) as Result<(), TurtleError>
-                })
-                .unwrap();
-            println!("\nThread for {:?} finished", path);
-            println!("PREFIXES : {:?}", parser.prefixes());
-            for (alias, namespace) in parser.prefixes().iter() {
-                tx.send(Message::PrefixDecl {
-                    namespace: namespace.to_string(),
-                    alias: alias.to_string(),
-                })
-                .unwrap()
-            }
-            tx.send(Message::Finished).unwrap();
-        })
+        spawn(&pool, &tx, path);
     }
     let mut running = cli.files.len();
     let mut res_trie = trie_generic::Trie::<i32>::new(None);
@@ -86,4 +54,43 @@ fn main() {
 
     println!("\nResource Trie\n{}", res_trie.pp());
     println!("\nPrefix Trie\n{}", pref_trie.pp());
+}
+
+fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
+    let tx = tx.clone();
+    pool.execute(move || {
+        let mut parser = parse(&path);
+        parser
+            .parse_all(&mut |t| {
+                if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+                    tx.send(Message::Resource {
+                        iri: iri.to_owned(),
+                    })
+                    .unwrap();
+                }
+                tx.send(Message::Resource {
+                    iri: t.predicate.iri.to_owned(),
+                })
+                .unwrap();
+                if let Term::NamedNode(NamedNode { iri }) = t.object {
+                    tx.send(Message::Resource {
+                        iri: iri.to_owned(),
+                    })
+                    .unwrap();
+                }
+
+                Ok(()) as Result<(), TurtleError>
+            })
+            .unwrap();
+        eprintln!("\nThread for {:?} finished", path);
+        println!("PREFIXES : {:?}", parser.prefixes());
+        for (alias, namespace) in parser.prefixes().iter() {
+            tx.send(Message::PrefixDecl {
+                namespace: namespace.to_string(),
+                alias: alias.to_string(),
+            })
+            .unwrap()
+        }
+        tx.send(Message::Finished).unwrap();
+    });
 }
