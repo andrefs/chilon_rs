@@ -1,12 +1,12 @@
 use clap::Parser;
 use rio_api::parser::TriplesParser;
-use rio_turtle::{TurtleError, TurtleParser};
+use rio_turtle::TurtleError;
 use std::{
-    io::BufRead,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
 use threadpool::ThreadPool;
+use trie_generic::Trie;
 mod args;
 use args::Cli;
 mod extract;
@@ -23,18 +23,22 @@ pub enum Message {
 fn main() {
     let cli = Cli::parse();
 
-    let n_workers = std::cmp::min(cli.files.len(), num_cpus::get() - 2);
-    let pool: ThreadPool = ThreadPool::new(n_workers);
-    let (tx, rx) = channel::<Message>();
+    let mut pref_trie = trie_generic::Trie::<String>::new(None);
+    let mut iri_trie = build_iri_trie(cli.files, &mut pref_trie);
 
-    for path in cli.files.to_vec() {
+    println!("\nResource Trie\n{}", iri_trie.pp(false));
+    println!("\nPrefix Trie\n{}", pref_trie.pp(true));
+}
+
+fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut Trie<String>) -> Trie<i32> {
+    let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
+    let pool: ThreadPool = ThreadPool::new(n_workers);
+    let mut running = paths.len();
+    let (tx, rx) = channel::<Message>();
+    for path in paths {
         spawn(&pool, &tx, path);
     }
-    let mut running = cli.files.len();
-    let mut res_trie = trie_generic::Trie::<i32>::new(None);
-    let mut pref_trie = trie_generic::Trie::<String>::new(None);
-    let mut res_count = 0;
-    let mut res_length = 0;
+    let mut iri_trie = trie_generic::Trie::<i32>::new(None);
 
     loop {
         if running == 0 {
@@ -43,9 +47,7 @@ fn main() {
         if let Ok(message) = rx.recv() {
             match message {
                 Message::Resource { iri } => {
-                    res_trie.add(&iri, Some(1));
-                    res_count += 1;
-                    res_length += iri.len();
+                    iri_trie.add(&iri, Some(1));
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     pref_trie.add(&namespace, Some(alias.to_owned()));
@@ -57,17 +59,15 @@ fn main() {
         }
     }
 
-    println!("Avg res length {}", res_length / res_count);
-
-    println!("\nResource Trie\n{}", res_trie.pp(false));
-    println!("\nPrefix Trie\n{}", pref_trie.pp(true));
+    return iri_trie;
 }
 
 fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
     let tx = tx.clone();
+
     pool.execute(move || {
-        let mut parser = parse(&path);
-        parser
+        let mut graph = parse(&path);
+        graph
             .parse_all(&mut |t| {
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
                     tx.send(Message::Resource {
@@ -89,9 +89,8 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 Ok(()) as Result<(), TurtleError>
             })
             .unwrap();
-        eprintln!("\nThread for {:?} finished", path);
-        println!("PREFIXES : {:?}", parser.prefixes());
-        for (alias, namespace) in parser.prefixes().iter() {
+        println!("PREFIXES : {:?}", graph.prefixes());
+        for (alias, namespace) in graph.prefixes().iter() {
             tx.send(Message::PrefixDecl {
                 namespace: namespace.to_string(),
                 alias: alias.to_string(),
@@ -101,5 +100,3 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
         tx.send(Message::Finished).unwrap();
     });
 }
-
-fn cenas(p: TurtleParser<R: BufRead>) {}
