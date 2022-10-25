@@ -13,6 +13,8 @@ mod extract;
 mod parse;
 use parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
+mod prefixes;
+use prefixes::prefixcc;
 
 pub enum Message {
     Resource { iri: String },
@@ -23,7 +25,7 @@ pub enum Message {
 fn main() {
     let cli = Cli::parse();
 
-    let mut pref_trie = trie_generic::Trie::<String>::new(None);
+    let mut pref_trie = prefixcc::load();
     let mut iri_trie = build_iri_trie(cli.files, &mut pref_trie);
 
     println!("\nResource Trie\n{}", iri_trie.pp(false));
@@ -35,6 +37,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut Trie<String>) -> Trie<i32
     let pool: ThreadPool = ThreadPool::new(n_workers);
     let mut running = paths.len();
     let (tx, rx) = channel::<Message>();
+
     for path in paths {
         spawn(&pool, &tx, path);
     }

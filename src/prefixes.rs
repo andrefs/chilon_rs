@@ -1,1 +1,1 @@
-mod prefixcc;
+pub mod prefixcc;
