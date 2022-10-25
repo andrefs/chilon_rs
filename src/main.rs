@@ -1,7 +1,8 @@
 use clap::Parser;
 use rio_api::parser::TriplesParser;
-use rio_turtle::TurtleError;
+use rio_turtle::{TurtleError, TurtleParser};
 use std::{
+    io::BufRead,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -32,6 +33,8 @@ fn main() {
     let mut running = cli.files.len();
     let mut res_trie = trie_generic::Trie::<i32>::new(None);
     let mut pref_trie = trie_generic::Trie::<String>::new(None);
+    let mut res_count = 0;
+    let mut res_length = 0;
 
     loop {
         if running == 0 {
@@ -39,7 +42,11 @@ fn main() {
         }
         if let Ok(message) = rx.recv() {
             match message {
-                Message::Resource { iri } => res_trie.add(&iri, Some(1)),
+                Message::Resource { iri } => {
+                    res_trie.add(&iri, Some(1));
+                    res_count += 1;
+                    res_length += iri.len();
+                }
                 Message::PrefixDecl { namespace, alias } => {
                     pref_trie.add(&namespace, Some(alias.to_owned()));
                 }
@@ -49,6 +56,8 @@ fn main() {
             }
         }
     }
+
+    println!("Avg res length {}", res_length / res_count);
 
     println!("\nResource Trie\n{}", res_trie.pp(false));
     println!("\nPrefix Trie\n{}", pref_trie.pp(true));
@@ -92,3 +101,5 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
         tx.send(Message::Finished).unwrap();
     });
 }
+
+fn cenas(p: TurtleParser<R: BufRead>) {}
