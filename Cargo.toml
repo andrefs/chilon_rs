@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-trie-generic = "0.1.5"
+trie-generic = "0.1.6"
 rio_turtle = "0.7.1"
 rio_api = "0.7.1"
 bzip2 = "0.4.3"
