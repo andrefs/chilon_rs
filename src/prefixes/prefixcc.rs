@@ -27,18 +27,22 @@ pub fn download() {
     parse(fixed);
 }
 
-pub fn parse(ttl: String) -> Trie<String> {
+pub fn parse<'a>(ttl: String) -> Trie<String> {
     let mut parser = TurtleParser::new(ttl.as_ref(), None);
     parser
         .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
         .unwrap();
     let pfs = parser.prefixes();
-    let pref_hash = pfs.to_owned();
+    let pref_hash: HashMap<String, String> = pfs
+        .iter()
+        .map(|(alias, namespace)| (alias.to_owned(), namespace.to_owned()))
+        .collect();
 
-    return build_namespace_trie(pref_hash);
+    let trie = build_namespace_trie(pref_hash);
+    return trie;
 }
 
-pub fn load() -> Trie<String> {
+pub fn load<'a>() -> Trie<String> {
     if !Path::new(PCC_PATH).exists() {
         download();
     }
@@ -49,7 +53,7 @@ pub fn load() -> Trie<String> {
     return parse(s);
 }
 
-pub fn build_namespace_trie(pref_hash: HashMap<String, String>) -> Trie<String> {
+pub fn build_namespace_trie<'a>(pref_hash: HashMap<String, String>) -> Trie<String> {
     let mut t = Trie::new(None);
     for (alias, namespace) in pref_hash.iter() {
         t.add(namespace, Some(alias.to_owned()));
