@@ -1,3 +1,4 @@
+use qp_trie::{wrapper::BString, Trie};
 use regex::Regex;
 use rio_api::parser::TriplesParser;
 use rio_turtle::{TurtleError, TurtleParser};
@@ -7,7 +8,6 @@ use std::{
     io::{BufReader, Read},
     path::Path,
 };
-use trie_generic::Trie;
 use ureq;
 
 const PCC_URL: &str = "https://prefix.cc/popular/all.file.ttl";
@@ -27,7 +27,7 @@ pub fn download() {
     parse(fixed);
 }
 
-pub fn parse<'a>(ttl: String) -> Trie<String> {
+pub fn parse<'a>(ttl: String) -> Box<Trie<BString, Box<Option<String>>>> {
     let mut parser = TurtleParser::new(ttl.as_ref(), None);
     parser
         .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
@@ -42,7 +42,7 @@ pub fn parse<'a>(ttl: String) -> Trie<String> {
     return trie;
 }
 
-pub fn load<'a>() -> Trie<String> {
+pub fn load<'a>() -> Box<Trie<BString, Box<Option<String>>>> {
     if !Path::new(PCC_PATH).exists() {
         download();
     }
@@ -53,10 +53,12 @@ pub fn load<'a>() -> Trie<String> {
     return parse(s);
 }
 
-pub fn build_namespace_trie<'a>(pref_hash: HashMap<String, String>) -> Trie<String> {
-    let mut t = Trie::new(None);
+pub fn build_namespace_trie<'a>(
+    pref_hash: HashMap<String, String>,
+) -> Box<Trie<BString, Box<Option<String>>>> {
+    let mut t = Box::new(Trie::new());
     for (alias, namespace) in pref_hash.iter() {
-        t.add(namespace, Some(alias.to_owned()));
+        t.insert_str(namespace, Box::new(Some(alias.to_owned())));
     }
     return t;
 }
