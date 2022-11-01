@@ -3,6 +3,7 @@ use qp_trie::{wrapper::BString, Trie};
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -14,7 +15,7 @@ mod parse;
 use parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
 mod prefixes;
-use prefixes::prefixcc::{self, PrefixTrie};
+use prefixes::prefixcc::{self, PrefixMap};
 
 pub enum Message {
     Resource { iri: String },
@@ -25,16 +26,31 @@ pub enum Message {
 fn main() {
     let cli = Cli::parse();
 
-    let mut pref_trie = prefixcc::load();
-    let mut iri_trie = build_iri_trie(cli.files, &mut pref_trie);
+    let mut ns_map = prefixcc::load();
+    //println!("\nNamespace Map\n{:#?}", ns_map);
+    // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
+    let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
+    println!("\nResource Trie\n{}", iri_trie.count());
+    remove_known_prefixes(&ns_map, &mut iri_trie);
 
-    println!("\nResource Trie\n{:#?}", iri_trie);
-    println!("\nPrefix Trie\n{:#?}", pref_trie);
+    println!("\nResource Trie (cleaned)\n{}", iri_trie.count());
+    //println!("\nPrefix Trie\n{:#?}", ns_map);
+}
+
+fn remove_known_prefixes(ns_map: &HashMap<String, String>, iri_trie: &mut IriTrie) {
+    for (_, namespace) in ns_map.iter() {
+        println!(
+            "{}  {namespace}",
+            iri_trie.subtrie_str(namespace).iter().count()
+        );
+
+        iri_trie.remove_prefix_str(namespace);
+    }
 }
 
 pub type IriTrie = Box<Trie<BString, Box<Option<u8>>>>; // todo finish
 
-fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut PrefixTrie) -> IriTrie {
+fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
     let pool: ThreadPool = ThreadPool::new(n_workers);
     let mut running = paths.len();
@@ -55,7 +71,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut PrefixTrie) -> IriTrie {
                     iri_trie.insert_str(&iri, Box::new(Some(1)));
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    pref_trie.insert_str(&namespace, Box::new(Some(alias.to_owned())));
+                    ns_map.insert(alias.to_owned(), namespace);
                 }
                 Message::Finished => {
                     running -= 1;
@@ -94,7 +110,7 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 Ok(()) as Result<(), TurtleError>
             })
             .unwrap();
-        println!("PREFIXES : {:?}", graph.prefixes());
+        //println!("PREFIXES : {:?}", graph.prefixes());
         for (alias, namespace) in graph.prefixes().iter() {
             tx.send(Message::PrefixDecl {
                 namespace: namespace.to_string(),
