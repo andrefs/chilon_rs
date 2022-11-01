@@ -13,6 +13,38 @@ pub struct Node<T> {
     children: BTreeMap<char, Node<T>>,
 }
 
+impl<T: Display> Node<T> {
+    pub fn pp(&self, print_value: bool) -> String {
+        self.pp_fn(0, print_value)
+    }
+
+    fn pp_fn(&self, indent: u8, print_value: bool) -> String {
+        let mut res = "".to_string();
+        // print value
+        if self.children.is_empty() {
+            if print_value {
+                res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
+            }
+            res.push('\n');
+            return res;
+        }
+        let child_count = self.children.iter().count();
+        for (k, v) in self.children.iter() {
+            if self.is_terminal || child_count > 1 {
+                if indent != 0 {
+                    res.push('\n');
+                }
+                res.push_str(&" ".repeat(indent.into()));
+            }
+
+            res.push_str(&k.to_string());
+            res.push_str(v.pp_fn(indent + 1, print_value).as_str());
+        }
+
+        return res;
+    }
+}
+
 impl<T> Node<T> {
     pub fn new() -> Node<T> {
         Node {
@@ -22,7 +54,7 @@ impl<T> Node<T> {
         }
     }
 
-    pub fn is_leaf(&mut self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
 
@@ -65,6 +97,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn pretty_print() {
+        let t: Node<u8> = Node {
+            is_terminal: false,
+            value: None,
+            children: BTreeMap::from([
+                (
+                    'a',
+                    Node {
+                        is_terminal: true,
+                        value: None,
+                        children: BTreeMap::from([(
+                            'b',
+                            Node {
+                                is_terminal: false,
+                                value: None,
+                                children: BTreeMap::from([(
+                                    'c',
+                                    Node {
+                                        is_terminal: true,
+                                        value: None,
+                                        children: BTreeMap::new(),
+                                    },
+                                )]),
+                            },
+                        )]),
+                    },
+                ),
+                (
+                    'd',
+                    Node {
+                        is_terminal: true,
+                        value: None,
+                        children: BTreeMap::new(),
+                    },
+                ),
+                (
+                    'e',
+                    Node {
+                        is_terminal: true,
+                        value: None,
+                        children: BTreeMap::new(),
+                    },
+                ),
+            ]),
+        };
+        assert_eq!(t.pp(false), "a\n bc\nd\ne\n")
+    }
+
+    #[test]
     fn insert_to_empty_trie() {
         let mut t = Node::new();
         t.insert("a", 1);
@@ -76,14 +157,14 @@ mod tests {
         assert_eq!(subt.is_terminal, true);
     }
 
-    //#[test]
-    //fn insert_single_char_string() {
-    //    let mut t = Node::new();
-    //    t.insert("a", 1);
-    //    t.insert("ab", 2);
-    //    t.insert("c", 3);
-    //    t.insert("de", 4);
-    //    println!("{:#?}", t);
-    //    assert_eq!(format!("{:#?}", t), "a\n b\nc\nd\n")
-    //}
+    #[test]
+    fn insert_single_char_string() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("ab", 2);
+        t.insert("c", 3);
+        t.insert("de", 4);
+        println!("{:#?}", t);
+        assert_eq!(t.pp(false), "a\n b\nc\nde\n")
+    }
 }
