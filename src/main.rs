@@ -1,4 +1,5 @@
 use clap::Parser;
+use qp_trie::{wrapper::BString, Trie};
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
@@ -6,7 +7,6 @@ use std::{
     sync::mpsc::{channel, Sender},
 };
 use threadpool::ThreadPool;
-use trie_generic::Trie;
 mod args;
 use args::Cli;
 mod extract;
@@ -14,7 +14,7 @@ mod parse;
 use parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
 mod prefixes;
-use prefixes::prefixcc;
+use prefixes::prefixcc::{self, PrefixTrie};
 
 pub enum Message {
     Resource { iri: String },
@@ -28,11 +28,13 @@ fn main() {
     let mut pref_trie = prefixcc::load();
     let mut iri_trie = build_iri_trie(cli.files, &mut pref_trie);
 
-    println!("\nResource Trie\n{}", iri_trie.pp(false));
-    println!("\nPrefix Trie\n{}", pref_trie.pp(true));
+    println!("\nResource Trie\n{:#?}", iri_trie);
+    println!("\nPrefix Trie\n{:#?}", pref_trie);
 }
 
-fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut Trie<String>) -> Trie<i32> {
+pub type IriTrie = Box<Trie<BString, Box<Option<u8>>>>; // todo finish
+
+fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut PrefixTrie) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
     let pool: ThreadPool = ThreadPool::new(n_workers);
     let mut running = paths.len();
@@ -41,7 +43,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut Trie<String>) -> Trie<i32
     for path in paths {
         spawn(&pool, &tx, path);
     }
-    let mut iri_trie = trie_generic::Trie::<i32>::new(None);
+    let mut iri_trie = Box::new(Trie::new());
 
     loop {
         if running == 0 {
@@ -50,10 +52,10 @@ fn build_iri_trie(paths: Vec<PathBuf>, pref_trie: &mut Trie<String>) -> Trie<i32
         if let Ok(message) = rx.recv() {
             match message {
                 Message::Resource { iri } => {
-                    iri_trie.add(&iri, Some(1));
+                    iri_trie.insert_str(&iri, Box::new(Some(1)));
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    pref_trie.add(&namespace, Some(alias.to_owned()));
+                    pref_trie.insert_str(&namespace, Box::new(Some(alias.to_owned())));
                 }
                 Message::Finished => {
                     running -= 1;

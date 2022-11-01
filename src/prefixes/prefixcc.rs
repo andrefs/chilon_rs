@@ -27,7 +27,7 @@ pub fn download() {
     parse(fixed);
 }
 
-pub fn parse<'a>(ttl: String) -> Box<Trie<BString, Box<Option<String>>>> {
+pub fn parse<'a>(ttl: String) -> PrefixTrie {
     let mut parser = TurtleParser::new(ttl.as_ref(), None);
     parser
         .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
@@ -42,7 +42,7 @@ pub fn parse<'a>(ttl: String) -> Box<Trie<BString, Box<Option<String>>>> {
     return trie;
 }
 
-pub fn load<'a>() -> Box<Trie<BString, Box<Option<String>>>> {
+pub fn load<'a>() -> PrefixTrie {
     if !Path::new(PCC_PATH).exists() {
         download();
     }
@@ -53,9 +53,9 @@ pub fn load<'a>() -> Box<Trie<BString, Box<Option<String>>>> {
     return parse(s);
 }
 
-pub fn build_namespace_trie<'a>(
-    pref_hash: HashMap<String, String>,
-) -> Box<Trie<BString, Box<Option<String>>>> {
+pub type PrefixTrie = Box<Trie<BString, Box<Option<String>>>>;
+
+pub fn build_namespace_trie<'a>(pref_hash: HashMap<String, String>) -> PrefixTrie {
     let mut t = Box::new(Trie::new());
     for (alias, namespace) in pref_hash.iter() {
         t.insert_str(namespace, Box::new(Some(alias.to_owned())));
