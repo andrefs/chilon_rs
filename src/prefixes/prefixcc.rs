@@ -1,45 +1,49 @@
-use qp_trie::{wrapper::BString, Trie};
 use regex::Regex;
 use rio_api::parser::TriplesParser;
 use rio_turtle::{TurtleError, TurtleParser};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs::{create_dir_all, write, File},
     io::{BufReader, Read},
     path::Path,
 };
 use ureq;
 
-const PCC_URL: &str = "https://prefix.cc/popular/all.file.ttl";
+const PCC_URL: &str = "https://prefix.cc/popular/all.file.json";
 const PCC_DIR: &str = "cache";
-const PCC_PATH: &str = "cache/prefix.cc.ttl";
+const PCC_PATH: &str = "cache/prefix.cc.json";
 
 pub fn download() {
-    let res = ureq::get(&PCC_URL)
-        .set("Content-Type", "text/turtle")
-        .call()
-        .unwrap();
-    let ttl = res.into_string().unwrap();
-    let fixed = fix_pcc(ttl);
+    let res = ureq::get(&PCC_URL).call().unwrap();
+    let json = res.into_string().unwrap();
+    let map = parse(json);
+    let fixed = fix_pcc(map);
 
     create_dir_all(PCC_DIR).unwrap();
-    write(PCC_PATH, &fixed).unwrap();
-    parse(fixed);
+    write(PCC_PATH, serde_json::to_string_pretty(&fixed).unwrap()).unwrap();
 }
 
-pub fn parse<'a>(ttl: String) -> PrefixMap {
-    let mut parser = TurtleParser::new(ttl.as_ref(), None);
-    parser
-        .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
-        .unwrap();
-    let pfs = parser.prefixes();
-    let pref_hash: HashMap<String, String> = pfs
-        .iter()
-        .map(|(alias, namespace)| (alias.to_owned(), namespace.to_owned()))
-        .collect();
-
-    return pref_hash;
+pub fn parse<'a>(json: String) -> PrefixMap {
+    let m: PrefixMap = serde_json::from_str(json.as_str()).unwrap();
+    m
 }
+
+// pub fn parse<'a>(ttl: String) -> PrefixMap {
+//     let mut parser = TurtleParser::new(ttl.as_ref(), None);
+//     parser
+//         .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
+//         .unwrap();
+//     let pfs = parser.prefixes();
+//     let pref_hash: PrefixMap = pfs
+//         .iter()
+//         .map(|(alias, namespace)| {
+//             println!("  namespace {alias} {namespace}");
+//             (alias.to_owned(), namespace.to_owned())
+//         })
+//         .collect();
+//
+//     return pref_hash;
+// }
 
 pub fn load<'a>() -> PrefixMap {
     if !Path::new(PCC_PATH).exists() {
@@ -49,42 +53,42 @@ pub fn load<'a>() -> PrefixMap {
     let mut buf_reader = BufReader::new(file);
     let mut s = String::new();
     buf_reader.read_to_string(&mut s).unwrap();
-    return parse(s);
+
+    let m: PrefixMap = serde_json::from_str(s.as_str()).unwrap();
+    m
 }
 
-pub type PrefixMap = HashMap<String, String>;
+pub type PrefixMap = BTreeMap<String, String>;
 
-fn fix_pcc(ttl: String) -> String {
-    let lines = ttl.lines();
-    let line_count = lines.clone().count();
-    let fixed = lines.filter(|line| {
-        let re = Regex::new(r"^@prefix\s+(\w+):\s+<(.*)>\s*.$").unwrap();
-        let caps = re.captures(line).unwrap();
-        let alias = caps.get(1).unwrap().as_str();
-        let namespace = caps.get(2).unwrap().as_str();
+fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
+    let entry_count = ns_map.len();
+    let fixed: PrefixMap = ns_map
+        .iter()
+        .filter(|(alias, namespace)| {
+            // TODO improve
+            if alias.contains("walmart") && namespace.contains("amazon.es") {
+                return false;
+            }
+            if alias.contains("movie") && namespace.contains("data.linkedmdb.org/resource/movie") {
+                return false;
+            }
 
-        // TODO improve
-        if alias.contains("walmart") && namespace.contains("amazon.es") {
-            return false;
-        }
-        if alias.contains("movie") && namespace.contains("data.linkedmdb.org/resource/movie") {
-            return false;
-        }
+            if alias.contains("linkedmdb") && namespace.contains("data.linkedmdb.org") {
+                return false;
+            }
 
-        if alias.contains("linkedmdb") && namespace.contains("data.linkedmdb.org") {
-            return false;
-        }
+            // https://www.w3.org/2006/vcard/ns#latitude#"
+            if Regex::new("#.*#").unwrap().is_match(namespace) {
+                return false;
+            }
 
-        // https://www.w3.org/2006/vcard/ns#latitude#"
-        if Regex::new("#.*#").unwrap().is_match(namespace) {
-            return false;
-        }
-
-        return true;
-    });
-    let fixed_count = fixed.clone().count();
-    println!("fix_pcc {} {}", line_count, fixed_count);
-    return fixed.collect::<Vec<_>>().join("");
+            return true;
+        })
+        .map(|(k, v)| ((k.to_owned(), v.to_owned())))
+        .collect();
+    let fixed_count = fixed.len();
+    println!("fix_pcc {} {}", entry_count, fixed_count);
+    fixed
 }
 
 //  @prefix walmart:    <https://www.amazon.de/>.

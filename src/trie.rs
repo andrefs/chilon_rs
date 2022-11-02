@@ -25,7 +25,6 @@ impl<T: Display> Node<T> {
             if print_value {
                 res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
             }
-            res.push('\n');
             return res;
         }
         let child_count = self.children.iter().count();
@@ -45,7 +44,7 @@ impl<T: Display> Node<T> {
     }
 }
 
-impl<T> Node<T> {
+impl<T: Debug> Node<T> {
     pub fn new() -> Node<T> {
         Node {
             value: None,
@@ -56,6 +55,21 @@ impl<T> Node<T> {
 
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
+    }
+
+    pub fn count_nodes(&self) -> u32 {
+        return self
+            .children
+            .iter()
+            .fold(self.children.len() as u32, |acc, (_, v)| {
+                acc + v.count_nodes()
+            });
+    }
+
+    pub fn count_terminals(&self) -> u32 {
+        return self.children.iter().fold(0, |acc, (_, v)| {
+            acc + if v.is_terminal { 1 } else { 0 } + v.count_terminals()
+        });
     }
 
     pub fn insert<Q: ?Sized>(&mut self, key: &Q, value: T) -> Option<T>
@@ -87,6 +101,57 @@ impl<T> Node<T> {
         let res = new_node.insert(rest, value);
         self.children.insert(first_char, new_node);
         res
+    }
+
+    pub fn remove(&mut self, key: &str, remove_subtree: bool) -> bool {
+        println!("    {} remove {}", key, self.count_terminals());
+        let res = self.remove_fn(key, remove_subtree).1;
+        println!("        removed {}", self.count_terminals());
+        res
+    }
+
+    fn remove_fn(&mut self, str_left: &str, remove_subtree: bool) -> (bool, bool) {
+        let first_char = str_left.chars().next().unwrap();
+        let rest = &str_left[first_char.len_utf8()..];
+        println!(
+            "    {first_char} {rest} remove_fn  {} ",
+            self.count_terminals()
+        );
+
+        if self.children.is_empty() {
+            return (false, false);
+        }
+
+        if !self.children.contains_key(&first_char) {
+            return (false, false);
+        }
+
+        if rest.is_empty() {
+            let sub_node = self.children.get_mut(&first_char).unwrap();
+            if sub_node.children.is_empty() || remove_subtree {
+                let removed = self.children.remove(&first_char).is_some();
+                let bubble_up = removed && !self.is_terminal;
+                return (bubble_up, removed);
+            }
+
+            if !sub_node.is_terminal {
+                return (false, false);
+            }
+            sub_node.is_terminal = false;
+            return (true, true);
+        } else {
+            let (bubble_up, removed) = self
+                .children
+                .get_mut(&first_char)
+                .unwrap()
+                .remove_fn(rest, remove_subtree);
+            if bubble_up {
+                let removed = self.children.remove(&first_char).is_some();
+                let bubble_up = removed && !self.is_terminal;
+                return (bubble_up, removed);
+            }
+            return (false, removed);
+        }
     }
 }
 
@@ -167,4 +232,55 @@ mod tests {
         println!("{:#?}", t);
         assert_eq!(t.pp(false), "a\n b\nc\nde\n")
     }
+
+    #[test]
+    fn remove() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        t.insert("abcd", 3);
+
+        assert!(!t.remove("ab", false));
+        //assert!(t.contains_key("a"));
+        //assert!(t.contains_key("abc"));
+        //assert!(t.contains_key("abcd"));
+
+        assert!(t.remove("abc", true));
+        //assert!(t.contains_key("a"));
+        //assert!(!t.contains_key("abc"));
+        //assert!(!t.contains_key("abcd"));
+
+        assert!(t.remove("a", false));
+    }
+
+    //#[test]
+    //fn remove_non_terminal() {
+    //    let mut t = TNode::Empty;
+    //    t.add("a", &Some(1)).unwrap();
+    //    t.add("abc", &Some(2)).unwrap();
+    //    t.remove("abc", false);
+    //    println!("{}", t.pp(true));
+    //    let expected = "a\n";
+    //    assert_eq!(t.pp(false), expected);
+    //}
+    //#[test]
+    //fn remove_subtree() {
+    //    let mut t = TNode::Empty;
+    //    t.add("a", &Some(1)).unwrap();
+    //    t.add("abc", &Some(2)).unwrap();
+    //    t.remove("ab", true);
+    //    println!("{}", t.pp(true));
+    //    let expected = "a\n";
+    //    assert_eq!(t.pp(false), expected);
+    //}
+    //#[test]
+    //fn remove_non_existing() {
+    //    let mut t = TNode::Empty;
+    //    t.add("a", &Some(1)).unwrap();
+    //    t.add("abc", &Some(2)).unwrap();
+    //    let expected = t.pp(false);
+    //    t.remove("xyz", true);
+    //    println!("{}", t.pp(true));
+    //    assert_eq!(t.pp(false), expected);
+    //}
 }
