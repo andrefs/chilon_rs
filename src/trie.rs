@@ -20,14 +20,10 @@ impl<T: Display> Node<T> {
     fn pp_fn(&self, indent: u8, print_value: bool) -> String {
         let mut res = "".to_string();
         // print value
-        if self.children.is_empty() {
-            if print_value {
-                res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
-            }
-            res.push('\n');
-            return res;
+        if print_value && self.value.is_some() {
+            res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
         }
-        if self.is_terminal {
+        if self.children.is_empty() || self.is_terminal {
             res.push('\n');
         }
         for (k, v) in self.children.iter() {
