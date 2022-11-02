@@ -29,15 +29,17 @@ fn main() {
     let mut ns_map = prefixcc::load();
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
-    println!("\nNamespace Map\n{:#?}", ns_map.len());
-    println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
-    println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
+    //println!("\nNamespace Map\n{:#?}", ns_map.len());
+    //println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
+    //println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
+    println!("\nIri Trie\n{}", iri_trie.pp(true));
     println!("\nremoving\n");
     remove_known_prefixes(&ns_map, &mut iri_trie);
     //
     //println!("\nNamespace Map\n{:#?}", ns_map);
-    println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
-    println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
+    println!("\nIri Trie\n{}", iri_trie.pp(true));
+    //println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
+    //println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
 }
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {

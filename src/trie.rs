@@ -104,19 +104,13 @@ impl<T: Debug> Node<T> {
     }
 
     pub fn remove(&mut self, key: &str, remove_subtree: bool) -> bool {
-        println!("    {} remove {}", key, self.count_terminals());
         let res = self.remove_fn(key, remove_subtree).1;
-        println!("        removed {}", self.count_terminals());
         res
     }
 
     fn remove_fn(&mut self, str_left: &str, remove_subtree: bool) -> (bool, bool) {
         let first_char = str_left.chars().next().unwrap();
         let rest = &str_left[first_char.len_utf8()..];
-        println!(
-            "    {first_char} {rest} remove_fn  {} ",
-            self.count_terminals()
-        );
 
         if self.children.is_empty() {
             return (false, false);
@@ -129,9 +123,14 @@ impl<T: Debug> Node<T> {
         if rest.is_empty() {
             let sub_node = self.children.get_mut(&first_char).unwrap();
             if sub_node.children.is_empty() || remove_subtree {
-                let removed = self.children.remove(&first_char).is_some();
-                let bubble_up = removed && !self.is_terminal;
-                return (bubble_up, removed);
+                let old_node = self.children.remove(&first_char);
+                match old_node {
+                    None => return (false, false),
+                    Some(_) => {
+                        let bubble_up = self.children.is_empty();
+                        return (bubble_up, true);
+                    }
+                }
             }
 
             if !sub_node.is_terminal {
@@ -147,7 +146,7 @@ impl<T: Debug> Node<T> {
                 .remove_fn(rest, remove_subtree);
             if bubble_up {
                 let removed = self.children.remove(&first_char).is_some();
-                let bubble_up = removed && !self.is_terminal;
+                let bubble_up = removed && !self.is_terminal && self.children.is_empty();
                 return (bubble_up, removed);
             }
             return (false, removed);
