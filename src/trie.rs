@@ -122,7 +122,7 @@ impl<T: Debug> Node<T> {
                 match old_node {
                     None => return (false, false),
                     Some(_) => {
-                        let bubble_up = self.children.is_empty();
+                        let bubble_up = self.children.is_empty() && !self.is_terminal;
                         return (bubble_up, true);
                     }
                 }
@@ -263,7 +263,6 @@ mod tests {
         t.insert("a", 1);
         t.insert("abc", 2);
         t.remove("ab", true);
-        println!("{}", t.pp(true));
         let expected = "a\n";
         assert_eq!(t.pp(false), expected);
     }
