@@ -1,8 +1,6 @@
 use regex::Regex;
-use rio_api::parser::TriplesParser;
-use rio_turtle::{TurtleError, TurtleParser};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fs::{create_dir_all, write, File},
     io::{BufReader, Read},
     path::Path,
@@ -28,23 +26,6 @@ pub fn parse<'a>(json: String) -> PrefixMap {
     m
 }
 
-// pub fn parse<'a>(ttl: String) -> PrefixMap {
-//     let mut parser = TurtleParser::new(ttl.as_ref(), None);
-//     parser
-//         .parse_all(&mut |_| Ok(()) as Result<(), TurtleError>)
-//         .unwrap();
-//     let pfs = parser.prefixes();
-//     let pref_hash: PrefixMap = pfs
-//         .iter()
-//         .map(|(alias, namespace)| {
-//             println!("  namespace {alias} {namespace}");
-//             (alias.to_owned(), namespace.to_owned())
-//         })
-//         .collect();
-//
-//     return pref_hash;
-// }
-
 pub fn load<'a>() -> PrefixMap {
     if !Path::new(PCC_PATH).exists() {
         download();
@@ -61,7 +42,6 @@ pub fn load<'a>() -> PrefixMap {
 pub type PrefixMap = BTreeMap<String, String>;
 
 fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
-    let entry_count = ns_map.len();
     let fixed: PrefixMap = ns_map
         .iter()
         .filter(|(alias, namespace)| {
@@ -86,8 +66,6 @@ fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
         })
         .map(|(k, v)| ((k.to_owned(), v.to_owned())))
         .collect();
-    let fixed_count = fixed.len();
-    println!("fix_pcc {} {}", entry_count, fixed_count);
     fixed
 }
 

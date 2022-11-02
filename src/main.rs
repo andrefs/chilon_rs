@@ -3,7 +3,6 @@ use clap::Parser;
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
-    collections::HashMap,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -29,17 +28,9 @@ fn main() {
     let mut ns_map = prefixcc::load();
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
-    //println!("\nNamespace Map\n{:#?}", ns_map.len());
-    //println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
-    //println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
-    println!("\nIri Trie\n{}", iri_trie.pp(true));
-    println!("\nremoving\n");
+    println!("Total IRIs: {}", iri_trie.count_terminals());
     remove_known_prefixes(&ns_map, &mut iri_trie);
-    //
-    //println!("\nNamespace Map\n{:#?}", ns_map);
-    println!("\nIri Trie\n{}", iri_trie.pp(true));
-    //println!("\nIri Trie nodes\n{}", iri_trie.count_nodes());
-    //println!("\nIri Trie terminals\n{}", iri_trie.count_terminals());
+    println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 }
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
@@ -71,7 +62,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                     iri_trie.insert(&iri, 1);
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    // ns_map.push((alias.to_owned(), namespace));
+                    ns_map.insert(alias.to_owned(), namespace);
                 }
                 Message::Finished => {
                     running -= 1;
