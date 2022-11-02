@@ -24,14 +24,14 @@ impl<T: Display> Node<T> {
             if print_value {
                 res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
             }
+            res.push('\n');
             return res;
         }
-        let child_count = self.children.iter().count();
+        if self.is_terminal {
+            res.push('\n');
+        }
         for (k, v) in self.children.iter() {
-            if self.is_terminal || child_count > 1 {
-                if indent != 0 {
-                    res.push('\n');
-                }
+            if self.is_terminal {
                 res.push_str(&" ".repeat(indent.into()));
             }
 
@@ -251,34 +251,34 @@ mod tests {
         assert!(t.remove("a", false));
     }
 
-    //#[test]
-    //fn remove_non_terminal() {
-    //    let mut t = TNode::Empty;
-    //    t.add("a", &Some(1)).unwrap();
-    //    t.add("abc", &Some(2)).unwrap();
-    //    t.remove("abc", false);
-    //    println!("{}", t.pp(true));
-    //    let expected = "a\n";
-    //    assert_eq!(t.pp(false), expected);
-    //}
-    //#[test]
-    //fn remove_subtree() {
-    //    let mut t = TNode::Empty;
-    //    t.add("a", &Some(1)).unwrap();
-    //    t.add("abc", &Some(2)).unwrap();
-    //    t.remove("ab", true);
-    //    println!("{}", t.pp(true));
-    //    let expected = "a\n";
-    //    assert_eq!(t.pp(false), expected);
-    //}
-    //#[test]
-    //fn remove_non_existing() {
-    //    let mut t = TNode::Empty;
-    //    t.add("a", &Some(1)).unwrap();
-    //    t.add("abc", &Some(2)).unwrap();
-    //    let expected = t.pp(false);
-    //    t.remove("xyz", true);
-    //    println!("{}", t.pp(true));
-    //    assert_eq!(t.pp(false), expected);
-    //}
+    #[test]
+    fn remove_non_terminal() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        t.remove("abc", false);
+        println!("{}", t.pp(true));
+        let expected = "a\n";
+        assert_eq!(t.pp(false), expected);
+    }
+    #[test]
+    fn remove_subtree() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        t.remove("ab", true);
+        println!("{}", t.pp(true));
+        let expected = "a\n";
+        assert_eq!(t.pp(false), expected);
+    }
+    #[test]
+    fn remove_non_existing() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        let expected = t.pp(false);
+        t.remove("xyz", true);
+        println!("{}", t.pp(true));
+        assert_eq!(t.pp(false), expected);
+    }
 }
