@@ -147,6 +147,19 @@ impl<T: Debug> Node<T> {
             return (false, removed);
         }
     }
+
+    pub fn traverse(&self, f: &impl Fn(String, &T)) {
+        self.traverse_fn("".to_owned(), f)
+    }
+
+    fn traverse_fn(&self, str_acc: String, f: &impl Fn(String, &T)) {
+        if let Some(v) = &self.value {
+            f(str_acc.clone(), v);
+        }
+        for (c, n) in self.children.iter() {
+            n.traverse_fn(format!("{}{}", str_acc, c), f);
+        }
+    }
 }
 
 #[cfg(test)]
