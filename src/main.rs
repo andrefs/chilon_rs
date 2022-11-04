@@ -110,7 +110,8 @@ fn main() {
     remove_known_prefixes(&ns_map, &mut iri_trie);
     println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
-    iri_trie.traverse(&|key, value| println!("{key} [{:#?}]", value))
+    //iri_trie.traverse(&|key, value| println!("{key} [{:#?}]", value))
+    println!("{:#?}", iri_trie);
 }
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
@@ -153,6 +154,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                             terminal: None,
                         },
                     );
+                    //iri_trie.insert(&iri, stats);
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     ns_map.insert(alias.to_owned(), namespace);
