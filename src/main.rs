@@ -16,10 +16,88 @@ use rio_api::model::{NamedNode, Subject, Term};
 mod prefixes;
 use prefixes::prefixcc::{self, PrefixMap};
 
+pub enum TriplePos {
+    S,
+    P,
+    O,
+}
+
 pub enum Message {
-    Resource { iri: String },
+    Resource { iri: String, position: TriplePos },
     PrefixDecl { namespace: String, alias: String },
     Finished,
+}
+
+// Represents occurrences as subject, predicate or object
+#[derive(Debug, Default)]
+pub struct Stats {
+    s: u32,
+    p: u32,
+    o: u32,
+    total: u32,
+}
+
+// Each node keeps its own stats (if terminal) and its descendants stats
+#[derive(Debug)]
+pub struct NodeStats {
+    own: Option<Stats>,
+    desc: Stats,
+}
+
+impl NodeStats {
+    fn new() -> NodeStats {
+        NodeStats {
+            own: None,
+            desc: Default::default(),
+        }
+    }
+
+    fn new_terminal(pos: TriplePos) -> NodeStats {
+        NodeStats {
+            own: match pos {
+                TriplePos::S => Some(Stats {
+                    s: 1,
+                    ..Default::default()
+                }),
+                TriplePos::P => Some(Stats {
+                    p: 1,
+                    ..Default::default()
+                }),
+                TriplePos::O => Some(Stats {
+                    o: 1,
+                    ..Default::default()
+                }),
+            },
+            desc: Default::default(),
+        }
+    }
+}
+impl Default for NodeStats {
+    fn default() -> Self {
+        NodeStats {
+            own: None,
+            desc: Default::default(),
+        }
+    }
+}
+
+impl Stats {
+    fn inc(&mut self, pos: TriplePos) {
+        match pos {
+            TriplePos::S => self.inc_s(),
+            TriplePos::P => self.inc_p(),
+            TriplePos::O => self.inc_o(),
+        }
+    }
+    fn inc_s(&mut self) {
+        self.s += 1;
+    }
+    fn inc_p(&mut self) {
+        self.p += 1;
+    }
+    fn inc_o(&mut self) {
+        self.o += 1;
+    }
 }
 
 fn main() {
@@ -32,7 +110,6 @@ fn main() {
     remove_known_prefixes(&ns_map, &mut iri_trie);
     println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
-    iri_trie.traverse_mut(&mut |_, value| *value = *value * 2);
     iri_trie.traverse(&|key, value| println!("{key} [{:#?}]", value))
 }
 
@@ -42,7 +119,7 @@ fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
     }
 }
 
-pub type IriTrie = Node<u32>; // todo finish
+pub type IriTrie = Node<NodeStats>; // todo finish
 
 fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
@@ -53,7 +130,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
     for path in paths {
         spawn(&pool, &tx, path);
     }
-    let mut iri_trie = Node::new();
+    let mut iri_trie = Node::<NodeStats>::new();
 
     loop {
         if running == 0 {
@@ -61,8 +138,9 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
         }
         if let Ok(message) = rx.recv() {
             match message {
-                Message::Resource { iri } => {
-                    iri_trie.insert(&iri, 1);
+                Message::Resource { iri, position } => {
+                    let stats = NodeStats::new_terminal(position);
+                    iri_trie.insert(&iri, stats);
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     ns_map.insert(alias.to_owned(), namespace);
@@ -87,16 +165,19 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
                     tx.send(Message::Resource {
                         iri: iri.to_owned(),
+                        position: TriplePos::S,
                     })
                     .unwrap();
                 }
                 tx.send(Message::Resource {
                     iri: t.predicate.iri.to_owned(),
+                    position: TriplePos::P,
                 })
                 .unwrap();
                 if let Term::NamedNode(NamedNode { iri }) = t.object {
                     tx.send(Message::Resource {
                         iri: iri.to_owned(),
+                        position: TriplePos::O,
                     })
                     .unwrap();
                 }
