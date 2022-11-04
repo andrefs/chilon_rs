@@ -1,4 +1,4 @@
-use chilon_rs::Node;
+use chilon_rs::{trie::InsertFns, Node};
 use clap::Parser;
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
@@ -121,6 +121,11 @@ fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
 
 pub type IriTrie = Node<NodeStats>; // todo finish
 
+fn add_stats(n: &mut Node<NodeStats>) {
+    let mut new_stats = NodeStats::new();
+    n.value = Some(new_stats);
+}
+
 fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
     let pool: ThreadPool = ThreadPool::new(n_workers);
@@ -140,7 +145,14 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
             match message {
                 Message::Resource { iri, position } => {
                     let stats = NodeStats::new_terminal(position);
-                    iri_trie.insert(&iri, stats);
+                    iri_trie.insert_fn(
+                        &iri,
+                        stats,
+                        InsertFns {
+                            branch: Some(&add_stats),
+                            terminal: None,
+                        },
+                    );
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     ns_map.insert(alias.to_owned(), namespace);

@@ -7,14 +7,14 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
-    value: Option<T>,
+    pub value: Option<T>,
     is_terminal: bool,
     children: BTreeMap<char, Node<T>>,
 }
 
 pub struct InsertFns<'a, T, Q> {
-    branch: Option<&'a dyn Fn(Node<T>) -> Q>,
-    terminal: Option<&'a dyn Fn(Node<T>) -> Q>,
+    pub branch: Option<&'a dyn Fn(&mut Node<T>) -> Q>,
+    pub terminal: Option<&'a dyn Fn(&Node<T>) -> Q>,
 }
 
 impl<T: Display> Node<T> {
@@ -93,7 +93,11 @@ impl<T: Debug> Node<T> {
         let k: &str = key.borrow();
         if k.is_empty() {
             self.is_terminal = true;
-            return mem::replace(&mut self.value, Some(value));
+            let old_val = mem::replace(&mut self.value, Some(value));
+            if let Some(f) = fns.terminal {
+                f(&self);
+            }
+            return old_val;
         }
 
         let first_char = k.chars().next().unwrap();
@@ -112,6 +116,9 @@ impl<T: Debug> Node<T> {
             children: BTreeMap::new(),
             value: None,
         };
+        if let Some(f) = fns.branch {
+            f(&mut new_node);
+        }
         let res = new_node.insert_fn(rest, value, fns);
         self.children.insert(first_char, new_node);
         res
