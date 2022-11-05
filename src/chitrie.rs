@@ -1,5 +1,3 @@
-use crate::Node;
-
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default)]
 pub struct Stats {

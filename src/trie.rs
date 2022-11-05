@@ -175,30 +175,53 @@ impl<T: Debug> Node<T> {
     }
 
     pub fn traverse(&self, f: &impl Fn(String, &T)) {
-        self.traverse_fn("".to_owned(), f)
+        self.traverse_aux("".to_owned(), f, &TraverseDirection::Down)
+    }
+    pub fn traverse_up(&self, f: &impl Fn(String, &T)) {
+        self.traverse_aux("".to_owned(), f, &TraverseDirection::Up)
     }
 
-    fn traverse_fn(&self, str_acc: String, f: &impl Fn(String, &T)) {
-        if let Some(v) = &self.value {
-            f(str_acc.clone(), v);
-        }
-        for (c, n) in self.children.iter() {
-            n.traverse_fn(format!("{}{}", str_acc, c), f);
+    fn traverse_aux(
+        &self,
+        str_acc: String,
+        f: &impl Fn(String, &T),
+        direction: &TraverseDirection,
+    ) {
+        if let TraverseDirection::Down = direction {
+            if let Some(v) = &self.value {
+                f(str_acc.clone(), v);
+            }
+            for (c, n) in self.children.iter() {
+                n.traverse_aux(format!("{}{}", str_acc, c), f, direction);
+            }
+        } else {
+            for (c, n) in self.children.iter().rev() {
+                n.traverse_aux(format!("{}{}", str_acc, c), f, direction);
+            }
+            if let Some(v) = &self.value {
+                f(str_acc.clone(), v);
+            }
         }
     }
 
     pub fn traverse_mut(&mut self, f: &impl Fn(String, &mut T)) {
-        self.traverse_mut_fn("".to_owned(), f)
+        self.traverse_mut_aux("".to_owned(), f)
     }
 
-    fn traverse_mut_fn(&mut self, str_acc: String, f: &impl Fn(String, &mut T)) {
+    fn traverse_mut_aux(&mut self, str_acc: String, f: &impl Fn(String, &mut T)) {
         if let Some(v) = &mut self.value {
             f(str_acc.clone(), v);
         }
         for (c, n) in &mut self.children.iter_mut() {
-            n.traverse_mut_fn(format!("{}{}", str_acc, c), f);
+            n.traverse_mut_aux(format!("{}{}", str_acc, c), f);
         }
     }
+}
+
+#[derive(Copy, Clone)]
+pub enum TraverseDirection {
+    Down,
+    Up,
 }
 
 #[cfg(test)]

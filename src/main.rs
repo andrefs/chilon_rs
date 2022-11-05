@@ -36,8 +36,11 @@ fn main() {
     //remove_known_prefixes(&ns_map, &mut iri_trie);
     println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
-    //iri_trie.traverse(&|key, value| println!("{key} [{:#?}]", value))
-    println!("{:#?}", iri_trie);
+    println!("\n\n\ndown");
+    iri_trie.traverse(&|key, value| println!("{key}"));
+    println!("\n\n\nup");
+    iri_trie.traverse_up(&|key, value| println!("{key}"));
+    //println!("{:#?}", iri_trie);
 }
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
