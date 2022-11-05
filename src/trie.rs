@@ -12,9 +12,9 @@ pub struct Node<T> {
     children: BTreeMap<char, Node<T>>,
 }
 
-pub struct InsertFns<'a, T, Q> {
-    pub branch: Option<&'a dyn Fn(&mut Node<T>) -> Q>,
-    pub terminal: Option<&'a dyn Fn(&Node<T>) -> Q>,
+pub struct InsertFns<'a, T, U> {
+    pub branch: Option<&'a dyn Fn(&mut Node<T>) -> U>,
+    pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
 }
 
 impl<T: Display> Node<T> {
@@ -72,9 +72,9 @@ impl<T: Debug> Node<T> {
         });
     }
 
-    pub fn insert<Q: ?Sized>(&mut self, key: &Q, value: T) -> Option<T>
+    pub fn insert<S: ?Sized>(&mut self, key: &S, value: T) -> Option<T>
     where
-        Q: Borrow<str>,
+        S: Borrow<str>,
     {
         return self.insert_fn(
             key,
@@ -86,9 +86,9 @@ impl<T: Debug> Node<T> {
         );
     }
 
-    pub fn insert_fn<S, Q: ?Sized>(&mut self, key: &Q, value: T, fns: InsertFns<T, S>) -> Option<T>
+    pub fn insert_fn<U, S: ?Sized>(&mut self, key: &S, value: T, fns: InsertFns<T, U>) -> Option<T>
     where
-        Q: Borrow<str>,
+        S: Borrow<str>,
     {
         let k: &str = key.borrow();
         if k.is_empty() {
