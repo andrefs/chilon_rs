@@ -8,8 +8,8 @@ use std::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     pub value: Option<T>,
-    is_terminal: bool,
-    children: BTreeMap<char, Node<T>>,
+    pub is_terminal: bool,
+    pub children: BTreeMap<char, Node<T>>,
 }
 
 pub struct InsertFns<'a, T, U> {

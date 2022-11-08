@@ -43,6 +43,21 @@ fn main() {
     //println!("{:#?}", iri_trie);
 }
 
+fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
+    if iri_trie.children.is_empty() {
+        return false;
+    }
+    let mut deleted = false;
+    for (&ch, mut node) in iri_trie.children.iter_mut() {
+        let child_deleted = remove_leaves(&mut node);
+        if child_deleted && !['/', '#'].contains(&ch) {
+            node.children.remove(&ch);
+        }
+        deleted = deleted || child_deleted;
+    }
+    return false;
+}
+
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
     for (_, namespace) in ns_map.iter() {
         iri_trie.remove(namespace, true);
