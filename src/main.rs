@@ -59,7 +59,7 @@ fn remove_leaves_aux(iri_trie: &mut IriTrie, cur_str: String) -> bool {
 
     for (&ch, mut node) in iri_trie.children.iter_mut() {
         let child_deleted = remove_leaves_aux(&mut node, format!("{}{}", cur_str, ch));
-        if !child_deleted && !['/', '#'].contains(&ch) {
+        if !child_deleted && ['/', '#'].contains(&ch) {
             println!("Removing {}{}", cur_str, ch);
             to_remove.push(ch);
             deleted = true;
