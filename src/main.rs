@@ -48,6 +48,9 @@ fn main() {
 }
 
 fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
+    remove_leaves_aux(iri_trie, "".to_string())
+}
+fn remove_leaves_aux(iri_trie: &mut IriTrie, cur_str: String) -> bool {
     if iri_trie.children.is_empty() {
         return false;
     }
@@ -55,8 +58,9 @@ fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
     let mut to_remove = Vec::<char>::new();
 
     for (&ch, mut node) in iri_trie.children.iter_mut() {
-        let child_deleted = remove_leaves(&mut node);
+        let child_deleted = remove_leaves_aux(&mut node, format!("{}{}", cur_str, ch));
         if !child_deleted && !['/', '#'].contains(&ch) {
+            println!("Removing {}{}", cur_str, ch);
             to_remove.push(ch);
             deleted = true;
         }
