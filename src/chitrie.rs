@@ -13,6 +13,7 @@ pub struct NodeStats {
     pub own: Option<Stats>,
     pub desc: Stats,
 }
+#[derive(Clone, Copy, Debug)]
 pub enum TriplePos {
     S,
     P,

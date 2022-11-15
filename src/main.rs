@@ -7,7 +7,6 @@ use clap::Parser;
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
-    collections::BTreeMap,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -80,9 +79,18 @@ fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
 
 pub type IriTrie = Node<NodeStats>; // todo finish
 
-fn add_stats(n: &mut IriTrie) {
+fn init_stats(n: &mut IriTrie) {
     let new_stats = NodeStats::new();
     n.value = Some(new_stats);
+}
+fn add_stats(position: TriplePos) -> impl Fn(&mut Node<NodeStats>) -> () {
+    move |n: &mut IriTrie| {
+        let mut new_stats = NodeStats::new();
+        if n.value.is_none() {
+            n.value = Some(new_stats);
+        }
+        n.value.as_mut().unwrap().desc.inc(position)
+    }
 }
 
 fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
@@ -108,7 +116,7 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                         &iri,
                         stats,
                         InsertFns {
-                            branch: Some(&add_stats),
+                            branch: Some(&add_stats(position)),
                             terminal: None,
                         },
                     );

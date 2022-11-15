@@ -25,7 +25,8 @@ impl<T: Debug> Node<T> {
     fn pp_fn(&self, indent: u8, print_value: bool) -> String {
         let mut res = "".to_string();
         // print value
-        if print_value && self.value.is_some() {
+        //if print_value && self.value.is_some() {
+        if self.value.is_some() {
             res.push_str(format!("  {:?}", self.value.as_ref().unwrap()).as_str());
         }
         let count = self.children.len();
@@ -39,6 +40,7 @@ impl<T: Debug> Node<T> {
 
             res.push_str(&k.to_string());
             res.push_str(v.pp_fn(indent + 1, print_value).as_str());
+            if v.children.is_empty() {}
         }
 
         return res;
@@ -81,14 +83,14 @@ impl<T: Debug> Node<T> {
     where
         S: Borrow<str>,
     {
-        return self.insert_fn(
+        self.insert_fn(
             key,
             value,
             InsertFns::<T, u32> {
                 branch: None,
                 terminal: None,
             },
-        );
+        )
     }
 
     pub fn insert_fn<U, S: ?Sized>(&mut self, key: &S, value: T, fns: InsertFns<T, U>) -> Option<T>
@@ -99,8 +101,15 @@ impl<T: Debug> Node<T> {
         if k.is_empty() {
             self.is_terminal = true;
             let old_val = mem::replace(&mut self.value, Some(value));
-            if let Some(f) = fns.terminal {
-                f(&self);
+
+            if self.is_terminal {
+                if let Some(f) = fns.terminal {
+                    f(&self);
+                }
+            } else {
+                if let Some(f) = fns.branch {
+                    f(self);
+                }
             }
             return old_val;
         }
@@ -109,11 +118,11 @@ impl<T: Debug> Node<T> {
         let rest = &k[first_char.len_utf8()..];
 
         if self.children.contains_key(&first_char) {
-            return self
-                .children
-                .get_mut(&first_char)
-                .unwrap()
-                .insert_fn(rest, value, fns);
+            let mut child_node = self.children.get_mut(&first_char).unwrap();
+            if let Some(f) = fns.branch {
+                f(&mut child_node);
+            }
+            return child_node.insert_fn(rest, value, fns);
         }
 
         let mut new_node = Node {
