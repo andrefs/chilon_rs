@@ -64,6 +64,7 @@ fn remove_leaves_aux(iri_trie: &mut IriTrie, cur_str: String) -> bool {
             to_remove.push(ch);
             deleted = true;
         }
+        deleted = deleted || child_deleted;
     }
     for ch in to_remove.iter() {
         iri_trie.children.remove(ch);
