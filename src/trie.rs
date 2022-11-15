@@ -17,7 +17,7 @@ pub struct InsertFns<'a, T, U> {
     pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
 }
 
-impl<T: Display> Node<T> {
+impl<T: Debug> Node<T> {
     pub fn pp(&self, print_value: bool) -> String {
         self.pp_fn(0, print_value)
     }
@@ -26,13 +26,14 @@ impl<T: Display> Node<T> {
         let mut res = "".to_string();
         // print value
         if print_value && self.value.is_some() {
-            res.push_str(format!("  {}", self.value.as_ref().unwrap()).as_str());
+            res.push_str(format!("  {:?}", self.value.as_ref().unwrap()).as_str());
         }
-        if self.children.is_empty() || self.is_terminal {
+        let count = self.children.len();
+        if self.children.is_empty() || self.is_terminal || count > 1 {
             res.push('\n');
         }
         for (k, v) in self.children.iter() {
-            if self.is_terminal {
+            if self.is_terminal || count > 1 {
                 res.push_str(&" ".repeat(indent.into()));
             }
 
