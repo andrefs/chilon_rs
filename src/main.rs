@@ -7,6 +7,7 @@ use clap::Parser;
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 use std::{
+    collections::BTreeMap,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -38,6 +39,9 @@ fn main() {
 
     println!("\n\n\ndown");
     iri_trie.traverse(&|key, value| println!("{key}"));
+
+    remove_leaves(&mut iri_trie);
+
     println!("\n\n\nup");
     iri_trie.traverse_up(&|key, value| println!("{key}"));
     //println!("{:#?}", iri_trie);
@@ -48,14 +52,19 @@ fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
         return false;
     }
     let mut deleted = false;
+    let mut to_remove = Vec::<(char, &mut Node<NodeStats>)>::new();
+
     for (&ch, mut node) in iri_trie.children.iter_mut() {
         let child_deleted = remove_leaves(&mut node);
-        if child_deleted && !['/', '#'].contains(&ch) {
-            node.children.remove(&ch);
+        if !child_deleted && !['/', '#'].contains(&ch) {
+            to_remove.push((ch, node));
+            deleted = true;
         }
-        deleted = deleted || child_deleted;
     }
-    return false;
+    for (ch, node) in to_remove.iter_mut() {
+        node.children.remove(ch);
+    }
+    return deleted;
 }
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {

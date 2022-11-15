@@ -72,6 +72,10 @@ impl<T: Debug> Node<T> {
         });
     }
 
+    pub fn get_mut(&mut self, ch: char) -> Option<&mut Node<T>> {
+        return self.children.get_mut(&ch);
+    }
+
     pub fn insert<S: ?Sized>(&mut self, key: &S, value: T) -> Option<T>
     where
         S: Borrow<str>,
