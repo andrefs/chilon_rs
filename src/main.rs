@@ -52,17 +52,17 @@ fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
         return false;
     }
     let mut deleted = false;
-    let mut to_remove = Vec::<(char, &mut Node<NodeStats>)>::new();
+    let mut to_remove = Vec::<char>::new();
 
     for (&ch, mut node) in iri_trie.children.iter_mut() {
         let child_deleted = remove_leaves(&mut node);
         if !child_deleted && !['/', '#'].contains(&ch) {
-            to_remove.push((ch, node));
+            to_remove.push(ch);
             deleted = true;
         }
     }
-    for (ch, node) in to_remove.iter_mut() {
-        node.children.remove(ch);
+    for ch in to_remove.iter() {
+        iri_trie.children.remove(ch);
     }
     return deleted;
 }
