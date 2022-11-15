@@ -67,11 +67,14 @@ impl Stats {
     }
     pub fn inc_s(&mut self) {
         self.s += 1;
+        self.total += 1;
     }
     pub fn inc_p(&mut self) {
         self.p += 1;
+        self.total += 1;
     }
     pub fn inc_o(&mut self) {
         self.o += 1;
+        self.total += 1;
     }
 }

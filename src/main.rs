@@ -1,6 +1,6 @@
 use chilon_rs::{
     chitrie::{NodeStats, TriplePos},
-    trie::InsertFns,
+    trie::TraverseFns,
     Node,
 };
 use clap::Parser;
@@ -32,18 +32,21 @@ fn main() {
     let mut ns_map = prefixcc::load();
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
-    println!("Total IRIs: {}", iri_trie.count_terminals());
-    //remove_known_prefixes(&ns_map, &mut iri_trie);
-    println!("Unmatched IRIs: {}", iri_trie.count_terminals());
+    //println!("Total IRIs: {}", iri_trie.count_terminals());
+    ////remove_known_prefixes(&ns_map, &mut iri_trie);
+    //println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
-    println!("\n\n\ndown");
-    iri_trie.traverse(&|key, value| println!("{key}"));
+    //println!("\n\n\ndown");
+    //iri_trie.traverse(&|key, value| println!("{key}"));
 
-    remove_leaves(&mut iri_trie);
+    ////println!("Remove leaves 1: {}", remove_leaves(&mut iri_trie));
+    ////println!("Remove leaves 2: {}", remove_leaves(&mut iri_trie));
+    ////println!("Remove leaves 3: {}", remove_leaves(&mut iri_trie));
 
-    println!("\n\n\nup");
-    iri_trie.traverse_up(&|key, value| println!("{key}"));
-    //println!("{:#?}", iri_trie);
+    //println!("\n\n\nup");
+    //iri_trie.traverse_up(&|key, value| println!("{key}"));
+    println!("{:#?}", iri_trie);
+    println!("{}", iri_trie.pp(true));
 }
 
 fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
@@ -59,7 +62,6 @@ fn remove_leaves_aux(iri_trie: &mut IriTrie, cur_str: String) -> bool {
     for (&ch, mut node) in iri_trie.children.iter_mut() {
         let child_deleted = remove_leaves_aux(&mut node, format!("{}{}", cur_str, ch));
         if !child_deleted && ['/', '#'].contains(&ch) {
-            println!("Removing {}{}", cur_str, ch);
             to_remove.push(ch);
             deleted = true;
         }
@@ -83,7 +85,16 @@ fn init_stats(n: &mut IriTrie) {
     let new_stats = NodeStats::new();
     n.value = Some(new_stats);
 }
-fn add_stats(position: TriplePos) -> impl Fn(&mut Node<NodeStats>) -> () {
+fn inc_stats(position: TriplePos) -> impl Fn(&mut Node<NodeStats>) -> () {
+    move |n: &mut IriTrie| {
+        let mut new_stats = NodeStats::new();
+        if n.value.is_none() {
+            n.value = Some(new_stats);
+        }
+        n.value.as_mut().unwrap().desc.inc(position)
+    }
+}
+fn dec_stats(n: &mut IriTrie) -> impl Fn(&mut Node<NodeStats>) -> () {
     move |n: &mut IriTrie| {
         let mut new_stats = NodeStats::new();
         if n.value.is_none() {
@@ -115,8 +126,8 @@ fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                     iri_trie.insert_fn(
                         &iri,
                         stats,
-                        InsertFns {
-                            branch: Some(&add_stats(position)),
+                        TraverseFns {
+                            branch: Some(&inc_stats(position)),
                             terminal: None,
                         },
                     );

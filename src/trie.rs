@@ -12,9 +12,16 @@ pub struct Node<T> {
     pub children: BTreeMap<char, Node<T>>,
 }
 
-pub struct InsertFns<'a, T, U> {
+pub struct TraverseFns<'a, T, U> {
     pub branch: Option<&'a dyn Fn(&mut Node<T>) -> U>,
     pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
+}
+
+enum PrettyPrintValue {
+    None,
+    Terminal,
+    Branch,
+    All,
 }
 
 impl<T: Debug> Node<T> {
@@ -30,7 +37,7 @@ impl<T: Debug> Node<T> {
             res.push_str(format!("  {:?}", self.value.as_ref().unwrap()).as_str());
         }
         let count = self.children.len();
-        if self.children.is_empty() || self.is_terminal || count > 1 {
+        if self.children.is_empty() || self.is_terminal || count > 1 || self.value.is_some() {
             res.push('\n');
         }
         for (k, v) in self.children.iter() {
@@ -40,7 +47,6 @@ impl<T: Debug> Node<T> {
 
             res.push_str(&k.to_string());
             res.push_str(v.pp_fn(indent + 1, print_value).as_str());
-            if v.children.is_empty() {}
         }
 
         return res;
@@ -86,14 +92,19 @@ impl<T: Debug> Node<T> {
         self.insert_fn(
             key,
             value,
-            InsertFns::<T, u32> {
+            TraverseFns::<T, u32> {
                 branch: None,
                 terminal: None,
             },
         )
     }
 
-    pub fn insert_fn<U, S: ?Sized>(&mut self, key: &S, value: T, fns: InsertFns<T, U>) -> Option<T>
+    pub fn insert_fn<U, S: ?Sized>(
+        &mut self,
+        key: &S,
+        value: T,
+        fns: TraverseFns<T, U>,
+    ) -> Option<T>
     where
         S: Borrow<str>,
     {
@@ -138,21 +149,40 @@ impl<T: Debug> Node<T> {
         res
     }
 
-    pub fn remove(&mut self, key: &str, remove_subtree: bool) -> bool {
-        let res = self.remove_fn(key, remove_subtree).1;
+    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool) -> bool
+    where
+        S: Borrow<str>,
+    {
+        let res = self.remove_fn(
+            key,
+            remove_subtree,
+            TraverseFns::<T, u32> {
+                branch: None,
+                terminal: None,
+            },
+        );
         res
     }
 
-    fn remove_fn(&mut self, str_left: &str, remove_subtree: bool) -> (bool, bool) {
-        let first_char = str_left.chars().next().unwrap();
-        let rest = &str_left[first_char.len_utf8()..];
+    fn remove_fn<U, S: ?Sized>(
+        &mut self,
+        str_left: &S,
+        remove_subtree: bool,
+        fns: TraverseFns<T, U>,
+    ) -> bool
+    where
+        S: Borrow<str>,
+    {
+        let sl: &str = str_left.borrow();
+        let first_char = sl.chars().next().unwrap();
+        let rest = &sl[first_char.len_utf8()..];
 
         if self.children.is_empty() {
-            return (false, false);
+            return false;
         }
 
         if !self.children.contains_key(&first_char) {
-            return (false, false);
+            return false;
         }
 
         if rest.is_empty() {
@@ -160,31 +190,31 @@ impl<T: Debug> Node<T> {
             if sub_node.children.is_empty() || remove_subtree {
                 let old_node = self.children.remove(&first_char);
                 match old_node {
-                    None => return (false, false),
+                    None => return false,
                     Some(_) => {
                         let bubble_up = self.children.is_empty() && !self.is_terminal;
-                        return (bubble_up, true);
+                        return bubble_up;
                     }
                 }
             }
 
             if !sub_node.is_terminal {
-                return (false, false);
+                return false;
             }
             sub_node.is_terminal = false;
-            return (true, true);
+            return true;
         } else {
-            let (bubble_up, removed) = self
-                .children
-                .get_mut(&first_char)
-                .unwrap()
-                .remove_fn(rest, remove_subtree);
+            let bubble_up =
+                self.children
+                    .get_mut(&first_char)
+                    .unwrap()
+                    .remove_fn(rest, remove_subtree, fns);
             if bubble_up {
                 let removed = self.children.remove(&first_char).is_some();
                 let bubble_up = removed && !self.is_terminal && self.children.is_empty();
-                return (bubble_up, removed);
+                return bubble_up;
             }
-            return (false, removed);
+            return false;
         }
     }
 
