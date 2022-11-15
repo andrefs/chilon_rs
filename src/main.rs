@@ -33,20 +33,20 @@ fn main() {
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
     //println!("Total IRIs: {}", iri_trie.count_terminals());
-    ////remove_known_prefixes(&ns_map, &mut iri_trie);
+    remove_known_prefixes(&ns_map, &mut iri_trie);
     //println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
     //println!("\n\n\ndown");
     //iri_trie.traverse(&|key, value| println!("{key}"));
 
-    ////println!("Remove leaves 1: {}", remove_leaves(&mut iri_trie));
+    println!("Remove leaves 1: {}", remove_leaves(&mut iri_trie));
     ////println!("Remove leaves 2: {}", remove_leaves(&mut iri_trie));
     ////println!("Remove leaves 3: {}", remove_leaves(&mut iri_trie));
 
     //println!("\n\n\nup");
     //iri_trie.traverse_up(&|key, value| println!("{key}"));
-    println!("{:#?}", iri_trie);
-    println!("{}", iri_trie.pp(true));
+    //println!("{:#?}", iri_trie);
+    //println!("{}", iri_trie.pp(true));
 }
 
 fn remove_leaves(iri_trie: &mut IriTrie) -> bool {
@@ -75,7 +75,7 @@ fn remove_leaves_aux(iri_trie: &mut IriTrie, cur_str: String) -> bool {
 
 fn remove_known_prefixes(ns_map: &PrefixMap, iri_trie: &mut IriTrie) {
     for (_, namespace) in ns_map.iter() {
-        iri_trie.remove(namespace, true);
+        iri_trie.remove_fn(namespace, true, Some(&dec_stats));
     }
 }
 
@@ -87,21 +87,25 @@ fn init_stats(n: &mut IriTrie) {
 }
 fn inc_stats(position: TriplePos) -> impl Fn(&mut Node<NodeStats>) -> () {
     move |n: &mut IriTrie| {
-        let mut new_stats = NodeStats::new();
+        let new_stats = NodeStats::new();
         if n.value.is_none() {
             n.value = Some(new_stats);
         }
         n.value.as_mut().unwrap().desc.inc(position)
     }
 }
-fn dec_stats(n: &mut IriTrie) -> impl Fn(&mut Node<NodeStats>) -> () {
-    move |n: &mut IriTrie| {
-        let mut new_stats = NodeStats::new();
-        if n.value.is_none() {
-            n.value = Some(new_stats);
-        }
-        n.value.as_mut().unwrap().desc.inc(position)
-    }
+fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
+    let mut par_desc = parent.value.as_mut().unwrap().desc;
+    let child_own = child
+        .value
+        .as_ref()
+        .unwrap()
+        .own
+        .unwrap_or(Default::default());
+    let child_desc = child.value.as_ref().unwrap().desc;
+    par_desc.s -= child_own.s + child_desc.s;
+    par_desc.p -= child_own.p + child_desc.p;
+    par_desc.o -= child_own.o + child_desc.o;
 }
 
 fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {

@@ -1,5 +1,5 @@
 // Represents occurrences as subject, predicate or object
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Stats {
     pub s: u32,
     pub p: u32,
