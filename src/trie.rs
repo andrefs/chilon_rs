@@ -109,19 +109,21 @@ impl<T: Debug> Node<T> {
         S: Borrow<str>,
     {
         let k: &str = key.borrow();
+
+        if self.is_terminal {
+            if let Some(f) = fns.terminal {
+                f(&self);
+            }
+        } else {
+            if let Some(f) = fns.branch {
+                f(self);
+            }
+        }
+
         if k.is_empty() {
             self.is_terminal = true;
             let old_val = mem::replace(&mut self.value, Some(value));
 
-            if self.is_terminal {
-                if let Some(f) = fns.terminal {
-                    f(&self);
-                }
-            } else {
-                if let Some(f) = fns.branch {
-                    f(self);
-                }
-            }
             return old_val;
         }
 
@@ -129,10 +131,7 @@ impl<T: Debug> Node<T> {
         let rest = &k[first_char.len_utf8()..];
 
         if self.children.contains_key(&first_char) {
-            let mut child_node = self.children.get_mut(&first_char).unwrap();
-            if let Some(f) = fns.branch {
-                f(&mut child_node);
-            }
+            let child_node = self.children.get_mut(&first_char).unwrap();
             return child_node.insert_fn(rest, value, fns);
         }
 
@@ -141,9 +140,6 @@ impl<T: Debug> Node<T> {
             children: BTreeMap::new(),
             value: None,
         };
-        if let Some(f) = fns.branch {
-            f(&mut new_node);
-        }
         let res = new_node.insert_fn(rest, value, fns);
         self.children.insert(first_char, new_node);
         res
@@ -185,7 +181,7 @@ impl<T: Debug> Node<T> {
         if rest.is_empty() {
             let sub_node = self.children.get_mut(&first_char).unwrap();
             if sub_node.children.is_empty() || remove_subtree {
-                // to do : can sub_node be shadowed instead of new variable old_node
+                // to do: can sub_node be shadowed instead of new variable old_node
                 let old_node = self.children.remove(&first_char);
                 match old_node {
                     None => return false,

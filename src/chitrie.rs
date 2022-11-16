@@ -1,3 +1,5 @@
+use crate::trie::Node;
+
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Stats {
@@ -19,6 +21,8 @@ pub enum TriplePos {
     P,
     O,
 }
+
+pub type IriTrie = Node<NodeStats>; // todo finish
 
 impl NodeStats {
     pub fn new() -> NodeStats {
@@ -77,4 +81,36 @@ impl Stats {
         self.o += 1;
         self.total += 1;
     }
+}
+
+pub fn init_stats(n: &mut IriTrie) {
+    let new_stats = NodeStats::new();
+    n.value = Some(new_stats);
+}
+pub fn inc_stats(position: TriplePos) -> impl Fn(&mut IriTrie) -> () {
+    move |n: &mut IriTrie| {
+        let new_stats = NodeStats::new();
+        if n.value.is_none() {
+            n.value = Some(new_stats);
+        }
+        n.value.as_mut().unwrap().desc.inc(position)
+    }
+}
+pub fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
+    println!("char {ch}");
+    let mut par_desc = parent.value.as_mut().unwrap_or(&mut NodeStats::new()).desc;
+    let child_own = child
+        .value
+        .as_ref()
+        .unwrap()
+        .own
+        .unwrap_or(Default::default());
+    let child_desc = child.value.as_ref().unwrap().desc;
+    println!(
+        "par_desc {:#?}\n\tchild_own {:#?}\n\tchild_desc {:#?}",
+        par_desc, child_own, child_desc
+    );
+    par_desc.s -= child_own.s + child_desc.s;
+    par_desc.p -= child_own.p + child_desc.p;
+    par_desc.o -= child_own.o + child_desc.o;
 }
