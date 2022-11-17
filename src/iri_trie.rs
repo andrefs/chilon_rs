@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::{prefixes::prefixcc::PrefixMap, trie::Node};
 
 // Represents occurrences as subject, predicate or object
@@ -135,7 +137,11 @@ pub fn dec_stats(parent: &mut IriTrie, _: char, child: &IriTrie) {
     par_desc.o -= child_own.o + child_desc.o;
 }
 
-pub fn update_desc_stats(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
+pub fn upd_stats_visitor(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
+    update_desc_stats(node);
+}
+
+pub fn update_desc_stats(node: &mut IriTrie) {
     let desc_s = 0 + node
         .children
         .iter()
@@ -197,18 +203,19 @@ impl IriTrieExt for IriTrie {
             if !child_deleted && ['/', '#'].contains(&ch) {
                 to_remove.push(ch);
                 deleted = true;
+            } else {
             }
             deleted = deleted || child_deleted;
         }
         for ch in to_remove.iter() {
-            self.children.remove(ch);
+            self.get_mut(*ch).unwrap().children = BTreeMap::new();
         }
         return deleted;
     }
 
     fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
         for (_, namespace) in ns_map.iter() {
-            self.remove_fn(namespace, true, Some(&update_desc_stats));
+            self.remove_fn(namespace, true, Some(&upd_stats_visitor));
         }
     }
 }
@@ -240,7 +247,7 @@ mod tests {
                 terminal: None,
             },
         );
-        t.remove_fn("abcd", true, Some(&update_desc_stats));
+        t.remove_fn("abcd", true, Some(&upd_stats_visitor));
         println!("{:#?}", t);
         assert_eq!(t.value.unwrap().desc.s, 1);
         assert_eq!(t.value.unwrap().desc.p, 0);

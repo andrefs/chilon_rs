@@ -14,9 +14,9 @@ use crate::{iri_trie::IriTrieExt, prefixes::build_iri_trie};
 fn main() {
     let cli = Cli::parse();
 
-    // prepare_prefixes
-    // normalize triples
-    // summarize graph
+    /*******************
+     * prepare_prefixes *
+     *******************/
 
     let mut ns_map = prefixcc::load();
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
@@ -25,6 +25,18 @@ fn main() {
     println!("{:#?}", iri_trie);
     iri_trie.remove_known_prefixes(&ns_map);
     println!("{:#?}", iri_trie);
+
+    iri_trie.remove_leaves();
+    println!("{:#?}", iri_trie);
+
+    /*********************
+     * normalize triples *
+     *********************/
+
+    /*******************
+     * summarize graph *
+     *******************/
+
     //println!("Unmatched IRIs: {}", iri_trie.count_terminals());
 
     //println!("\n\n\ndown");
