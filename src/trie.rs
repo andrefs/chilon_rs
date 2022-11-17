@@ -7,11 +7,6 @@ pub struct Node<T> {
     pub children: BTreeMap<char, Node<T>>,
 }
 
-pub struct TraverseFns<'a, T, U> {
-    pub any: Option<&'a dyn Fn(&mut Node<T>) -> U>,
-    pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
-}
-
 impl<T: Debug> Node<T> {
     pub fn pp(&self, print_value: bool) -> String {
         self.pp_fn(0, print_value)
@@ -77,39 +72,26 @@ impl<T: Debug> Node<T> {
     where
         S: Borrow<str>,
     {
-        self.insert_fn(
-            key,
-            value,
-            TraverseFns::<T, u32> {
-                any: None,
-                terminal: None,
-            },
-        )
+        self.insert_fn(key, value, None::<&dyn Fn(&mut Node<T>) -> u32>)
     }
 
     pub fn insert_fn<U, S: ?Sized>(
         &mut self,
         key: &S,
         value: T,
-        fns: TraverseFns<T, U>,
+        cb: Option<&dyn Fn(&mut Node<T>) -> U>,
     ) -> Option<T>
     where
         S: Borrow<str>,
     {
         let k: &str = key.borrow();
 
-        if self.is_terminal {
-            if let Some(f) = fns.terminal {
-                f(&self);
-            }
-        }
-        if let Some(f) = fns.any {
-            f(self);
-        }
-
         if k.is_empty() {
             self.is_terminal = true;
             let old_val = mem::replace(&mut self.value, Some(value));
+            if let Some(f) = cb {
+                f(self);
+            }
 
             return old_val;
         }
@@ -119,7 +101,11 @@ impl<T: Debug> Node<T> {
 
         if self.children.contains_key(&first_char) {
             let child_node = self.children.get_mut(&first_char).unwrap();
-            return child_node.insert_fn(rest, value, fns);
+            let res = child_node.insert_fn(rest, value, cb);
+            if let Some(f) = cb {
+                f(self);
+            }
+            return res;
         }
 
         let mut new_node = Node {
@@ -127,8 +113,11 @@ impl<T: Debug> Node<T> {
             children: BTreeMap::new(),
             value: None,
         };
-        let res = new_node.insert_fn(rest, value, fns);
+        let res = new_node.insert_fn(rest, value, cb);
         self.children.insert(first_char, new_node);
+        if let Some(f) = cb {
+            f(self);
+        }
         res
     }
 

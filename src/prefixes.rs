@@ -1,8 +1,7 @@
 pub mod prefixcc;
 
-use crate::iri_trie::{inc_stats, IriTrie, NodeStats, TriplePos};
+use crate::iri_trie::{update_desc_stats, IriTrie, NodeStats, TriplePos};
 use crate::parse::parse;
-use crate::trie::TraverseFns;
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use threadpool::ThreadPool;
@@ -40,14 +39,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
             match message {
                 Message::Resource { iri, position } => {
                     let stats = NodeStats::new_terminal(position);
-                    iri_trie.insert_fn(
-                        &iri,
-                        stats,
-                        TraverseFns {
-                            any: Some(&inc_stats(position)),
-                            terminal: None,
-                        },
-                    );
+                    iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
                     //iri_trie.insert(&iri, stats);
                 }
                 Message::PrefixDecl { namespace, alias } => {
