@@ -233,14 +233,15 @@ mod tests {
             },
         );
         t.insert_fn(
-            "abcd",
+            "abcde",
             stats,
             TraverseFns {
                 any: Some(&inc_stats(pos)),
                 terminal: None,
             },
         );
-        t.remove_fn("abc", true, Some(&update_desc_stats));
+        t.remove_fn("abcd", true, Some(&update_desc_stats));
+        println!("{:#?}", t);
         assert_eq!(t.value.unwrap().desc.s, 1);
         assert_eq!(t.value.unwrap().desc.p, 0);
         assert_eq!(t.value.unwrap().desc.o, 0);
