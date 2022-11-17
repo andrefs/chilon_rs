@@ -204,11 +204,15 @@ impl IriTrieExt for IriTrie {
                 to_remove.push(ch);
                 deleted = true;
             } else {
+                update_desc_stats(node);
             }
             deleted = deleted || child_deleted;
         }
         for ch in to_remove.iter() {
-            self.get_mut(*ch).unwrap().children = BTreeMap::new();
+            let sub_node = self.get_mut(*ch).unwrap();
+            sub_node.children = BTreeMap::new();
+            update_desc_stats(sub_node);
+            update_desc_stats(self);
         }
         return deleted;
     }
