@@ -1,4 +1,6 @@
-use crate::chitrie::{dec_stats, inc_stats, update_desc_stats, IriTrie, NodeStats, TriplePos};
+pub mod prefixcc;
+
+use crate::iri_trie::{inc_stats, IriTrie, NodeStats, TriplePos};
 use crate::parse::parse;
 use crate::trie::TraverseFns;
 use rio_api::model::{NamedNode, Subject, Term};
@@ -6,7 +8,6 @@ use rio_turtle::TurtleError;
 use threadpool::ThreadPool;
 
 use self::prefixcc::PrefixMap;
-use std::borrow::Borrow;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -14,51 +15,10 @@ use std::{
 
 use rio_api::parser::TriplesParser;
 
-pub mod prefixcc;
-
 pub enum Message {
     Resource { iri: String, position: TriplePos },
     PrefixDecl { namespace: String, alias: String },
     Finished,
-}
-
-pub trait IriTrieExt {
-    fn remove_leaves(&mut self) -> bool;
-    fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap);
-    //fn remove_prefix<U, S: ?Sized + Borrow<str>>(&mut self, str_left: &S) -> bool;
-}
-
-impl IriTrieExt for IriTrie {
-    fn remove_leaves(&mut self) -> bool {
-        self.remove_leaves_aux("".to_string())
-    }
-    fn remove_leaves_aux(&mut self, cur_str: String) -> bool {
-        if self.children.is_empty() {
-            return false;
-        }
-        let mut deleted = false;
-        let mut to_remove = Vec::<char>::new();
-
-        for (&ch, node) in self.children.iter_mut() {
-            let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
-            if !child_deleted && ['/', '#'].contains(&ch) {
-                to_remove.push(ch);
-                deleted = true;
-            }
-            deleted = deleted || child_deleted;
-        }
-        for ch in to_remove.iter() {
-            self.children.remove(ch);
-        }
-        return deleted;
-    }
-
-    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
-        for (_, namespace) in ns_map.iter() {
-            self.remove_fn(namespace, true, Some(&update_desc_stats));
-        }
-    }
 }
 
 pub fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {

@@ -1,15 +1,15 @@
 mod args;
-mod chitrie;
 mod extract;
+mod iri_trie;
 mod parse;
 mod prefixes;
 mod trie;
 
 use args::Cli;
 use clap::Parser;
-use prefixes::{prefixcc, IriTrieExt};
+use prefixes::prefixcc;
 
-use crate::prefixes::build_iri_trie;
+use crate::{iri_trie::IriTrieExt, prefixes::build_iri_trie};
 
 fn main() {
     let cli = Cli::parse();

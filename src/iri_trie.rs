@@ -1,4 +1,4 @@
-use crate::trie::Node;
+use crate::{prefixes::prefixcc::PrefixMap, trie::Node};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy)]
@@ -116,7 +116,7 @@ pub fn inc_stats(position: TriplePos) -> impl Fn(&mut IriTrie) -> () {
         n.value.as_mut().unwrap().desc.inc(position)
     }
 }
-pub fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
+pub fn dec_stats(parent: &mut IriTrie, _: char, child: &IriTrie) {
     let mut par_desc = parent.value.as_mut().unwrap_or(&mut NodeStats::new()).desc;
     let child_own = child
         .value
@@ -158,6 +158,45 @@ pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
             return if let Some(c) = stats.own { c.o } else { 0 } + stats.desc.o;
         })
         .sum::<u32>();
+}
+
+pub trait IriTrieExt {
+    fn remove_leaves(&mut self) -> bool;
+    fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
+    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap);
+    //fn remove_prefix<U, S: ?Sized + Borrow<str>>(&mut self, str_left: &S) -> bool;
+}
+
+impl IriTrieExt for IriTrie {
+    fn remove_leaves(&mut self) -> bool {
+        self.remove_leaves_aux("".to_string())
+    }
+    fn remove_leaves_aux(&mut self, cur_str: String) -> bool {
+        if self.children.is_empty() {
+            return false;
+        }
+        let mut deleted = false;
+        let mut to_remove = Vec::<char>::new();
+
+        for (&ch, node) in self.children.iter_mut() {
+            let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
+            if !child_deleted && ['/', '#'].contains(&ch) {
+                to_remove.push(ch);
+                deleted = true;
+            }
+            deleted = deleted || child_deleted;
+        }
+        for ch in to_remove.iter() {
+            self.children.remove(ch);
+        }
+        return deleted;
+    }
+
+    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
+        for (_, namespace) in ns_map.iter() {
+            self.remove_fn(namespace, true, Some(&update_desc_stats));
+        }
+    }
 }
 
 #[cfg(test)]

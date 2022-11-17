@@ -1,9 +1,4 @@
-use std::{
-    borrow::Borrow,
-    collections::BTreeMap,
-    fmt::{Debug, Display},
-    mem,
-};
+use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug, mem};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
@@ -15,13 +10,6 @@ pub struct Node<T> {
 pub struct TraverseFns<'a, T, U> {
     pub any: Option<&'a dyn Fn(&mut Node<T>) -> U>,
     pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
-}
-
-enum PrettyPrintValue {
-    None,
-    Terminal,
-    Branch,
-    All,
 }
 
 impl<T: Debug> Node<T> {
