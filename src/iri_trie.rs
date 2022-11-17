@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Borrow, collections::BTreeMap};
 
 use crate::{prefixes::prefixcc::PrefixMap, trie::Node};
 
@@ -184,7 +184,7 @@ pub trait IriTrieExt {
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_known_prefixes(&mut self, ns_map: &PrefixMap);
-    //fn remove_prefix<U, S: ?Sized + Borrow<str>>(&mut self, str_left: &S) -> bool;
+    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
 }
 
 impl IriTrieExt for IriTrie {
@@ -215,8 +215,12 @@ impl IriTrieExt for IriTrie {
 
     fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
         for (_, namespace) in ns_map.iter() {
-            self.remove_fn(namespace, true, Some(&upd_stats_visitor));
+            self.remove_prefix(namespace);
         }
+    }
+
+    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
+        self.remove_fn(namespace, true, Some(&upd_stats_visitor))
     }
 }
 

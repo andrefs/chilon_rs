@@ -36,18 +36,4 @@ fn main() {
     /*******************
      * summarize graph *
      *******************/
-
-    //println!("Unmatched IRIs: {}", iri_trie.count_terminals());
-
-    //println!("\n\n\ndown");
-    //iri_trie.traverse(&|key, value| println!("{key}"));
-
-    //println!("Remove leaves 1: {}", remove_leaves(&mut iri_trie));
-    ////println!("Remove leaves 2: {}", remove_leaves(&mut iri_trie));
-    ////println!("Remove leaves 3: {}", remove_leaves(&mut iri_trie));
-
-    //println!("\n\n\nup");
-    //iri_trie.traverse_up(&|key, value| println!("{key}"));
-    //println!("{:#?}", iri_trie);
-    //println!("{}", iri_trie.pp(true));
 }
