@@ -10,7 +10,7 @@ pub struct Stats {
 }
 
 // Each node keeps its own stats (if terminal) and its descendants stats
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NodeStats {
     pub own: Option<Stats>,
     pub desc: Stats,
@@ -113,4 +113,38 @@ pub fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
     par_desc.s -= child_own.s + child_desc.s;
     par_desc.p -= child_own.p + child_desc.p;
     par_desc.o -= child_own.o + child_desc.o;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::trie::TraverseFns;
+
+    use super::*;
+
+    #[test]
+    fn remove_fn_dec_stats() {
+        let pos = TriplePos::S;
+        let stats = NodeStats::new_terminal(pos);
+        let mut t = Node::new();
+        t.insert_fn(
+            "a",
+            stats,
+            TraverseFns {
+                any: Some(&inc_stats(pos)),
+                terminal: None,
+            },
+        );
+        t.insert_fn(
+            "abc",
+            stats,
+            TraverseFns {
+                any: Some(&inc_stats(pos)),
+                terminal: None,
+            },
+        );
+        println!("{}", t.pp(true));
+        t.remove_fn("abc", true, Some(&dec_stats));
+        println!("{}", t.pp(true));
+        assert!(false);
+    }
 }

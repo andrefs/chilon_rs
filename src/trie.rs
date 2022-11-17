@@ -13,7 +13,7 @@ pub struct Node<T> {
 }
 
 pub struct TraverseFns<'a, T, U> {
-    pub branch: Option<&'a dyn Fn(&mut Node<T>) -> U>,
+    pub any: Option<&'a dyn Fn(&mut Node<T>) -> U>,
     pub terminal: Option<&'a dyn Fn(&Node<T>) -> U>,
 }
 
@@ -93,7 +93,7 @@ impl<T: Debug> Node<T> {
             key,
             value,
             TraverseFns::<T, u32> {
-                branch: None,
+                any: None,
                 terminal: None,
             },
         )
@@ -114,10 +114,9 @@ impl<T: Debug> Node<T> {
             if let Some(f) = fns.terminal {
                 f(&self);
             }
-        } else {
-            if let Some(f) = fns.branch {
-                f(self);
-            }
+        }
+        if let Some(f) = fns.any {
+            f(self);
         }
 
         if k.is_empty() {

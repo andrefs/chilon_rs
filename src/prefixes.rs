@@ -82,7 +82,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                         &iri,
                         stats,
                         TraverseFns {
-                            branch: Some(&inc_stats(position)),
+                            any: Some(&inc_stats(position)),
                             terminal: None,
                         },
                     );
