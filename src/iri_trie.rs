@@ -203,16 +203,12 @@ impl IriTrieExt for IriTrie {
             if !child_deleted && ['/', '#'].contains(&ch) {
                 to_remove.push(ch);
                 deleted = true;
-            } else {
-                update_desc_stats(node);
             }
             deleted = deleted || child_deleted;
         }
         for ch in to_remove.iter() {
             let sub_node = self.get_mut(*ch).unwrap();
             sub_node.children = BTreeMap::new();
-            update_desc_stats(sub_node);
-            update_desc_stats(self);
         }
         return deleted;
     }
@@ -226,8 +222,6 @@ impl IriTrieExt for IriTrie {
 
 #[cfg(test)]
 mod tests {
-    use crate::trie::TraverseFns;
-
     use super::*;
 
     #[test]
