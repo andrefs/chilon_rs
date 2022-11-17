@@ -139,7 +139,7 @@ impl<T: Debug> Node<T> {
         let res = self.remove_fn(
             key,
             remove_subtree,
-            None::<&dyn Fn(&mut Node<T>, char, &Node<T>) -> u32>,
+            None::<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> u32>,
         );
         res
     }
@@ -148,7 +148,7 @@ impl<T: Debug> Node<T> {
         &mut self,
         str_left: &S,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Node<T>, char, &Node<T>) -> U>,
+        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
     ) -> bool
     where
         S: Borrow<str>,
@@ -168,18 +168,12 @@ impl<T: Debug> Node<T> {
         if rest.is_empty() {
             let sub_node = self.children.get_mut(&first_char).unwrap();
             if sub_node.children.is_empty() || remove_subtree {
-                // to do: can sub_node be shadowed instead of new variable old_node
-                let old_node = self.children.remove(&first_char);
-                match old_node {
-                    None => return false,
-                    Some(n) => {
-                        if let Some(f) = cb {
-                            f(self, first_char, &n);
-                        }
-                        let bubble_up = self.children.is_empty() && !self.is_terminal;
-                        return bubble_up;
-                    }
+                let sub_node = self.children.remove(&first_char).unwrap();
+                if let Some(f) = cb {
+                    f(self, first_char, Some(&sub_node));
                 }
+                let bubble_up = self.children.is_empty() && !self.is_terminal;
+                return bubble_up;
             }
 
             if !sub_node.is_terminal {
@@ -194,16 +188,17 @@ impl<T: Debug> Node<T> {
                     .unwrap()
                     .remove_fn(rest, remove_subtree, cb);
             if bubble_up {
-                let old_node = self.children.remove(&first_char);
-                let removed = old_node.is_some();
+                let old_node = self.children.remove(&first_char).unwrap();
 
-                if let Some(n) = old_node {
-                    if let Some(f) = cb {
-                        f(self, first_char, &n);
-                    }
+                if let Some(f) = cb {
+                    f(self, first_char, Some(&old_node));
                 }
-                let bubble_up = removed && !self.is_terminal && self.children.is_empty();
+                let bubble_up = !self.is_terminal && self.children.is_empty();
                 return bubble_up;
+            } else {
+                if let Some(f) = cb {
+                    f(self, first_char, None);
+                }
             }
             return false;
         }

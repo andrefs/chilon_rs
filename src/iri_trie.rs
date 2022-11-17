@@ -55,6 +55,7 @@ impl NodeStats {
 
 pub trait IriTrieStatsExt {
     fn stats(&self) -> NodeStats;
+    fn set_stats(&mut self, stats: Option<NodeStats>);
 }
 
 impl IriTrieStatsExt for IriTrie {
@@ -69,6 +70,9 @@ impl IriTrieStatsExt for IriTrie {
                 desc,
             },
         }
+    }
+    fn set_stats(&mut self, stats: Option<NodeStats>) {
+        self.value = stats;
     }
 }
 
@@ -131,10 +135,8 @@ pub fn dec_stats(parent: &mut IriTrie, _: char, child: &IriTrie) {
     par_desc.o -= child_own.o + child_desc.o;
 }
 
-pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
-    let mut par_desc = node.value.as_mut().unwrap_or(&mut NodeStats::new()).desc;
-
-    par_desc.s = 0 + node
+pub fn update_desc_stats(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
+    let desc_s = 0 + node
         .children
         .iter()
         .map(|(_, child)| {
@@ -142,7 +144,7 @@ pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
             return if let Some(c) = stats.own { c.s } else { 0 } + stats.desc.s;
         })
         .sum::<u32>();
-    par_desc.p = 0 + node
+    let desc_p = 0 + node
         .children
         .iter()
         .map(|(_, child)| {
@@ -150,7 +152,7 @@ pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
             return if let Some(c) = stats.own { c.p } else { 0 } + stats.desc.p;
         })
         .sum::<u32>();
-    par_desc.o = 0 + node
+    let desc_o = 0 + node
         .children
         .iter()
         .map(|(_, child)| {
@@ -158,6 +160,18 @@ pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
             return if let Some(c) = stats.own { c.o } else { 0 } + stats.desc.o;
         })
         .sum::<u32>();
+    let desc_total = desc_s + desc_p + desc_o;
+
+    let desc_stats = Some(NodeStats {
+        desc: Stats {
+            s: desc_s,
+            p: desc_p,
+            o: desc_o,
+            total: desc_total,
+        },
+        own: node.stats().own,
+    });
+    node.set_stats(desc_stats);
 }
 
 pub trait IriTrieExt {
@@ -226,9 +240,10 @@ mod tests {
                 terminal: None,
             },
         );
-        println!("{}", t.pp(true));
-        t.remove_fn("abc", true, Some(&dec_stats));
-        println!("{}", t.pp(true));
-        assert!(false);
+        t.remove_fn("abc", true, Some(&update_desc_stats));
+        assert_eq!(t.value.unwrap().desc.s, 1);
+        assert_eq!(t.value.unwrap().desc.p, 0);
+        assert_eq!(t.value.unwrap().desc.o, 0);
+        assert_eq!(t.value.unwrap().desc.total, 1);
     }
 }
