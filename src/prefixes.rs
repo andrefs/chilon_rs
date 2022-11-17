@@ -1,4 +1,4 @@
-use crate::chitrie::{dec_stats, inc_stats, IriTrie, NodeStats, TriplePos};
+use crate::chitrie::{dec_stats, inc_stats, update_desc_stats, IriTrie, NodeStats, TriplePos};
 use crate::parse::parse;
 use crate::trie::TraverseFns;
 use rio_api::model::{NamedNode, Subject, Term};
@@ -6,6 +6,7 @@ use rio_turtle::TurtleError;
 use threadpool::ThreadPool;
 
 use self::prefixcc::PrefixMap;
+use std::borrow::Borrow;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -25,6 +26,7 @@ pub trait IriTrieExt {
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_known_prefixes(&mut self, ns_map: &PrefixMap);
+    //fn remove_prefix<U, S: ?Sized + Borrow<str>>(&mut self, str_left: &S) -> bool;
 }
 
 impl IriTrieExt for IriTrie {
@@ -54,7 +56,7 @@ impl IriTrieExt for IriTrie {
 
     fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
         for (_, namespace) in ns_map.iter() {
-            self.remove_fn(namespace, true, Some(&dec_stats));
+            self.remove_fn(namespace, true, Some(&update_desc_stats));
         }
     }
 }

@@ -52,6 +52,26 @@ impl NodeStats {
         }
     }
 }
+
+pub trait IriTrieStatsExt {
+    fn stats(&self) -> NodeStats;
+}
+
+impl IriTrieStatsExt for IriTrie {
+    fn stats(&self) -> NodeStats {
+        match self.value {
+            None => NodeStats::new(),
+            Some(NodeStats { own, desc }) => NodeStats {
+                own: match own {
+                    None => Default::default(),
+                    Some(s) => Some(s),
+                },
+                desc,
+            },
+        }
+    }
+}
+
 impl Default for NodeStats {
     fn default() -> Self {
         NodeStats {
@@ -97,7 +117,6 @@ pub fn inc_stats(position: TriplePos) -> impl Fn(&mut IriTrie) -> () {
     }
 }
 pub fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
-    println!("char {ch}");
     let mut par_desc = parent.value.as_mut().unwrap_or(&mut NodeStats::new()).desc;
     let child_own = child
         .value
@@ -106,13 +125,39 @@ pub fn dec_stats(parent: &mut IriTrie, ch: char, child: &IriTrie) {
         .own
         .unwrap_or(Default::default());
     let child_desc = child.value.as_ref().unwrap().desc;
-    println!(
-        "par_desc {:#?}\n\tchild_own {:#?}\n\tchild_desc {:#?}",
-        par_desc, child_own, child_desc
-    );
+
     par_desc.s -= child_own.s + child_desc.s;
     par_desc.p -= child_own.p + child_desc.p;
     par_desc.o -= child_own.o + child_desc.o;
+}
+
+pub fn update_desc_stats(node: &mut IriTrie, _: char, _: &IriTrie) {
+    let mut par_desc = node.value.as_mut().unwrap_or(&mut NodeStats::new()).desc;
+
+    par_desc.s = 0 + node
+        .children
+        .iter()
+        .map(|(_, child)| {
+            let stats = child.stats();
+            return if let Some(c) = stats.own { c.s } else { 0 } + stats.desc.s;
+        })
+        .sum::<u32>();
+    par_desc.p = 0 + node
+        .children
+        .iter()
+        .map(|(_, child)| {
+            let stats = child.stats();
+            return if let Some(c) = stats.own { c.p } else { 0 } + stats.desc.p;
+        })
+        .sum::<u32>();
+    par_desc.o = 0 + node
+        .children
+        .iter()
+        .map(|(_, child)| {
+            let stats = child.stats();
+            return if let Some(c) = stats.own { c.o } else { 0 } + stats.desc.o;
+        })
+        .sum::<u32>();
 }
 
 #[cfg(test)]
@@ -127,7 +172,7 @@ mod tests {
         let stats = NodeStats::new_terminal(pos);
         let mut t = Node::new();
         t.insert_fn(
-            "a",
+            "ab",
             stats,
             TraverseFns {
                 any: Some(&inc_stats(pos)),
@@ -135,7 +180,7 @@ mod tests {
             },
         );
         t.insert_fn(
-            "abc",
+            "abcd",
             stats,
             TraverseFns {
                 any: Some(&inc_stats(pos)),
