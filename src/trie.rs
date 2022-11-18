@@ -193,6 +193,12 @@ impl<T: Debug> Node<T> {
         }
     }
 
+    // TODO HERE
+    // implement
+    //  longest_prefix
+    //  find
+    //  contains
+
     pub fn traverse(&self, f: &impl Fn(String, &T)) {
         self.traverse_aux("".to_owned(), f, &TraverseDirection::Down)
     }

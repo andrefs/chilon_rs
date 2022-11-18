@@ -43,7 +43,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     //iri_trie.insert(&iri, stats);
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    ns_trie.insert(alias.to_owned(), namespace);
+                    ns_trie.insert(&alias, namespace);
                 }
                 Message::Finished => {
                     running -= 1;
