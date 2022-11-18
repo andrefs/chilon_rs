@@ -6,7 +6,7 @@ use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use threadpool::ThreadPool;
 
-use self::prefixcc::PrefixMap;
+use crate::ns_trie::NamespaceTrie;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -20,7 +20,7 @@ pub enum Message {
     Finished,
 }
 
-pub fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
+pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
     let pool: ThreadPool = ThreadPool::new(n_workers);
     let mut running = paths.len();
@@ -43,7 +43,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_map: &mut PrefixMap) -> IriTrie {
                     //iri_trie.insert(&iri, stats);
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    ns_map.insert(alias.to_owned(), namespace);
+                    ns_trie.insert(alias.to_owned(), namespace);
                 }
                 Message::Finished => {
                     running -= 1;

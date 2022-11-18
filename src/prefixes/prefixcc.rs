@@ -7,9 +7,13 @@ use std::{
 };
 use ureq;
 
+use crate::ns_trie::NamespaceTrie;
+
 const PCC_URL: &str = "https://prefix.cc/popular/all.file.json";
 const PCC_DIR: &str = "cache";
 const PCC_PATH: &str = "cache/prefix.cc.json";
+
+pub type PrefixMap = BTreeMap<String, String>;
 
 pub fn download() {
     let res = ureq::get(&PCC_URL).call().unwrap();
@@ -26,7 +30,15 @@ pub fn parse<'a>(json: String) -> PrefixMap {
     m
 }
 
-pub fn load<'a>() -> PrefixMap {
+fn map_to_trie<'a>(map: PrefixMap) -> NamespaceTrie {
+    let mut t = NamespaceTrie::new();
+    for (k, v) in map.iter() {
+        t.insert(k, *v);
+    }
+    return t;
+}
+
+pub fn load() -> NamespaceTrie {
     if !Path::new(PCC_PATH).exists() {
         download();
     }
@@ -35,11 +47,9 @@ pub fn load<'a>() -> PrefixMap {
     let mut s = String::new();
     buf_reader.read_to_string(&mut s).unwrap();
 
-    let m: PrefixMap = serde_json::from_str(s.as_str()).unwrap();
-    m
+    let map: PrefixMap = serde_json::from_str(s.as_str()).unwrap();
+    return map_to_trie(map);
 }
-
-pub type PrefixMap = BTreeMap<String, String>;
 
 fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
     let fixed: PrefixMap = ns_map

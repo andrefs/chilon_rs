@@ -1,6 +1,7 @@
 mod args;
 mod extract;
 mod iri_trie;
+mod ns_trie;
 mod parse;
 mod prefixes;
 mod trie;

@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::BTreeMap};
 
-use crate::{prefixes::prefixcc::PrefixMap, trie::Node};
+use crate::{ns_trie::NamespaceTrie, trie::Node};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy)]
@@ -183,7 +183,7 @@ pub fn update_desc_stats(node: &mut IriTrie) {
 pub trait IriTrieExt {
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap);
+    fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
 }
 
@@ -213,7 +213,7 @@ impl IriTrieExt for IriTrie {
         return deleted;
     }
 
-    fn remove_known_prefixes(&mut self, ns_map: &PrefixMap) {
+    fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie) {
         for (_, namespace) in ns_map.iter() {
             self.remove_prefix(namespace);
         }
