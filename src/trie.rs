@@ -258,7 +258,7 @@ impl<T: Debug> Node<T> {
                 };
             }
 
-            return last_terminal;
+            return Some((self, str_acc.clone()));
         }
 
         let first_char = sl.chars().next().unwrap();
@@ -478,7 +478,17 @@ mod tests {
         t.insert("this is more words", 3);
         let must_be_terminal = false;
         let res = t.longest_prefix("this is more wo", must_be_terminal);
-        let expected: Vec<char> = "this is more".chars().collect();
+        let expected: Vec<char> = "this is more wo".chars().collect();
+        assert_eq!(res.chars().collect::<Vec<_>>(), expected);
+    }
+    #[test]
+    fn longest_prefix_no_full_match() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is more words", 3);
+        let res = t.longest_prefix("this is weeks", false);
+        let expected: Vec<char> = "this is w".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
 }
