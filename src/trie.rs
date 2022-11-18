@@ -520,4 +520,16 @@ mod tests {
         assert!(res.is_empty());
     }
 
+    #[test]
+    fn find() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+        let must_be_terminal = false;
+        let res = t.find("this is more", must_be_terminal);
+        //let expected: Vec<char> = "this is more".chars().collect();
+        assert_eq!(res.unwrap().value.unwrap(), 2)
+    }
+
 }
