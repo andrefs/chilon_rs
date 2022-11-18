@@ -491,4 +491,16 @@ mod tests {
         let expected: Vec<char> = "this is w".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
+
+    #[test]
+    fn longest_prefix_terminal() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 1);
+        t.insert("this is more words", 1);
+        let res = t.longest_prefix("this is more wo", true);
+        let expected: Vec<char> = "this is more".chars().collect();
+        assert_eq!(res.chars().collect::<Vec<_>>(), expected);
+    }
+
 }
