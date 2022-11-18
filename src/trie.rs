@@ -244,32 +244,28 @@ impl<T: Debug> Node<T> {
     where
         S: ?Sized + Borrow<str>,
     {
-        if self.is_terminal {
-            last_terminal = Some((self, str_acc.clone()));
-        }
-
         let sl: &str = str_left.borrow();
 
-        if sl.is_empty() {
-            if opts.must_match_fully && opts.must_be_terminal {
-                return if self.is_terminal {
-                    Some((self, str_acc.clone()))
-                } else {
+        if sl.is_empty()
+            || self.children.is_empty()
+            || !self.children.contains_key(&sl.chars().next().unwrap())
+        {
+            if opts.must_be_terminal && !self.is_terminal {
+                return if opts.must_match_fully {
                     None
+                } else {
+                    last_terminal
                 };
             }
+
             return last_terminal;
         }
 
         let first_char = sl.chars().next().unwrap();
         let rest = &sl[first_char.len_utf8()..];
 
-        if self.children.is_empty() || !self.children.contains_key(&first_char) {
-            return if opts.must_match_fully {
-                None
-            } else {
-                last_terminal
-            };
+        if self.is_terminal {
+            last_terminal = Some((self, str_acc.clone()));
         }
 
         return self.children.get(&first_char).unwrap().longest_prefix_aux(
@@ -473,5 +469,16 @@ mod tests {
         t.insert("abc", 2);
         assert!(!t.contains_key("b"));
         assert!(t.contains_key("abc"));
+    }
+    #[test]
+    fn longest_prefix() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is more words", 3);
+        let must_be_terminal = false;
+        let res = t.longest_prefix("this is more wo", must_be_terminal);
+        let expected: Vec<char> = "this is more".chars().collect();
+        assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
 }
