@@ -532,4 +532,15 @@ mod tests {
         assert_eq!(res.unwrap().value.unwrap(), 2)
     }
 
+    #[test]
+    fn find_terminal() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+        let res = t.find("this is more", true);
+        //let expected: Vec<char> = "this is more".chars().collect();
+        assert_eq!(res.unwrap().value.unwrap(), 2);
+    }
+
 }
