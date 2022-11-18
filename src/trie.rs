@@ -228,10 +228,13 @@ impl<T: Debug> Node<T> {
             must_match_fully: false,
         };
         let last_term = None;
-        let (_, prefix) = self
-            .longest_prefix_aux(s, "".to_string(), last_term, lpo)
-            .expect("With must match fully something is always returned");
-        return prefix;
+
+        let res = self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
+        return if let Some((_, prefix)) = res {
+            prefix
+        } else {
+            "".to_owned()
+        };
     }
 
     fn longest_prefix_aux<'a, S>(
@@ -487,7 +490,8 @@ mod tests {
         t.insert("this is words", 1);
         t.insert("this is more", 2);
         t.insert("this is more words", 3);
-        let res = t.longest_prefix("this is weeks", false);
+        let must_be_terminal = false;
+        let res = t.longest_prefix("this is weeks", must_be_terminal);
         let expected: Vec<char> = "this is w".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
@@ -496,11 +500,24 @@ mod tests {
     fn longest_prefix_terminal() {
         let mut t = Node::new();
         t.insert("this is words", 1);
-        t.insert("this is more", 1);
-        t.insert("this is more words", 1);
-        let res = t.longest_prefix("this is more wo", true);
+        t.insert("this is more", 2);
+        t.insert("this is more words", 3);
+        let must_be_terminal = true;
+        let res = t.longest_prefix("this is more wo", must_be_terminal);
         let expected: Vec<char> = "this is more".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
+    }
+
+    #[test]
+    fn longest_prefix_fail() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is more words", 3);
+        let must_be_terminal = true;
+        let res = t.longest_prefix("this is", must_be_terminal);
+        println!("RES: '{res}'");
+        assert!(res.is_empty());
     }
 
 }
