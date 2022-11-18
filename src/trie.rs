@@ -257,8 +257,9 @@ impl<T: Debug> Node<T> {
         let first_char = sl.chars().next().unwrap();
         let rest = &sl[first_char.len_utf8()..];
 
+        let next_node = self.children.get(&first_char);
         if self.children.is_empty()
-            || self.children.get(&first_char).is_none()
+            || next_node.is_none()
                 && opts.must_be_terminal
                 && !self.is_terminal
                 && opts.must_match_fully
@@ -270,7 +271,7 @@ impl<T: Debug> Node<T> {
             last_terminal = Some((self, format!("{str_acc}{first_char}")));
         }
 
-        return self.children.get(&first_char).unwrap().longest_prefix_aux(
+        return next_node.unwrap().longest_prefix_aux(
             rest,
             format!("{str_acc}{first_char}"),
             last_terminal,
@@ -503,7 +504,7 @@ mod tests {
         t.insert("this is more words", 3);
         let must_be_terminal = true;
         let res = t.longest_prefix("this is more wo", must_be_terminal);
-        let expected: Vec<char> = "this is more".chars().collect();
+        let expected: Vec<char> = "this is more ".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
 
