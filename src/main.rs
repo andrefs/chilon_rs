@@ -24,7 +24,7 @@ fn main() {
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
     //println!("Total IRIs: {}", iri_trie.count_terminals());
     println!("{:#?}", iri_trie);
-    iri_trie.remove_known_prefixes(&ns_map);
+    //iri_trie.remove_known_prefixes(&ns_map);
     println!("{:#?}", iri_trie);
 
     iri_trie.remove_leaves();

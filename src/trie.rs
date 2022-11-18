@@ -1,4 +1,9 @@
-use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug, mem};
+use std::{
+    borrow::Borrow,
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+    mem,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
@@ -199,6 +204,82 @@ impl<T: Debug> Node<T> {
     //  find
     //  contains
 
+    pub fn contains_key(&self, s: &str) -> bool {
+        self.find(s, true).is_some()
+    }
+
+    pub fn find(&self, s: &str, must_be_terminal: bool) -> Option<&Node<T>> {
+        let lpo = LongestPrefOpts {
+            must_be_terminal,
+            must_match_fully: true,
+        };
+        let last_term = None;
+        let res = self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
+        return if let Some((node, _)) = res {
+            Some(node)
+        } else {
+            None
+        };
+    }
+
+    pub fn longest_prefix(&mut self, s: &str, must_be_terminal: bool) -> String {
+        let lpo = LongestPrefOpts {
+            must_be_terminal,
+            must_match_fully: false,
+        };
+        let last_term = None;
+        let (_, prefix) = self
+            .longest_prefix_aux(s, "".to_string(), last_term, lpo)
+            .expect("With must match fully something is always returned");
+        return prefix;
+    }
+
+    fn longest_prefix_aux<'a, S>(
+        &'a self,
+        str_left: &S,
+        str_acc: String,
+        mut last_terminal: FindResults<'a, T>,
+        opts: LongestPrefOpts,
+    ) -> FindResults<T>
+    where
+        S: ?Sized + Borrow<str>,
+    {
+        if self.is_terminal {
+            last_terminal = Some((self, str_acc.clone()));
+        }
+
+        let sl: &str = str_left.borrow();
+
+        if sl.is_empty() {
+            if opts.must_match_fully && opts.must_be_terminal {
+                return if self.is_terminal {
+                    Some((self, str_acc.clone()))
+                } else {
+                    None
+                };
+            }
+            return last_terminal;
+        }
+
+        let first_char = sl.chars().next().unwrap();
+        let rest = &sl[first_char.len_utf8()..];
+
+        if self.children.is_empty() || !self.children.contains_key(&first_char) {
+            return if opts.must_match_fully {
+                None
+            } else {
+                last_terminal
+            };
+        }
+
+        return self.children.get(&first_char).unwrap().longest_prefix_aux(
+            rest,
+            format!("{str_acc}{first_char}"),
+            last_terminal,
+            opts,
+        );
+    }
+
     pub fn traverse(&self, f: &impl Fn(String, &T)) {
         self.traverse_aux("".to_owned(), f, &TraverseDirection::Down)
     }
@@ -242,6 +323,13 @@ impl<T: Debug> Node<T> {
         }
     }
 }
+
+struct LongestPrefOpts {
+    must_be_terminal: bool,
+    must_match_fully: bool,
+}
+
+type FindResults<'a, T> = Option<(&'a Node<T>, String)>;
 
 #[derive(Copy, Clone)]
 pub enum TraverseDirection {
@@ -375,5 +463,15 @@ mod tests {
         t.remove("xyz", true);
         println!("{}", t.pp(true));
         assert_eq!(t.pp(false), expected);
+    }
+    #[test]
+    fn contains_key() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        assert!(t.contains_key("a"));
+
+        t.insert("abc", 2);
+        assert!(!t.contains_key("b"));
+        assert!(t.contains_key("abc"));
     }
 }
