@@ -198,12 +198,6 @@ impl<T: Debug> Node<T> {
         }
     }
 
-    // TODO HERE
-    // implement
-    //  longest_prefix
-    //  find
-    //  contains
-
     pub fn contains_key(&self, s: &str) -> bool {
         self.find(s, true).is_some()
     }
@@ -249,26 +243,31 @@ impl<T: Debug> Node<T> {
     {
         let sl: &str = str_left.borrow();
 
-        if sl.is_empty()
-            || self.children.is_empty()
-            || !self.children.contains_key(&sl.chars().next().unwrap())
-        {
-            if opts.must_be_terminal && !self.is_terminal {
-                return if opts.must_match_fully {
-                    None
+        if sl.is_empty() {
+            if !self.is_terminal && opts.must_be_terminal {
+                if opts.must_match_fully {
+                    return None;
                 } else {
-                    last_terminal
-                };
+                    return last_terminal;
+                }
             }
-
             return Some((self, str_acc.clone()));
         }
 
         let first_char = sl.chars().next().unwrap();
         let rest = &sl[first_char.len_utf8()..];
 
+        if self.children.is_empty()
+            || self.children.get(&first_char).is_none()
+                && opts.must_be_terminal
+                && !self.is_terminal
+                && opts.must_match_fully
+        {
+            return None;
+        }
+
         if self.is_terminal {
-            last_terminal = Some((self, str_acc.clone()));
+            last_terminal = Some((self, format!("{str_acc}{first_char}")));
         }
 
         return self.children.get(&first_char).unwrap().longest_prefix_aux(
@@ -528,7 +527,6 @@ mod tests {
         t.insert("this is even more", 3);
         let must_be_terminal = false;
         let res = t.find("this is more", must_be_terminal);
-        //let expected: Vec<char> = "this is more".chars().collect();
         assert_eq!(res.unwrap().value.unwrap(), 2)
     }
 
@@ -538,9 +536,20 @@ mod tests {
         t.insert("this is words", 1);
         t.insert("this is more", 2);
         t.insert("this is even more", 3);
-        let res = t.find("this is more", true);
-        //let expected: Vec<char> = "this is more".chars().collect();
+        let must_be_terminal = true;
+        let res = t.find("this is more", must_be_terminal);
         assert_eq!(res.unwrap().value.unwrap(), 2);
     }
 
+    #[test]
+    fn find_terminal_fail() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+        let must_be_terminal = true;
+        let pref = t.find("this is more wo", must_be_terminal);
+        println!("{:#?}", pref);
+        assert!(pref.is_none())
+    }
 }
