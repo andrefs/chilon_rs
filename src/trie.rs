@@ -258,13 +258,15 @@ impl<T: Debug> Node<T> {
         let rest = &sl[first_char.len_utf8()..];
 
         let next_node = self.children.get(&first_char);
-        if self.children.is_empty()
-            || next_node.is_none()
-                && opts.must_be_terminal
-                && !self.is_terminal
-                && opts.must_match_fully
-        {
-            return None;
+        if self.children.is_empty() || next_node.is_none() {
+            if !self.is_terminal && opts.must_be_terminal {
+                if opts.must_match_fully {
+                    return None;
+                } else {
+                    return last_terminal;
+                }
+            }
+            return Some((self, str_acc.clone()));
         }
 
         if self.is_terminal {
