@@ -126,16 +126,15 @@ impl<T: Debug> Node<T> {
         res
     }
 
-    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool) -> bool
+    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool)
     where
         S: Borrow<str>,
     {
-        let res = self.remove_fn(
+        self.remove_fn(
             key,
             remove_subtree,
             None::<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> u32>,
         );
-        res
     }
 
     pub fn remove_fn<U, S: ?Sized>(
@@ -422,17 +421,18 @@ mod tests {
         t.insert("abc", 2);
         t.insert("abcd", 3);
 
-        assert!(!t.remove("ab", false));
-        //assert!(t.contains_key("a"));
-        //assert!(t.contains_key("abc"));
-        //assert!(t.contains_key("abcd"));
+        // TODO remove returns true/false
+        t.remove("ab", false);
+        assert!(t.contains_key("a"));
+        assert!(t.contains_key("abc"));
+        assert!(t.contains_key("abcd"));
 
-        assert!(t.remove("abc", true));
-        //assert!(t.contains_key("a"));
-        //assert!(!t.contains_key("abc"));
-        //assert!(!t.contains_key("abcd"));
+        t.remove("abc", true);
+        assert!(t.contains_key("a"));
+        assert!(!t.contains_key("abc"));
+        assert!(!t.contains_key("abcd"));
 
-        assert!(t.remove("a", false));
+        t.remove("a", false);
     }
 
     #[test]
@@ -441,9 +441,10 @@ mod tests {
         t.insert("a", 1);
         t.insert("abc", 2);
         t.remove("abc", false);
-        println!("{}", t.pp(true));
-        let expected = "a\n";
-        assert_eq!(t.pp(false), expected);
+
+        assert_eq!(t.children.len(), 1);
+        assert!(t.children.contains_key(&'a'));
+        assert_eq!(t.children.get(&'a').unwrap().value, Some(1));
     }
     #[test]
     fn remove_subtree() {
@@ -451,8 +452,10 @@ mod tests {
         t.insert("a", 1);
         t.insert("abc", 2);
         t.remove("ab", true);
-        let expected = "a\n";
-        assert_eq!(t.pp(false), expected);
+
+        assert_eq!(t.children.len(), 1);
+        assert!(t.children.contains_key(&'a'));
+        assert_eq!(t.children.get(&'a').unwrap().value, Some(1));
     }
     #[test]
     fn remove_non_existing() {
