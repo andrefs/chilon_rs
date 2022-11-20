@@ -58,6 +58,13 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     // local file prefix decls are only sent in the end
     // remove the prefix and add to other prefix trie
 
+    println!(
+        "local_ns_trie: {:#?}",
+        local_ns_trie
+            .iter()
+            .map(|(k, v)| (k, &v.value))
+            .collect::<Vec<_>>()
+    );
     iri_trie.remove_known_prefixes(&local_ns_trie);
     for (namespace, node) in local_ns_trie.iter() {
         if let Some(alias) = &node.value {

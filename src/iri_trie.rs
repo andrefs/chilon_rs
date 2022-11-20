@@ -226,10 +226,8 @@ impl IriTrieExt for IriTrie {
     }
 
     fn remove_known_prefixes(&mut self, ns_trie: &NamespaceTrie) {
-        for (_, node) in ns_trie.iter() {
-            if let Some(namespace) = &node.value {
-                self.remove_prefix(&namespace.as_str());
-            }
+        for (namespace, _) in ns_trie.iter() {
+            self.remove_prefix(&namespace);
         }
     }
 
