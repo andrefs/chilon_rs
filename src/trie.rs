@@ -21,12 +21,14 @@ impl<T: Debug> Node<T> {
         let mut res = "".to_string();
         // print value
         //if print_value && self.value.is_some() {
-        if self.value.is_some() {
+        if self.value.is_some() && print_value {
             res.push_str(format!("  {:?}", self.value.as_ref().unwrap()).as_str());
         }
         let count = self.children.len();
         if self.children.is_empty() || self.is_terminal || count > 1 || self.value.is_some() {
-            res.push('\n');
+            if indent != 0 {
+                res.push('\n');
+            }
         }
         for (k, v) in self.children.iter() {
             if self.is_terminal || count > 1 {
