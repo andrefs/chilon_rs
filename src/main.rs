@@ -22,11 +22,7 @@ fn main() {
     let mut ns_map = prefixcc::load();
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_map);
-    //println!("Total IRIs: {}", iri_trie.count_terminals());
-    println!("{:#?}", iri_trie);
-    //iri_trie.remove_known_prefixes(&ns_map);
-    println!("{:#?}", iri_trie);
-
+    iri_trie.remove_known_prefixes(&ns_map);
     iri_trie.remove_leaves();
     println!("{:#?}", iri_trie);
 
