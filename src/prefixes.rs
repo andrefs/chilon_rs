@@ -38,6 +38,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         if let Ok(message) = rx.recv() {
             match message {
                 Message::Resource { iri, position } => {
+                    ns_trie.longest_prefix(iri.as_str(), true);
                     let stats = NodeStats::new_terminal(position);
                     iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
                     //iri_trie.insert(&iri, stats);

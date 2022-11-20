@@ -226,9 +226,10 @@ impl IriTrieExt for IriTrie {
     }
 
     fn remove_known_prefixes(&mut self, ns_trie: &NamespaceTrie) {
-        for (namespace, _) in ns_trie.iter() {
-            //println!("Removing {namespace}");
-            self.remove_prefix(&namespace);
+        for (_, node) in ns_trie.iter() {
+            if let Some(namespace) = &node.value {
+                self.remove_prefix(&namespace.as_str());
+            }
         }
     }
 
@@ -249,7 +250,6 @@ mod tests {
         t.insert_fn("ab", stats, Some(&update_desc_stats));
         t.insert_fn("abcde", stats, Some(&update_desc_stats));
         t.remove_fn("abcd", true, Some(&upd_stats_visitor));
-        println!("{:#?}", t);
         assert_eq!(t.value.unwrap().desc.s, 1);
         assert_eq!(t.value.unwrap().desc.p, 0);
         assert_eq!(t.value.unwrap().desc.o, 0);

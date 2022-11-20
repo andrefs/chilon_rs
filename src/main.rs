@@ -20,12 +20,11 @@ fn main() {
      *******************/
 
     let mut ns_trie = prefixcc::load();
-    println!("ns_map_trie: {:#?}", ns_trie);
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     let mut iri_trie = build_iri_trie(cli.files, &mut ns_trie);
     iri_trie.remove_known_prefixes(&ns_trie);
     //iri_trie.remove_leaves();
-    println!("{:#?}", iri_trie);
+    //println!("{:#?}", iri_trie);
 
     /*********************
      * normalize triples *
