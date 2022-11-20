@@ -250,6 +250,7 @@ mod tests {
         t.insert_fn("ab", stats, Some(&update_desc_stats));
         t.insert_fn("abcde", stats, Some(&update_desc_stats));
         t.remove_fn("abcd", true, Some(&upd_stats_visitor));
+
         assert_eq!(t.value.unwrap().desc.s, 1);
         assert_eq!(t.value.unwrap().desc.p, 0);
         assert_eq!(t.value.unwrap().desc.o, 0);

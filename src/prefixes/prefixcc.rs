@@ -33,7 +33,7 @@ pub fn parse<'a>(json: String) -> PrefixMap {
 fn map_to_trie<'a>(map: PrefixMap) -> NamespaceTrie {
     let mut t = NamespaceTrie::new();
     for (k, v) in map.iter() {
-        t.insert(k, v.clone());
+        t.insert(v, k.clone());
     }
     return t;
 }

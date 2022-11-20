@@ -1,6 +1,6 @@
 pub mod prefixcc;
 
-use crate::iri_trie::{update_desc_stats, IriTrie, NodeStats, TriplePos};
+use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
 use crate::parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
@@ -30,6 +30,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         spawn(&pool, &tx, path);
     }
     let mut iri_trie = IriTrie::new();
+    let mut local_ns_trie = NamespaceTrie::new();
 
     loop {
         if running == 0 {
@@ -38,18 +39,29 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         if let Ok(message) = rx.recv() {
             match message {
                 Message::Resource { iri, position } => {
-                    ns_trie.longest_prefix(iri.as_str(), true);
-                    let stats = NodeStats::new_terminal(position);
-                    iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
-                    //iri_trie.insert(&iri, stats);
+                    let res = ns_trie.longest_prefix(iri.as_str(), true);
+                    if res.is_empty() {
+                        let stats = NodeStats::new_terminal(position);
+                        iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
+                    }
                 }
                 Message::PrefixDecl { namespace, alias } => {
-                    ns_trie.insert(&alias, namespace);
+                    local_ns_trie.insert(&namespace, alias);
                 }
                 Message::Finished => {
                     running -= 1;
                 }
             }
+        }
+    }
+
+    // local file prefix decls are only sent in the end
+    // remove the prefix and add to other prefix trie
+
+    iri_trie.remove_known_prefixes(&local_ns_trie);
+    for (namespace, node) in local_ns_trie.iter() {
+        if let Some(alias) = &node.value {
+            ns_trie.insert(&namespace, alias.clone());
         }
     }
 
@@ -86,7 +98,6 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 Ok(()) as Result<(), TurtleError>
             })
             .unwrap();
-        //println!("PREFIXES : {:?}", graph.prefixes());
         for (alias, namespace) in graph.prefixes().iter() {
             tx.send(Message::PrefixDecl {
                 namespace: namespace.to_string(),
