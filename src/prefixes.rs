@@ -4,7 +4,6 @@ use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TripleP
 use crate::parse::parse;
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
-use threadpool::ThreadPool;
 
 use crate::ns_trie::NamespaceTrie;
 use std::{
@@ -22,7 +21,10 @@ pub enum Message {
 
 pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
-    let pool: ThreadPool = ThreadPool::new(n_workers);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(n_workers)
+        .build()
+        .unwrap();
     let mut running = paths.len();
     let (tx, rx) = channel::<Message>();
 
@@ -68,10 +70,10 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     return iri_trie;
 }
 
-fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf) {
+fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
     let tx = tx.clone();
 
-    pool.execute(move || {
+    pool.spawn(move || {
         let mut graph = parse(&path);
         graph
             .parse_all(&mut |t| {
