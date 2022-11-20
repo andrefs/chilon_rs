@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     fmt::{Debug, Display},
     mem,
 };
@@ -338,6 +338,36 @@ pub enum TraverseDirection {
     Up,
 }
 
+struct NodeIter<'a, T> {
+    queue: VecDeque<(String, &'a Node<T>)>,
+}
+
+impl<T> Node<T> {
+    fn iter(&self) -> NodeIter<'_, T> {
+        NodeIter {
+            queue: VecDeque::from([("".to_string(), self)]),
+        }
+    }
+}
+
+impl<'a, T> Iterator for NodeIter<'a, T> {
+    type Item = (String, &'a Node<T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.queue.is_empty() {
+            return None;
+        }
+        let (s, n) = self.queue.pop_front().unwrap();
+        for (k, v) in n.children.iter() {
+            self.queue.push_front((format!("{s}{k}"), &v));
+        }
+        if n.is_terminal {
+            return Some((s, n));
+        }
+        return self.next();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -558,5 +588,18 @@ mod tests {
         let pref = t.find("this is more wo", must_be_terminal);
         println!("{:#?}", pref);
         assert!(pref.is_none())
+    }
+
+    #[test]
+    fn iter() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+        let all_strs: Vec<_> = t.iter().map(|pair| pair.0).collect();
+        assert!(all_strs.contains(&"this is words".to_string()));
+        assert!(all_strs.contains(&"this is more".to_string()));
+        assert!(all_strs.contains(&"this is even more".to_string()));
+        assert_eq!(all_strs.len(), 3);
     }
 }
