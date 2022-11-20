@@ -338,12 +338,12 @@ pub enum TraverseDirection {
     Up,
 }
 
-struct NodeIter<'a, T> {
+pub struct NodeIter<'a, T> {
     queue: VecDeque<(String, &'a Node<T>)>,
 }
 
 impl<T> Node<T> {
-    fn iter(&self) -> NodeIter<'_, T> {
+    pub fn iter(&self) -> NodeIter<'_, T> {
         NodeIter {
             queue: VecDeque::from([("".to_string(), self)]),
         }

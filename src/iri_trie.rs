@@ -181,6 +181,7 @@ pub fn update_desc_stats(node: &mut IriTrie) {
 }
 
 pub trait IriTrieExt {
+    fn count(&self) -> u32;
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie);
@@ -188,9 +189,20 @@ pub trait IriTrieExt {
 }
 
 impl IriTrieExt for IriTrie {
+    fn count(&self) -> u32 {
+        let stats = self.stats();
+        let mut total = 0;
+        total += stats.desc.total;
+        if let Some(o) = stats.own {
+            total += o.total;
+        }
+        return total;
+    }
+
     fn remove_leaves(&mut self) -> bool {
         self.remove_leaves_aux("".to_string())
     }
+
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool {
         if self.children.is_empty() {
             return false;
@@ -214,10 +226,10 @@ impl IriTrieExt for IriTrie {
     }
 
     fn remove_known_prefixes(&mut self, ns_trie: &NamespaceTrie) {
-        todo!()
-        //for (_, namespace) in ns_trie.iter() {
-        //    self.remove_prefix(namespace);
-        //}
+        for (namespace, _) in ns_trie.iter() {
+            //println!("Removing {namespace}");
+            self.remove_prefix(&namespace);
+        }
     }
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
