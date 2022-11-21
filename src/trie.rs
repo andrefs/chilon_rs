@@ -217,19 +217,14 @@ impl<T: Debug> Node<T> {
         };
     }
 
-    pub fn longest_prefix(&mut self, s: &str, must_be_terminal: bool) -> String {
+    pub fn longest_prefix(&self, s: &str, must_be_terminal: bool) -> Option<(&Node<T>, String)> {
         let lpo = LongestPrefOpts {
             must_be_terminal,
             must_match_fully: false,
         };
         let last_term = None;
 
-        let res = self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
-        return if let Some((_, prefix)) = res {
-            prefix
-        } else {
-            "".to_owned()
-        };
+        return self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
     }
 
     fn longest_prefix_aux<'a, S>(
@@ -323,6 +318,13 @@ impl<T: Debug> Node<T> {
             n.traverse_mut_aux(format!("{}{}", str_acc, c), f);
         }
     }
+}
+
+enum MatchType {
+    FullQuery,
+    FullPath,
+    Exact,
+    Loose,
 }
 
 struct LongestPrefOpts {
@@ -564,6 +566,17 @@ mod tests {
         t.insert("this is even more", 3);
         let must_be_terminal = false;
         let res = t.find("this is more", must_be_terminal);
+        assert_eq!(res.unwrap().value.unwrap(), 2)
+    }
+
+    #[test]
+    fn find_longer() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+        let must_be_terminal = true;
+        let res = t.find("this is more rabelz", must_be_terminal);
         assert_eq!(res.unwrap().value.unwrap(), 2)
     }
 

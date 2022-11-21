@@ -23,14 +23,14 @@ trait TripleFreqFns {
 
 impl TripleFreqFns for TripleFreq {
     fn add(&mut self, triple: (String, String, String)) {
-        todo!()
-        //self.entry(triple.0)
-        //    .or_default()
-        //    .entry(triple.1)
-        //    .or_default()
-        //    .entry(triple.2)
-        //    .or_default()
-        //    .add(1);
+        let count = self
+            .entry(triple.0)
+            .or_default()
+            .entry(triple.1)
+            .or_default()
+            .entry(triple.2)
+            .or_default();
+        *count += 1;
     }
 }
 
@@ -129,7 +129,13 @@ fn handle_object(obj: Term, ns_trie: &NamespaceTrie) -> String {
 }
 
 fn handle_named_node(n: NamedNode, ns_trie: &NamespaceTrie) -> String {
-    todo!()
+    let res = ns_trie.longest_prefix(n.iri, true);
+    if let Some((node, _)) = res {
+        if node.value.is_some() {
+            return node.value.as_ref().unwrap().clone();
+        }
+    }
+    panic!("Could not normalize named node {}", n);
 }
 
 fn handle_literal(lit: Literal) -> String {
@@ -141,4 +147,8 @@ fn handle_literal(lit: Literal) -> String {
         } => "[LITERAL:lang-string]".to_string(),
         Literal::Typed { value: _, datatype } => format!("[LITERAL:{datatype}]").to_string(),
     }
+}
+
+pub fn print_normalized_triples(nts: &TripleFreq) {
+    todo!()
 }

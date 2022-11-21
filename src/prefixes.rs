@@ -42,7 +42,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             match message {
                 Message::Resource { iri, position } => {
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
-                    if res.is_empty() {
+                    if res.is_none() || res.unwrap().1.is_empty() {
                         let stats = NodeStats::new_terminal(position);
                         iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
                     }

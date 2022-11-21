@@ -9,6 +9,7 @@ mod trie;
 
 use crate::prefixes::build_iri_trie;
 use args::Cli;
+use chilon_rs::normalize::print_normalized_triples;
 use clap::Parser;
 use log::{debug, error, info, log_enabled, Level};
 use normalize::normalize_triples;
@@ -41,7 +42,10 @@ fn main() {
      * normalize triples *
      *********************/
     info!("Normalizing triples");
-    normalize_triples(cli.files.clone(), &mut ns_trie); // TODO
+    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO
+    print_normalized_triples(&nts);
+
+    println!("{:#?}", nts)
 
     /*******************
      * summarize graph *
