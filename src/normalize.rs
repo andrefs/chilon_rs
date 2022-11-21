@@ -182,7 +182,7 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
     }
     info!("Saving graph summary to {}", file_path.display());
 
-    let mut id_count = 0;
+    let mut id_count = 1;
 
     let base_url = "http://andrefs.com/graph-summ/v1/".clone();
     let fd = OpenOptions::new()
@@ -198,57 +198,62 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
 
         formatter
             .format(&Triple {
-                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode { iri: "a".clone() },
-                object: Term::NamedNode(NamedNode {
+                object: NamedNode {
                     iri: format!("{rdf}Statement").as_str(),
-                }),
+                }
+                .into(),
             })
             .unwrap();
 
         id_count += 1;
         formatter
             .format(&Triple {
-                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}subject").as_str(),
                 },
-                object: Term::NamedNode(NamedNode {
+                object: NamedNode {
                     iri: format!("{base_url}{}", tf.0).as_str(),
-                }),
+                }
+                .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}predicate").as_str(),
                 },
-                object: Term::NamedNode(NamedNode {
+                object: NamedNode {
                     iri: format!("{base_url}{}", tf.1).as_str(),
-                }),
+                }
+                .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}object").as_str(),
                 },
-                object: Term::NamedNode(NamedNode {
+                object: NamedNode {
                     iri: format!("{base_url}{}", tf.2).as_str(),
-                }),
+                }
+                .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
                     iri: format!("{base_url}occurrences").as_str(),
                 },
-                object: Term::Literal(Literal::Simple {
+                object: Literal::Simple {
                     value: tf.3.to_string().as_str(),
-                }),
+                }
+                .into(),
             })
             .unwrap();
 
