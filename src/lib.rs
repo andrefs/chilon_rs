@@ -6,3 +6,4 @@ pub mod ns_trie;
 pub mod parse;
 pub mod prefixes;
 pub mod trie;
+pub mod util;

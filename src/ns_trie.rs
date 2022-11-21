@@ -9,9 +9,7 @@ pub trait SaveTrie {
 }
 
 impl SaveTrie for NamespaceTrie {
-    fn save(&self) {
-        todo!()
-    }
+    fn save(&self) {}
 }
 
 pub trait InferredNamespaces {

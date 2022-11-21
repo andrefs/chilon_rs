@@ -6,6 +6,7 @@ mod ns_trie;
 mod parse;
 mod prefixes;
 mod trie;
+mod util;
 
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
@@ -38,7 +39,7 @@ fn main() {
     ns_trie.add_inferred_namespaces(inferred);
 
     info!("Saving namespaces");
-    //ns_trie.save(); // TODO
+    ns_trie.save(); // TODO
 
     /*********************
      * normalize triples *
