@@ -7,15 +7,15 @@ mod parse;
 mod prefixes;
 mod trie;
 
-use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats};
-use crate::normalize::print_normalized_triples;
+use crate::iri_trie::{IriTrie, IriTrieExt};
+use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::prefixes::infer_namespaces;
 use args::Cli;
 use clap::Parser;
-use log::{debug, error, info};
+use log::info;
 use normalize::normalize_triples;
-use ns_trie::{InferredNamespaces, NamespaceTrie};
+use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
 use simple_logger::SimpleLogger;
 
@@ -33,20 +33,19 @@ fn main() {
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     info!("Infering namespaces");
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
-
-    info!("Saving namespaces");
-    //ns_trie.save(); // TODO
-
     iri_trie.remove_leaves();
     let inferred = infer_namespaces(&iri_trie);
     ns_trie.add_inferred_namespaces(inferred);
+
+    info!("Saving namespaces");
+    //ns_trie.save(); // TODO
 
     /*********************
      * normalize triples *
      *********************/
     info!("Normalizing triples");
     let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO
-    print_normalized_triples(&nts);
+    save_normalized_triples(&nts);
 
     println!("{:#?}", nts)
 

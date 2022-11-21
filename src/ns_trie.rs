@@ -42,7 +42,7 @@ impl InferredNamespaces for NamespaceTrie {
                     }
                 }
                 debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
-                self.insert(&alias, ns.clone());
+                self.insert(ns, alias);
             }
         }
     }

@@ -168,7 +168,7 @@ fn handle_literal(lit: Literal) -> String {
     }
 }
 
-pub fn print_normalized_triples(nts: &TripleFreq) {
+pub fn save_normalized_triples(nts: &TripleFreq) {
     let base_path = "output";
     let ext = "ttl";
     let mut path = format!("{}.{}", base_path, ext);
