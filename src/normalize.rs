@@ -1,4 +1,5 @@
 use crate::parse::parse;
+use log::info;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
@@ -9,13 +10,13 @@ use rio_turtle::TurtleFormatter;
 use crate::ns_trie::NamespaceTrie;
 use std::fmt::format;
 use std::fs::File;
-use std::path::Path;
 use std::{
     collections::BTreeMap,
     ops::Add,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
+use std::{fs::OpenOptions, path::Path};
 
 use rio_api::parser::TriplesParser;
 
@@ -173,16 +174,22 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
     let mut path = format!("{}.{}", base_path, ext);
     let mut file_path = Path::new(&path);
 
-    let mut copy_count = 0;
+    let mut copy_count = 1;
     while file_path.exists() {
         copy_count += 1;
         path = format!("{}-{}.{}", base_path, copy_count, ext);
         file_path = Path::new(&path);
     }
-    let mut id_count = -1;
+    info!("Saving graph summary to {}", file_path.display());
 
-    let base_url = "http://andrefs.com/graph-summ/1/".clone();
-    let fd = File::open(file_path).unwrap();
+    let mut id_count = 0;
+
+    let base_url = "http://andrefs.com/graph-summ/v1/".clone();
+    let fd = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_path)
+        .unwrap();
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     let mut formatter = TurtleFormatter::new(fd);
@@ -207,7 +214,7 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
                     iri: format!("{rdf}subject").as_str(),
                 },
                 object: Term::NamedNode(NamedNode {
-                    iri: &tf.0.as_str(),
+                    iri: format!("{base_url}{}", tf.0).as_str(),
                 }),
             })
             .unwrap();
@@ -218,7 +225,7 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
                     iri: format!("{rdf}predicate").as_str(),
                 },
                 object: Term::NamedNode(NamedNode {
-                    iri: &tf.1.as_str(),
+                    iri: format!("{base_url}{}", tf.1).as_str(),
                 }),
             })
             .unwrap();
@@ -229,7 +236,7 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
                     iri: format!("{rdf}object").as_str(),
                 },
                 object: Term::NamedNode(NamedNode {
-                    iri: &tf.2.as_str(),
+                    iri: format!("{base_url}{}", tf.2).as_str(),
                 }),
             })
             .unwrap();

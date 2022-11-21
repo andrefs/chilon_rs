@@ -2,3 +2,4 @@
 /Cargo.lock
 *.bz2
 cache
+output*.ttl
