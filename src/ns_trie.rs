@@ -1,4 +1,6 @@
-use crate::trie::Node;
+use std::{collections::HashMap, fs::write};
+
+use crate::{trie::Node, util::gen_file_name};
 use log::{debug, info};
 use url::Url;
 
@@ -9,7 +11,15 @@ pub trait SaveTrie {
 }
 
 impl SaveTrie for NamespaceTrie {
-    fn save(&self) {}
+    fn save(&self) {
+        let file_path = gen_file_name("all-prefixes".to_string(), "json".to_string());
+        let mut ns_map = HashMap::<String, String>::new();
+        for (ns, node) in self.iter_leaves() {
+            ns_map.insert(node.value.as_ref().unwrap().clone(), ns);
+        }
+
+        write(file_path, serde_json::to_string_pretty(&ns_map).unwrap()).unwrap();
+    }
 }
 
 pub trait InferredNamespaces {

@@ -1,22 +1,19 @@
+use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
+use crate::util::gen_file_name;
 use log::{debug, info};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
-use rio_api::model::{BlankNode, Literal, NamedNode, Subject, Term};
+use rio_api::model::{Literal, NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use rio_turtle::TurtleFormatter;
-
-use crate::ns_trie::NamespaceTrie;
-use std::fmt::format;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::{
     collections::BTreeMap,
-    ops::Add,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
-use std::{fs::OpenOptions, path::Path};
 
 use rio_api::parser::TriplesParser;
 
@@ -169,18 +166,10 @@ fn handle_literal(lit: Literal) -> String {
 }
 
 pub fn save_normalized_triples(nts: &TripleFreq) {
-    let base_path = "output";
-    let ext = "ttl";
-    let mut path = format!("{}.{}", base_path, ext);
-    let mut file_path = Path::new(&path);
-
-    let mut copy_count = 1;
-    while file_path.exists() {
-        copy_count += 1;
-        path = format!("{}-{}.{}", base_path, copy_count, ext);
-        file_path = Path::new(&path);
-    }
-    info!("Saving graph summary to {}", file_path.display());
+    let base_path = "output".to_string();
+    let ext = "ttl".to_string();
+    let file_path = gen_file_name(base_path, ext);
+    info!("Saving graph summary to {}", file_path);
 
     let mut id_count = 1;
 

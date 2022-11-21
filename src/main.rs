@@ -39,13 +39,13 @@ fn main() {
     ns_trie.add_inferred_namespaces(inferred);
 
     info!("Saving namespaces");
-    ns_trie.save(); // TODO
+    ns_trie.save();
 
     /*********************
      * normalize triples *
      *********************/
     info!("Normalizing triples");
-    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO
+    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
     save_normalized_triples(&nts);
 
     println!("{:#?}", nts)
