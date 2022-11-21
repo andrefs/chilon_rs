@@ -1,5 +1,5 @@
 use crate::parse::parse;
-use log::info;
+use log::{debug, info};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
@@ -103,8 +103,8 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: &Names
     let tx = tx.clone();
 
     pool.scope(move |s| {
-        s.spawn(move |s| {
-            log::info!("  parsing {:?}", path);
+        s.spawn(move |_| {
+            debug!("parsing {:?}", path);
             let mut graph = parse(&path);
             graph
                 .parse_all(&mut |t| {
@@ -193,6 +193,7 @@ pub fn print_normalized_triples(nts: &TripleFreq) {
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     let mut formatter = TurtleFormatter::new(fd);
+
     for tf in nts.iter_all() {
         let t_id = format!("{base_url}t{:0width$}", id_count, width = 4);
 

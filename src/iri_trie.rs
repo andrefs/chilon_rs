@@ -1,4 +1,7 @@
-use std::{borrow::Borrow, collections::BTreeMap};
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, VecDeque},
+};
 
 use crate::{ns_trie::NamespaceTrie, trie::Node};
 
@@ -178,6 +181,36 @@ pub fn update_desc_stats(node: &mut IriTrie) {
         own: node.stats().own,
     });
     node.set_stats(desc_stats);
+}
+
+pub struct NodeIter<'a, T> {
+    queue: VecDeque<(String, &'a Node<T>)>,
+}
+
+impl<T> Node<T> {
+    pub fn iter_leaves(&self) -> NodeIter<'_, T> {
+        NodeIter {
+            queue: VecDeque::from([("".to_string(), self)]),
+        }
+    }
+}
+
+impl<'a, T> Iterator for NodeIter<'a, T> {
+    type Item = (String, &'a Node<T>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.queue.is_empty() {
+            return None;
+        }
+        let (s, n) = self.queue.pop_front().unwrap();
+        for (k, v) in n.children.iter() {
+            self.queue.push_front((format!("{s}{k}"), &v));
+        }
+        if n.children.is_empty() {
+            return Some((s, n));
+        }
+        return self.next();
+    }
 }
 
 pub trait IriTrieExt {

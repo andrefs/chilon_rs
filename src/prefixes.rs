@@ -1,11 +1,12 @@
 pub mod prefixcc;
 
 use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
+use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
+use log::{debug, info};
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
-
-use crate::ns_trie::NamespaceTrie;
+use std::collections::BTreeMap;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -75,6 +76,7 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
 
     pool.spawn(move || {
         let mut graph = parse(&path);
+        debug!("inferring from {:?}", path);
         graph
             .parse_all(&mut |t| {
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
@@ -109,4 +111,13 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
         }
         tx.send(Message::Finished).unwrap();
     });
+}
+
+pub fn infer_namespaces(iri_trie: &IriTrie) -> Vec<String> {
+    let mut res: Vec<String> = Vec::new();
+    for ns in iri_trie.iter_leaves() {
+        res.push(ns.0);
+    }
+
+    return res;
 }
