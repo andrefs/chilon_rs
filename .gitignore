@@ -3,3 +3,5 @@
 *.bz2
 cache
 output*.ttl
+all-prefixes*.json
+results/

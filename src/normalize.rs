@@ -166,7 +166,7 @@ fn handle_literal(lit: Literal) -> String {
 }
 
 pub fn save_normalized_triples(nts: &TripleFreq) {
-    let base_path = "output".to_string();
+    let base_path = "results/output".to_string();
     let ext = "ttl".to_string();
     let file_path = gen_file_name(base_path, ext);
     info!("Saving graph summary to {}", file_path);
