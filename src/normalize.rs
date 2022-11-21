@@ -1,9 +1,15 @@
 use crate::parse::parse;
 use rayon::{ThreadPool, ThreadPoolBuilder};
+use rio_api::formatter::TriplesFormatter;
+use rio_api::model::Triple;
 use rio_api::model::{BlankNode, Literal, NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
+use rio_turtle::TurtleFormatter;
 
 use crate::ns_trie::NamespaceTrie;
+use std::fmt::format;
+use std::fs::File;
+use std::path::Path;
 use std::{
     collections::BTreeMap,
     ops::Add,
@@ -19,6 +25,7 @@ type TripleFreqThird = BTreeMap<String, i32>;
 
 trait TripleFreqFns {
     fn add(&mut self, triple: (String, String, String));
+    fn iter_all(&self) -> Vec<(String, String, String, i32)>;
 }
 
 impl TripleFreqFns for TripleFreq {
@@ -31,6 +38,17 @@ impl TripleFreqFns for TripleFreq {
             .entry(triple.2)
             .or_default();
         *count += 1;
+    }
+
+    fn iter_all(&self) -> Vec<(String, String, String, i32)> {
+        self.into_iter()
+            .flat_map(|(s, m)| {
+                m.into_iter().flat_map(|(p, m)| {
+                    m.into_iter()
+                        .map(|(o, count)| (s.clone(), p.clone(), o.clone(), *count))
+                })
+            })
+            .collect()
     }
 }
 
@@ -150,5 +168,84 @@ fn handle_literal(lit: Literal) -> String {
 }
 
 pub fn print_normalized_triples(nts: &TripleFreq) {
-    todo!()
+    let base_path = "output";
+    let ext = "ttl";
+    let mut path = format!("{}.{}", base_path, ext);
+    let mut file_path = Path::new(&path);
+
+    let mut copy_count = 0;
+    while file_path.exists() {
+        copy_count += 1;
+        path = format!("{}-{}.{}", base_path, copy_count, ext);
+        file_path = Path::new(&path);
+    }
+    let mut id_count = -1;
+
+    let base_url = "http://andrefs.com/graph-summ/1/".clone();
+    let fd = File::open(file_path).unwrap();
+    let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+
+    let mut formatter = TurtleFormatter::new(fd);
+    for tf in nts.iter_all() {
+        let t_id = format!("{base_url}t{:0width$}", id_count, width = 4);
+
+        formatter
+            .format(&Triple {
+                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                predicate: NamedNode { iri: "a".clone() },
+                object: Term::NamedNode(NamedNode {
+                    iri: format!("{rdf}Statement").as_str(),
+                }),
+            })
+            .unwrap();
+
+        id_count += 1;
+        formatter
+            .format(&Triple {
+                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                predicate: NamedNode {
+                    iri: format!("{rdf}subject").as_str(),
+                },
+                object: Term::NamedNode(NamedNode {
+                    iri: &tf.0.as_str(),
+                }),
+            })
+            .unwrap();
+        formatter
+            .format(&Triple {
+                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                predicate: NamedNode {
+                    iri: format!("{rdf}predicate").as_str(),
+                },
+                object: Term::NamedNode(NamedNode {
+                    iri: &tf.1.as_str(),
+                }),
+            })
+            .unwrap();
+        formatter
+            .format(&Triple {
+                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                predicate: NamedNode {
+                    iri: format!("{rdf}object").as_str(),
+                },
+                object: Term::NamedNode(NamedNode {
+                    iri: &tf.2.as_str(),
+                }),
+            })
+            .unwrap();
+        formatter
+            .format(&Triple {
+                subject: Subject::NamedNode(NamedNode { iri: &t_id }),
+                predicate: NamedNode {
+                    iri: format!("{base_url}occurrences").as_str(),
+                },
+                object: Term::Literal(Literal::Simple {
+                    value: tf.3.to_string().as_str(),
+                }),
+            })
+            .unwrap();
+
+        id_count += 1;
+    }
+    formatter.finish().unwrap();
 }
