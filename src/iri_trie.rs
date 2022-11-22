@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
 };
 
 use crate::{ns_trie::NamespaceTrie, trie::Node};
@@ -225,7 +225,7 @@ pub trait IriTrieExt {
         prev_cand: &Option<(String, u32)>,
         cur_str: String,
         cur_char: char,
-        acc: &mut Vec<String>,
+        acc: &mut HashSet<String>,
     );
     //fn infer_namespaces_aux(&self, cur_str: String, acc: &mut Vec<String>);
 }
@@ -306,11 +306,11 @@ impl IriTrieExt for IriTrie {
     // }
 
     fn infer_namespaces(&self) -> Vec<String> {
-        let mut acc: Vec<String> = Vec::new();
+        let mut acc: HashSet<String> = HashSet::new();
         for (ch, node) in self.children.iter() {
             node.infer_namespaces_aux(&None, "".to_string(), *ch, &mut acc);
         }
-        return acc;
+        return acc.into_iter().collect();
     }
 
     fn infer_namespaces_aux(
@@ -318,39 +318,33 @@ impl IriTrieExt for IriTrie {
         prev_cand: &Option<(String, u32)>,
         cur_str: String,
         cur_char: char,
-        acc: &mut Vec<String>,
+        acc: &mut HashSet<String>,
     ) {
-        if !['/', '#'].contains(&cur_char) {
-            if self.children.is_empty() {
-                acc.push(format!("{cur_str}{cur_char}"));
-                return;
-            }
-            for (ch, node) in self.children.iter() {
-                node.infer_namespaces_aux(prev_cand, format!("{cur_str}{cur_char}"), *ch, acc)
-            }
-            return;
-        }
-
-        if let Some((prev_cand_str, prev_cand_desc)) = prev_cand {
-            let self_desc = self.stats().desc.total;
-            if self_desc > (2 / 3) * prev_cand_desc {
-                acc.push(format!("{cur_str}{cur_char}"));
-                return;
-            } else {
-                if self.children.is_empty() {
-                    acc.push(prev_cand_str.clone());
+        let self_desc = self.stats().desc.total;
+        if ['/', '#'].contains(&cur_char) {
+            if let Some((_, prev_cand_desc)) = prev_cand {
+                if self_desc > (2 / 3) * prev_cand_desc {
+                    acc.insert(format!("{cur_str}{cur_char}"));
                     return;
                 }
-                for (ch, node) in self.children.iter() {
+            }
+        }
+
+        if !self.children.is_empty() {
+            for (ch, node) in self.children.iter() {
+                if ['/', '#'].contains(&cur_char) {
                     node.infer_namespaces_aux(
                         &Some((format!("{cur_str}{cur_char}"), self_desc)),
                         format!("{cur_str}{cur_char}"),
                         *ch,
                         acc,
                     )
+                } else {
+                    node.infer_namespaces_aux(prev_cand, format!("{cur_str}{cur_char}"), *ch, acc)
                 }
             }
         }
+        return;
     }
 }
 
