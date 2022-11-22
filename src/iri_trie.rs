@@ -278,34 +278,6 @@ impl IriTrieExt for IriTrie {
         self.remove_fn(namespace, true, Some(&upd_stats_visitor))
     }
 
-    // fn infer_namespaces(&self) -> Vec<String> {
-    //     let mut acc: Vec<String> = Vec::new();
-    //     self.infer_namespaces_aux("".to_string(), &mut acc);
-    //     return acc;
-    // }
-
-    // fn infer_namespaces_aux(&self, cur_str: String, acc: &mut Vec<String>) {
-    //     for (ch, node) in self.children.iter() {
-    //         if node.children.is_empty() {
-    //             acc.push(format!("{cur_str}{ch}"));
-    //             continue;
-    //         }
-
-    //         if ['/', '#'].contains(&ch) {
-    //             let desc_total = node.stats().desc.total;
-    //             if !self
-    //                 .children
-    //                 .iter()
-    //                 .any(|(_, child)| child.stats().desc.total > (2 * desc_total) / 3)
-    //             {
-    //                 acc.push(format!("{cur_str}{ch}"));
-    //                 continue;
-    //             }
-    //         }
-    //         node.infer_namespaces_aux(format!("{cur_str}{ch}"), acc);
-    //     }
-    // }
-
     fn infer_namespaces(&self) -> Vec<String> {
         let mut acc: HashSet<String> = HashSet::new();
         for (ch, node) in self.children.iter() {
