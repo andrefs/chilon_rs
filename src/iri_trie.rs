@@ -222,7 +222,8 @@ pub trait IriTrieExt {
     fn infer_namespaces(&self) -> Vec<String>;
     fn infer_namespaces_aux(
         &self,
-        prev_cand: &Option<(String, u32)>,
+        prev_cand: String,
+        prev_node: &Option<(String, u32)>,
         cur_str: String,
         cur_char: char,
         acc: &mut HashSet<String>,
@@ -308,23 +309,29 @@ impl IriTrieExt for IriTrie {
     fn infer_namespaces(&self) -> Vec<String> {
         let mut acc: HashSet<String> = HashSet::new();
         for (ch, node) in self.children.iter() {
-            node.infer_namespaces_aux(&None, "".to_string(), *ch, &mut acc);
+            node.infer_namespaces_aux("".to_string(), &None, "".to_string(), *ch, &mut acc);
         }
         return acc.into_iter().collect();
     }
 
     fn infer_namespaces_aux(
         &self,
-        prev_cand: &Option<(String, u32)>,
+        prev_cand: String,
+        prev_node: &Option<(String, u32)>,
         cur_str: String,
         cur_char: char,
         acc: &mut HashSet<String>,
     ) {
         let self_desc = self.stats().desc.total;
+        let mut new_cand = prev_cand.clone();
+
         if ['/', '#'].contains(&cur_char) {
-            if let Some((_, prev_cand_desc)) = prev_cand {
-                if self_desc > (2 / 3) * prev_cand_desc {
-                    acc.insert(format!("{cur_str}{cur_char}"));
+            if let Some((_, prev_node_desc)) = prev_node {
+                if self_desc > (2 / 3) * prev_node_desc {
+                    new_cand = format!("{cur_str}{cur_char}");
+                }
+                if self.children.is_empty() {
+                    acc.insert(new_cand);
                     return;
                 }
             }
@@ -334,13 +341,20 @@ impl IriTrieExt for IriTrie {
             for (ch, node) in self.children.iter() {
                 if ['/', '#'].contains(&cur_char) {
                     node.infer_namespaces_aux(
+                        prev_cand.clone(),
                         &Some((format!("{cur_str}{cur_char}"), self_desc)),
                         format!("{cur_str}{cur_char}"),
                         *ch,
                         acc,
-                    )
+                    );
                 } else {
-                    node.infer_namespaces_aux(prev_cand, format!("{cur_str}{cur_char}"), *ch, acc)
+                    node.infer_namespaces_aux(
+                        prev_cand.clone(),
+                        prev_node,
+                        format!("{cur_str}{cur_char}"),
+                        *ch,
+                        acc,
+                    );
                 }
             }
         }
