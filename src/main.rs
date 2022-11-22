@@ -14,7 +14,7 @@ use crate::prefixes::build_iri_trie;
 use crate::prefixes::infer_namespaces;
 use args::Cli;
 use clap::Parser;
-use log::info;
+use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
@@ -32,10 +32,18 @@ fn main() {
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
-    info!("Infering namespaces");
+    info!("Inferring namespaces");
+
+    debug!("building IRI trie");
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
+
+    debug!("removing IRI trie leaves");
     iri_trie.remove_leaves();
-    let inferred = infer_namespaces(&iri_trie);
+
+    debug!("inferring namespaces");
+    let inferred = iri_trie.infer_namespaces();
+
+    debug!("adding inferred namespaces");
     ns_trie.add_inferred_namespaces(inferred);
 
     info!("Saving namespaces");
@@ -46,6 +54,8 @@ fn main() {
      *********************/
     info!("Normalizing triples");
     let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+
+    debug!("saving normalized triples");
     save_normalized_triples(&nts);
 
     println!("{:#?}", nts)

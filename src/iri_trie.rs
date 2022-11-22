@@ -219,6 +219,15 @@ pub trait IriTrieExt {
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
+    fn infer_namespaces(&self) -> Vec<String>;
+    fn infer_namespaces_aux(
+        &self,
+        prev_cand: &Option<(String, u32)>,
+        cur_str: String,
+        cur_char: char,
+        acc: &mut Vec<String>,
+    );
+    //fn infer_namespaces_aux(&self, cur_str: String, acc: &mut Vec<String>);
 }
 
 impl IriTrieExt for IriTrie {
@@ -266,6 +275,82 @@ impl IriTrieExt for IriTrie {
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
         self.remove_fn(namespace, true, Some(&upd_stats_visitor))
+    }
+
+    // fn infer_namespaces(&self) -> Vec<String> {
+    //     let mut acc: Vec<String> = Vec::new();
+    //     self.infer_namespaces_aux("".to_string(), &mut acc);
+    //     return acc;
+    // }
+
+    // fn infer_namespaces_aux(&self, cur_str: String, acc: &mut Vec<String>) {
+    //     for (ch, node) in self.children.iter() {
+    //         if node.children.is_empty() {
+    //             acc.push(format!("{cur_str}{ch}"));
+    //             continue;
+    //         }
+
+    //         if ['/', '#'].contains(&ch) {
+    //             let desc_total = node.stats().desc.total;
+    //             if !self
+    //                 .children
+    //                 .iter()
+    //                 .any(|(_, child)| child.stats().desc.total > (2 * desc_total) / 3)
+    //             {
+    //                 acc.push(format!("{cur_str}{ch}"));
+    //                 continue;
+    //             }
+    //         }
+    //         node.infer_namespaces_aux(format!("{cur_str}{ch}"), acc);
+    //     }
+    // }
+
+    fn infer_namespaces(&self) -> Vec<String> {
+        let mut acc: Vec<String> = Vec::new();
+        for (ch, node) in self.children.iter() {
+            node.infer_namespaces_aux(&None, "".to_string(), *ch, &mut acc);
+        }
+        return acc;
+    }
+
+    fn infer_namespaces_aux(
+        &self,
+        prev_cand: &Option<(String, u32)>,
+        cur_str: String,
+        cur_char: char,
+        acc: &mut Vec<String>,
+    ) {
+        if !['/', '#'].contains(&cur_char) {
+            if self.children.is_empty() {
+                acc.push(format!("{cur_str}{cur_char}"));
+                return;
+            }
+            for (ch, node) in self.children.iter() {
+                node.infer_namespaces_aux(prev_cand, format!("{cur_str}{cur_char}"), *ch, acc)
+            }
+            return;
+        }
+
+        if let Some((prev_cand_str, prev_cand_desc)) = prev_cand {
+            let self_desc = self.stats().desc.total;
+            if self_desc > (2 / 3) * prev_cand_desc {
+                acc.push(format!("{cur_str}{cur_char}"));
+                return;
+            } else {
+                if self.children.is_empty() {
+                    acc.push(prev_cand_str.clone());
+                    return;
+                }
+                for (ch, node) in self.children.iter() {
+                    node.infer_namespaces_aux(
+                        &Some((format!("{cur_str}{cur_char}"), self_desc)),
+                        format!("{cur_str}{cur_char}"),
+                        *ch,
+                        acc,
+                    )
+                }
+            }
+        }
     }
 }
 
