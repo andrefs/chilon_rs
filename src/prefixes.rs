@@ -3,10 +3,9 @@ pub mod prefixcc;
 use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
-use log::{debug, info};
+use log::debug;
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
-use std::collections::BTreeMap;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -49,6 +48,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     }
                 }
                 Message::PrefixDecl { namespace, alias } => {
+                    debug!("Found local prefix {alias}: {namespace}");
                     local_ns_trie.insert(&namespace, alias);
                 }
                 Message::Finished => {

@@ -8,6 +8,8 @@ mod prefixes;
 mod trie;
 mod util;
 
+use crate::iri_trie::NodeStats;
+use crate::iri_trie::Stats;
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
@@ -18,6 +20,7 @@ use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
+use rand::{thread_rng, Rng};
 use simple_logger::SimpleLogger;
 
 fn main() {
@@ -38,27 +41,66 @@ fn main() {
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
     debug!("removing IRI trie leaves");
-    iri_trie.remove_leaves();
+    //iri_trie.remove_leaves();
 
-    debug!("inferring namespaces");
-    let inferred = iri_trie.infer_namespaces();
+    /// /////////////////
+    /// TESTING STUFF
+    /// /////////////////
+    let unmatched = iri_trie.count();
+    println!("{}", unmatched);
 
-    debug!("adding inferred namespaces");
-    ns_trie.add_inferred_namespaces(inferred);
+    let mut rng = thread_rng();
 
-    info!("Saving namespaces");
-    ns_trie.save();
+    let mut urls = Vec::from([
+        //"http://wordnet-rdf.princeton.edu/ontology#partOfSpeech".to_string(),
+        //"http://wordnet-rdf.princeton.edu/id/00001740-n".to_string(),
+        //"http://ili.globalwordnet.org/ili/i35545".to_string(),
+        //"http://wikipedia.org/wiki/Synchronized_swimming".to_string(),
+        //"https://www.w3.org/2009/08/skos-reference/skos-owl1-dl.rdf".to_string(),
+    ]);
 
-    /*********************
-     * normalize triples *
-     *********************/
-    info!("Normalizing triples");
-    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+    let mut next_rand = 0;
+    for (i, (url, node)) in iri_trie.iter().enumerate() {
+        if (i - next_rand) % 1000 == 0 {
+            urls.push(url);
+            next_rand = rng.gen_range(1..25);
+        }
+    }
 
-    debug!("saving normalized triples");
-    save_normalized_triples(&nts);
+    for u in urls {
+        let mut v: Vec<(String, String)> = Vec::new();
+        iri_trie.value_along_path(u.to_string(), "".to_string(), &mut v);
 
-    println!("{:#?}", nts)
+        for (url, stats) in v.iter() {
+            println!("{:indent$} {:?} ", url, stats, indent = u.len());
+        }
+    }
+
+    panic!("FIM.");
+
+    ///////////////////////////////
+    //// NO MORE TESTING STUFF
+    ///////////////////////////////
+
+    //  debug!("inferring namespaces");
+    //  let inferred = iri_trie.infer_namespaces();
+
+    //  debug!("adding inferred namespaces");
+    //  ns_trie.add_inferred_namespaces(inferred);
+
+    //  info!("Saving namespaces");
+    //  ns_trie.save();
+
+    //  /*********************
+    //   * normalize triples *
+    //   *********************/
+    //  info!("Normalizing triples");
+    //  let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+
+    //  debug!("saving normalized triples");
+    //  save_normalized_triples(&nts);
+
+    //  println!("{:#?}", nts)
 
     /*******************
      * summarize graph *
