@@ -220,6 +220,8 @@ pub trait IriTrieExt {
     fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
+    fn infer_namespaces_1(&self) -> Vec<String>;
+
     //fn infer_namespaces(&self) -> Vec<String>;
     //fn infer_namespaces_aux(
     //    &self,
@@ -287,9 +289,12 @@ impl IriTrieExt for IriTrie {
         let mut to_remove = Vec::<char>::new();
 
         for (&ch, node) in self.children.iter_mut() {
+            let node_had_children = !node.children.is_empty();
             let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
             if !child_deleted && ['/', '#'].contains(&ch) {
                 to_remove.push(ch);
+                // if ch was the last one it doesn't count
+                //deleted = node_had_children;
                 deleted = true;
             }
             deleted = deleted || child_deleted;
@@ -309,6 +314,20 @@ impl IriTrieExt for IriTrie {
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
         self.remove_fn(namespace, true, Some(&upd_stats_visitor))
+    }
+
+    fn infer_namespaces_1(&self) -> Vec<String> {
+        let mut v: HashSet<String> = HashSet::new();
+        for (s, node) in self.iter_leaves() {
+            println!("{s}");
+
+            if let Some(stats) = node.value {
+                if stats.desc.total > 10 {
+                    v.insert(s.clone());
+                }
+            }
+        }
+        return v.into_iter().collect();
     }
 
     //fn infer_namespaces(&self) -> Vec<String> {

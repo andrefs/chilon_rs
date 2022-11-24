@@ -40,12 +40,45 @@ fn main() {
     debug!("building IRI trie");
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
-    debug!("removing IRI trie leaves");
-    //iri_trie.remove_leaves();
+    // /// TESTING STUFF
+    // debug_unknown_namespaces(&mut iri_trie);
 
-    /// /////////////////
-    /// TESTING STUFF
-    /// /////////////////
+    debug!("removing IRI trie leaves");
+    iri_trie.remove_leaves();
+    println!(
+        "XXXXX counts {} {} {}",
+        iri_trie.count(),
+        iri_trie.count_nodes(),
+        iri_trie.count_terminals()
+    );
+    debug!("inferring namespaces");
+    let inferred = iri_trie.infer_namespaces_1();
+
+    debug!("adding inferred namespaces");
+    ns_trie.add_inferred_namespaces(inferred);
+
+    info!("Saving namespaces");
+    ns_trie.save();
+
+    /*********************
+     * normalize triples *
+     *********************/
+    info!("Normalizing triples");
+    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+
+    debug!("saving normalized triples");
+    save_normalized_triples(&nts);
+
+    println!("{:#?}", nts)
+
+    /*******************
+     * summarize graph *
+     *******************/
+
+    //println!("{:#?}", iri_trie);
+}
+
+fn debug_unknown_namespaces(iri_trie: &mut IriTrie) {
     let unmatched = iri_trie.count();
     println!("{}", unmatched);
 
@@ -57,6 +90,10 @@ fn main() {
         //"http://ili.globalwordnet.org/ili/i35545".to_string(),
         //"http://wikipedia.org/wiki/Synchronized_swimming".to_string(),
         //"https://www.w3.org/2009/08/skos-reference/skos-owl1-dl.rdf".to_string(),
+        //"http://wordnet-rdf.princeton.edu/rdf/lemma/pair_of_trousers#pair_of_trousers-04496264-n",
+
+        // //"http://github.com/andrefs.com/project1/somefolter/ontology/a-resource",
+        // //"http://github.com/andrefs.com/project2/ontology#a-resource",
     ]);
 
     let mut next_rand = 0;
@@ -77,34 +114,4 @@ fn main() {
     }
 
     panic!("FIM.");
-
-    ///////////////////////////////
-    //// NO MORE TESTING STUFF
-    ///////////////////////////////
-
-    //  debug!("inferring namespaces");
-    //  let inferred = iri_trie.infer_namespaces();
-
-    //  debug!("adding inferred namespaces");
-    //  ns_trie.add_inferred_namespaces(inferred);
-
-    //  info!("Saving namespaces");
-    //  ns_trie.save();
-
-    //  /*********************
-    //   * normalize triples *
-    //   *********************/
-    //  info!("Normalizing triples");
-    //  let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
-
-    //  debug!("saving normalized triples");
-    //  save_normalized_triples(&nts);
-
-    //  println!("{:#?}", nts)
-
-    /*******************
-     * summarize graph *
-     *******************/
-
-    //println!("{:#?}", iri_trie);
 }

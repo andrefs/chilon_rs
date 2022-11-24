@@ -346,6 +346,7 @@ pub struct NodeIter<'a, T> {
 
 impl<T> Node<T> {
     pub fn iter(&self) -> NodeIter<'_, T> {
+        println!("YYYYYYY 2");
         NodeIter {
             queue: VecDeque::from([("".to_string(), self)]),
         }
