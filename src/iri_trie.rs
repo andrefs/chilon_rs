@@ -319,8 +319,6 @@ impl IriTrieExt for IriTrie {
     fn infer_namespaces_1(&self) -> Vec<String> {
         let mut v: HashSet<String> = HashSet::new();
         for (s, node) in self.iter_leaves() {
-            println!("{s}");
-
             if let Some(stats) = node.value {
                 if stats.desc.total > 10 {
                     v.insert(s.clone());
@@ -329,85 +327,6 @@ impl IriTrieExt for IriTrie {
         }
         return v.into_iter().collect();
     }
-
-    //fn infer_namespaces(&self) -> Vec<String> {
-    //    let mut acc: Vec<String> = Vec::new();
-    //    self.infer_namespaces_aux("".to_string(), "".to_string(), &mut acc);
-    //    return acc;
-    //}
-
-    //fn infer_namespaces_aux(&self, cur_str: String, acc: &mut Vec<String>) -> bool {
-    //    if self.children.is_empty() {
-    //        return false;
-    //    }
-
-    //    let
-
-    //    let  = self
-    //        .children
-    //        .iter()
-    //        .find(|(_, child)| child.stats().desc.total > (2 * desc_total) / 3);
-
-    //    //If let Some((ch, node)) = child {
-    //    //    if child.infer_namespaces(format!("{cur_str}{ch}")) {}
-    //    //} else {
-    //    //}
-    //}
-
-    // fn infer_namespaces(&self) -> Vec<String> {
-    //     let mut acc: HashSet<String> = HashSet::new();
-    //     for (ch, node) in self.children.iter() {
-    //         node.infer_namespaces_aux("".to_string(), &None, "".to_string(), *ch, &mut acc);
-    //     }
-    //     return acc.into_iter().collect();
-    // }
-
-    // fn infer_namespaces_aux(
-    //     &self,
-    //     prev_cand: String,
-    //     prev_node: &Option<(String, u32)>,
-    //     cur_str: String,
-    //     cur_char: char,
-    //     acc: &mut HashSet<String>,
-    // ) {
-    //     let self_desc = self.stats().desc.total;
-    //     let mut new_cand = prev_cand.clone();
-
-    //     if ['/', '#'].contains(&cur_char) {
-    //         if let Some((_, prev_node_desc)) = prev_node {
-    //             if self_desc > (2 / 3) * prev_node_desc {
-    //                 new_cand = format!("{cur_str}{cur_char}");
-    //             }
-    //             if self.children.is_empty() {
-    //                 acc.insert(new_cand);
-    //                 return;
-    //             }
-    //         }
-    //     }
-
-    //     if !self.children.is_empty() {
-    //         for (ch, node) in self.children.iter() {
-    //             if ['/', '#'].contains(&cur_char) {
-    //                 node.infer_namespaces_aux(
-    //                     prev_cand.clone(),
-    //                     &Some((format!("{cur_str}{cur_char}"), self_desc)),
-    //                     format!("{cur_str}{cur_char}"),
-    //                     *ch,
-    //                     acc,
-    //                 );
-    //             } else {
-    //                 node.infer_namespaces_aux(
-    //                     prev_cand.clone(),
-    //                     prev_node,
-    //                     format!("{cur_str}{cur_char}"),
-    //                     *ch,
-    //                     acc,
-    //                 );
-    //             }
-    //         }
-    //     }
-    //     return;
-    // }
 }
 
 #[cfg(test)]

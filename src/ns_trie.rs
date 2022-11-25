@@ -29,7 +29,6 @@ pub trait InferredNamespaces {
 impl InferredNamespaces for NamespaceTrie {
     fn add_inferred_namespaces(&mut self, inferred: Vec<String>) {
         for ns in inferred.iter() {
-            println!("XXXXXX 5 {}", ns.as_str());
             let url_obj = Url::parse(ns.as_str()).unwrap();
             if url_obj.has_host() {
                 let domains = url_obj.host_str().unwrap().split('.').collect::<Vec<_>>();

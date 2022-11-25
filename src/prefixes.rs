@@ -116,7 +116,6 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
 pub fn infer_namespaces(iri_trie: &IriTrie) -> Vec<String> {
     let mut res: Vec<String> = Vec::new();
     for ns in iri_trie.iter_leaves() {
-        println!("{} {:?}", ns.0, ns.1.value);
         res.push(ns.0);
     }
 

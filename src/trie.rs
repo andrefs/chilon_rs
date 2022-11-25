@@ -346,7 +346,6 @@ pub struct NodeIter<'a, T> {
 
 impl<T> Node<T> {
     pub fn iter(&self) -> NodeIter<'_, T> {
-        println!("YYYYYYY 2");
         NodeIter {
             queue: VecDeque::from([("".to_string(), self)]),
         }
@@ -445,7 +444,6 @@ mod tests {
         t.insert("ab", 2);
         t.insert("c", 3);
         t.insert("de", 4);
-        println!("{:#?}", t);
         assert_eq!(t.pp(false), "a\n b\nc\nde\n")
     }
 
@@ -499,7 +497,6 @@ mod tests {
         t.insert("abc", 2);
         let expected = t.pp(false);
         t.remove("xyz", true);
-        println!("{}", t.pp(true));
         assert_eq!(t.pp(false), expected);
     }
     #[test]
@@ -544,7 +541,8 @@ mod tests {
         let must_be_terminal = true;
         let res = t.longest_prefix("this is more wo", must_be_terminal);
         let expected: Vec<char> = "this is more ".chars().collect();
-        assert_eq!(res.chars().collect::<Vec<_>>(), expected);
+        let (node, s) = res.unwrap();
+        assert_eq!(s.chars().collect::<Vec<_>>(), expected);
     }
 
     #[test]
@@ -555,8 +553,7 @@ mod tests {
         t.insert("this is more words", 3);
         let must_be_terminal = true;
         let res = t.longest_prefix("this is", must_be_terminal);
-        println!("RES: '{res}'");
-        assert!(res.is_empty());
+        assert!(res.is_none());
     }
 
     #[test]
@@ -600,7 +597,6 @@ mod tests {
         t.insert("this is even more", 3);
         let must_be_terminal = true;
         let pref = t.find("this is more wo", must_be_terminal);
-        println!("{:#?}", pref);
         assert!(pref.is_none())
     }
 

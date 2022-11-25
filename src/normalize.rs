@@ -1,16 +1,19 @@
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::util::gen_file_name;
-use log::{debug, info};
+use log::{debug, info, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
 use rio_api::model::{Literal, NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use rio_turtle::TurtleFormatter;
-use std::fs::OpenOptions;
+use std::fmt::format;
+use std::fs::{write, OpenOptions};
+use std::io::Write;
 use std::{
     collections::BTreeMap,
+    error::Error,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };
@@ -56,6 +59,9 @@ pub enum Message {
         predicate: String,
         object: String,
     },
+    CouldNotNormalizeTriple {
+        err: UnknownNamespaceError,
+    },
     Finished,
 }
 
@@ -86,6 +92,13 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
                 } => {
                     triples.add((subject, predicate, object));
                 }
+                Message::CouldNotNormalizeTriple { err } => {
+                    if let UnknownNamespaceError { iri } = err {
+                        let msg = format!("Unknown namespace for resource {iri}");
+                        warn!("{msg}");
+                        log_error_to_file(msg);
+                    }
+                }
                 Message::Finished => {
                     running -= 1;
                 }
@@ -94,6 +107,20 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
     }
 
     return triples;
+}
+
+fn log_error_to_file(err: String) {
+    let base_path = "results/errors".to_string();
+    let ext = "log".to_string();
+    let file_path = gen_file_name(base_path, ext);
+
+    let mut fd = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(file_path.clone())
+        .unwrap();
+    writeln!(fd, "{}", err).unwrap();
 }
 
 fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: &NamespaceTrie) {
@@ -109,11 +136,19 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: &Names
                     let predicate = handle_predicate(t.predicate, ns_trie);
                     let object = handle_object(t.object, ns_trie);
 
-                    tx.send(Message::NormalizedTriple {
-                        subject: subject.to_string(),
-                        predicate,
-                        object: object.to_string(),
-                    })
+                    if let Err(err) = subject {
+                        tx.send(Message::CouldNotNormalizeTriple { err })
+                    } else if let Err(err) = predicate {
+                        tx.send(Message::CouldNotNormalizeTriple { err })
+                    } else if let Err(err) = object {
+                        tx.send(Message::CouldNotNormalizeTriple { err })
+                    } else {
+                        tx.send(Message::NormalizedTriple {
+                            subject: subject.unwrap().to_string(),
+                            predicate: predicate.unwrap(),
+                            object: object.unwrap().to_string(),
+                        })
+                    }
                     .unwrap();
                     Ok(()) as Result<(), TurtleError>
                 })
@@ -123,35 +158,48 @@ fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: &Names
     });
 }
 
-fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> String {
+fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
     match sub {
-        Subject::BlankNode(_) => "[BLANK]".to_string(),
+        Subject::BlankNode(_) => Ok("[BLANK]".to_string()),
         Subject::Triple(_) => unimplemented!(),
         Subject::NamedNode(n) => handle_named_node(n, ns_trie),
     }
 }
 
-fn handle_predicate(pred: NamedNode, ns_trie: &NamespaceTrie) -> String {
+fn handle_predicate(
+    pred: NamedNode,
+    ns_trie: &NamespaceTrie,
+) -> Result<String, UnknownNamespaceError> {
     handle_named_node(pred, ns_trie)
 }
 
-fn handle_object(obj: Term, ns_trie: &NamespaceTrie) -> String {
+fn handle_object(obj: Term, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
     match obj {
-        Term::BlankNode(_) => "[BLANK]".to_string(),
+        Term::BlankNode(_) => Ok("[BLANK]".to_string()),
         Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
-        Term::Literal(lit) => handle_literal(lit),
+        Term::Literal(lit) => Ok(handle_literal(lit)),
     }
 }
 
-fn handle_named_node(n: NamedNode, ns_trie: &NamespaceTrie) -> String {
+#[derive(Debug, Clone)]
+pub struct UnknownNamespaceError {
+    iri: String,
+}
+
+fn handle_named_node(
+    n: NamedNode,
+    ns_trie: &NamespaceTrie,
+) -> Result<String, UnknownNamespaceError> {
     let res = ns_trie.longest_prefix(n.iri, true);
     if let Some((node, _)) = res {
         if node.value.is_some() {
-            return node.value.as_ref().unwrap().clone();
+            return Ok(node.value.as_ref().unwrap().clone());
         }
     }
-    panic!("Could not normalize named node {}", n);
+    return Err(UnknownNamespaceError {
+        iri: n.iri.to_string(),
+    });
 }
 
 fn handle_literal(lit: Literal) -> String {

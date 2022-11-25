@@ -45,12 +45,6 @@ fn main() {
 
     debug!("removing IRI trie leaves");
     iri_trie.remove_leaves();
-    println!(
-        "XXXXX counts {} {} {}",
-        iri_trie.count(),
-        iri_trie.count_nodes(),
-        iri_trie.count_terminals()
-    );
     debug!("inferring namespaces");
     let inferred = iri_trie.infer_namespaces_1();
 
