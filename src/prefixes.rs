@@ -76,6 +76,7 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
 
     pool.spawn(move || {
         let mut graph = parse(&path);
+        print!("\r");
         debug!("inferring from {:?}", path);
         graph
             .parse_all(&mut |t| {

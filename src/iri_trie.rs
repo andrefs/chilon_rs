@@ -221,6 +221,7 @@ pub trait IriTrieExt {
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
     fn infer_namespaces_1(&self) -> Vec<String>;
+    fn infer_namespaces_2(&self) -> Vec<String>;
 
     //fn infer_namespaces(&self) -> Vec<String>;
     //fn infer_namespaces_aux(
@@ -317,6 +318,17 @@ impl IriTrieExt for IriTrie {
     }
 
     fn infer_namespaces_1(&self) -> Vec<String> {
+        let mut v: HashSet<String> = HashSet::new();
+        for (s, node) in self.iter_leaves() {
+            if let Some(stats) = node.value {
+                if stats.desc.total > 10 {
+                    v.insert(s.clone());
+                }
+            }
+        }
+        return v.into_iter().collect();
+    }
+    fn infer_namespaces_2(&self) -> Vec<String> {
         let mut v: HashSet<String> = HashSet::new();
         for (s, node) in self.iter_leaves() {
             if let Some(stats) = node.value {

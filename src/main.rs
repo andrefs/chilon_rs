@@ -38,6 +38,7 @@ fn main() {
     info!("Inferring namespaces");
 
     debug!("building IRI trie");
+
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
     // /// TESTING STUFF
