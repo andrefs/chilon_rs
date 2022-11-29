@@ -5,6 +5,7 @@ mod normalize;
 mod ns_trie;
 mod parse;
 mod prefixes;
+mod seg_tree;
 mod trie;
 mod util;
 
@@ -14,6 +15,7 @@ use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::prefixes::infer_namespaces;
+use crate::seg_tree::SegTree;
 use args::Cli;
 use clap::Parser;
 use log::{debug, info};
@@ -27,9 +29,9 @@ fn main() {
     let cli = Cli::parse();
     SimpleLogger::new().init().unwrap();
 
-    /*******************
-     * prepare_prefixes *
-     *******************/
+    /**********************
+     * Prepare namespaces *
+     **********************/
 
     info!("Loading namespaces from Prefix.cc");
     let mut ns_trie: NamespaceTrie = prefixcc::load();
@@ -37,40 +39,37 @@ fn main() {
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     info!("Inferring namespaces");
 
-    debug!("building IRI trie");
+    debug!("Building IRI trie");
 
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
     // /// TESTING STUFF
     // debug_unknown_namespaces(&mut iri_trie);
 
-    debug!("removing IRI trie leaves");
+    debug!("Removing IRI trie leaves");
     iri_trie.remove_leaves();
-    debug!("inferring namespaces");
-    let inferred = iri_trie.infer_namespaces_1();
+    debug!("Inferring namespaces");
 
-    debug!("adding inferred namespaces");
-    ns_trie.add_inferred_namespaces(inferred);
+    let seg_tree = SegTree::from(iri_trie);
 
-    info!("Saving namespaces");
-    ns_trie.save();
+    //let inferred = iri_trie.infer_namespaces_1();
 
-    /*********************
-     * normalize triples *
-     *********************/
-    info!("Normalizing triples");
-    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+    //debug!("Adding inferred namespaces");
+    //ns_trie.add_inferred_namespaces(inferred);
 
-    debug!("saving normalized triples");
-    save_normalized_triples(&nts);
+    //info!("Saving namespaces");
+    //ns_trie.save();
 
-    println!("{:#?}", nts)
+    ///*********************
+    // * Normalize triples *
+    // *********************/
 
-    /*******************
-     * summarize graph *
-     *******************/
+    //info!("Normalizing triples");
+    //let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
 
-    //println!("{:#?}", iri_trie);
+    //debug!("saving normalized triples");
+    //save_normalized_triples(&nts);
+    println!("{:#?}", seg_tree)
 }
 
 fn debug_unknown_namespaces(iri_trie: &mut IriTrie) {

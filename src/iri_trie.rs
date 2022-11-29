@@ -6,7 +6,7 @@ use std::{
 use crate::{ns_trie::NamespaceTrie, trie::Node};
 
 // Represents occurrences as subject, predicate or object
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Stats {
     pub s: u32,
     pub p: u32,
