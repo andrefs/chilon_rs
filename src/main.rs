@@ -1,3 +1,5 @@
+#![feature(btree_drain_filter)]
+
 mod args;
 mod extract;
 mod iri_trie;
@@ -47,10 +49,12 @@ fn main() {
     // debug_unknown_namespaces(&mut iri_trie);
 
     debug!("Removing IRI trie leaves");
-    iri_trie.remove_leaves();
+    //iri_trie.remove_leaves();
     debug!("Inferring namespaces");
 
     let seg_tree = SegTree::from(iri_trie);
+    let ns = seg_tree.infer_namespaces();
+    println!("{:#?}", ns);
 
     //let inferred = iri_trie.infer_namespaces_1();
 
