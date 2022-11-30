@@ -53,32 +53,27 @@ fn main() {
     debug!("Inferring namespaces");
 
     let seg_tree = SegTree::from(iri_trie);
-    let ns = seg_tree.infer_namespaces();
-    println!("{:#?}", ns);
+    let inferred = seg_tree.infer_namespaces();
 
-    //let inferred = iri_trie.infer_namespaces_1();
+    debug!("Adding inferred namespaces");
+    ns_trie.add_inferred_namespaces(inferred);
 
-    //debug!("Adding inferred namespaces");
-    //ns_trie.add_inferred_namespaces(inferred);
+    info!("Saving namespaces");
+    ns_trie.save();
 
-    //info!("Saving namespaces");
-    //ns_trie.save();
+    /*********************
+     * Normalize triples *
+     *********************/
 
-    ///*********************
-    // * Normalize triples *
-    // *********************/
+    info!("Normalizing triples");
+    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
 
-    //info!("Normalizing triples");
-    //let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
-
-    //debug!("saving normalized triples");
-    //save_normalized_triples(&nts);
-    println!("{:#?}", seg_tree)
+    debug!("saving normalized triples");
+    save_normalized_triples(&nts);
 }
 
 fn debug_unknown_namespaces(iri_trie: &mut IriTrie) {
     let unmatched = iri_trie.count();
-    println!("{}", unmatched);
 
     let mut rng = thread_rng();
 
