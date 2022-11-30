@@ -6,6 +6,7 @@ use crate::parse::parse;
 use log::debug;
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
+use std::collections::BTreeMap;
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -32,7 +33,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         spawn(&pool, &tx, path);
     }
     let mut iri_trie = IriTrie::new();
-    let mut local_ns_trie = NamespaceTrie::new();
+    let mut local_ns = BTreeMap::<String, String>::new();
 
     loop {
         if running == 0 {
@@ -49,7 +50,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
-                    local_ns_trie.insert(&namespace, alias);
+                    local_ns.insert(namespace, alias);
                 }
                 Message::Finished => {
                     running -= 1;
@@ -61,11 +62,9 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     // local file prefix decls are only sent in the end
     // remove the prefix and add to other prefix trie
 
-    iri_trie.remove_known_prefixes(&local_ns_trie);
-    for (namespace, node) in local_ns_trie.iter() {
-        if let Some(alias) = &node.value {
-            ns_trie.insert(&namespace, alias.clone());
-        }
+    iri_trie.remove_known_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
+    for (namespace, alias) in local_ns.iter() {
+        ns_trie.insert(&namespace.clone(), alias.clone());
     }
 
     return iri_trie;

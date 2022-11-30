@@ -20,7 +20,7 @@ use crate::prefixes::infer_namespaces;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use clap::Parser;
-use log::{debug, info};
+use log::{debug, info, warn};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
@@ -48,15 +48,18 @@ fn main() {
     // /// TESTING STUFF
     // debug_unknown_namespaces(&mut iri_trie);
 
-    debug!("Removing IRI trie leaves");
+    //debug!("Removing IRI trie leaves");
     //iri_trie.remove_leaves();
-    debug!("Inferring namespaces");
 
+    warn!("IRIs with unknwon namespaces: {}", iri_trie.count(),);
+
+    debug!("Inferring namespaces");
     let seg_tree = SegTree::from(iri_trie);
     let inferred = seg_tree.infer_namespaces();
 
     debug!("Adding inferred namespaces");
-    ns_trie.add_inferred_namespaces(inferred);
+    ns_trie.add_inferred_namespaces(&inferred);
+    iri_trie.remove_known_prefixes(&inferred);
 
     info!("Saving namespaces");
     ns_trie.save();

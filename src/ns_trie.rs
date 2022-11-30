@@ -23,11 +23,11 @@ impl SaveTrie for NamespaceTrie {
 }
 
 pub trait InferredNamespaces {
-    fn add_inferred_namespaces(&mut self, inferred: Vec<String>);
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>);
 }
 
 impl InferredNamespaces for NamespaceTrie {
-    fn add_inferred_namespaces(&mut self, inferred: Vec<String>) {
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) {
         for ns in inferred.iter() {
             let url_obj = Url::parse(ns.as_str()).unwrap();
             if url_obj.has_host() {

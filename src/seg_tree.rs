@@ -80,10 +80,8 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
             .cloned()
         {
             Some(parent) => {
-                println!("ns: {}", parent.namespace);
                 h.remove(&parent);
                 for (c, node) in parent.node.children {
-                    println!("inserting: {}{}", parent.namespace, c);
                     h.insert(NamespaceCandidate {
                         size: node.value,
                         children: node.children.len(),

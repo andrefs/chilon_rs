@@ -217,7 +217,7 @@ pub trait IriTrieExt {
     fn count(&self) -> u32;
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_known_prefixes(&mut self, ns_map: &NamespaceTrie);
+    fn remove_known_prefixes(&mut self, ns_vec: &Vec<String>);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
     fn infer_namespaces_1(&self) -> Vec<String>;
@@ -307,9 +307,9 @@ impl IriTrieExt for IriTrie {
         return deleted;
     }
 
-    fn remove_known_prefixes(&mut self, ns_trie: &NamespaceTrie) {
-        for (namespace, _) in ns_trie.iter() {
-            self.remove_prefix(&namespace);
+    fn remove_known_prefixes(&mut self, ns_vec: &Vec<String>) {
+        for namespace in ns_vec.iter() {
+            self.remove_prefix(namespace);
         }
     }
 
