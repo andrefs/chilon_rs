@@ -14,7 +14,7 @@ pub struct SegTree {
 }
 
 impl SegTree {
-    fn from_aux(&mut self, iri_trie: IriTrie, word_acc: String) {
+    fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String) {
         if iri_trie.children.is_empty() {
             self.children.insert(
                 word_acc,
@@ -28,7 +28,7 @@ impl SegTree {
             );
             return;
         }
-        for (c, node) in iri_trie.children {
+        for (c, node) in &iri_trie.children {
             if ['/', '#'].contains(&c) {
                 let sub_tree = SegTree {
                     children: BTreeMap::new(),
@@ -40,9 +40,9 @@ impl SegTree {
                 self.children
                     .entry(format!("{word_acc}{c}"))
                     .or_insert(sub_tree)
-                    .from_aux(node, "".to_string());
+                    .from_aux(&node, "".to_string());
             } else {
-                self.from_aux(node, format!("{word_acc}{c}"));
+                self.from_aux(&node, format!("{word_acc}{c}"));
             }
         }
     }
@@ -95,8 +95,8 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
     }
 }
 
-impl From<IriTrie> for SegTree {
-    fn from(iri_trie: IriTrie) -> Self {
+impl From<&IriTrie> for SegTree {
+    fn from(iri_trie: &IriTrie) -> Self {
         let mut res = SegTree {
             value: 0,
             children: BTreeMap::new(),

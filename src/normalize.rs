@@ -79,7 +79,12 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
         spawn(&pool, &tx, path, ns_trie);
     }
 
+    let mut i = 0;
     loop {
+        i += 1;
+        if i % 1000 == 0 {
+            debug!("Normalized {i} triples")
+        }
         if running == 0 {
             break;
         }
@@ -96,7 +101,7 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
                     if let UnknownNamespaceError { iri } = err {
                         let msg = format!("Unknown namespace for resource {iri}");
                         warn!("{msg}");
-                        log_error_to_file(msg);
+                        //log_error_to_file(msg);
                     }
                 }
                 Message::Finished => {

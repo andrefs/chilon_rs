@@ -20,7 +20,8 @@ use crate::prefixes::infer_namespaces;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use clap::Parser;
-use log::{debug, info, warn};
+use log::warn;
+use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
@@ -39,10 +40,7 @@ fn main() {
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
-    info!("Inferring namespaces");
-
-    debug!("Building IRI trie");
-
+    info!("Getting namespaces");
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
     // /// TESTING STUFF
@@ -51,15 +49,19 @@ fn main() {
     //debug!("Removing IRI trie leaves");
     //iri_trie.remove_leaves();
 
-    warn!("IRIs with unknwon namespaces: {}", iri_trie.count(),);
-
-    debug!("Inferring namespaces");
-    let seg_tree = SegTree::from(iri_trie);
+    let seg_tree = SegTree::from(&iri_trie);
     let inferred = seg_tree.infer_namespaces();
 
     debug!("Adding inferred namespaces");
     ns_trie.add_inferred_namespaces(&inferred);
+
+    debug!("Removing IRIs with inferred namespaces");
     iri_trie.remove_known_prefixes(&inferred);
+
+    warn!(
+        "IRIs without namespace: {:?}",
+        iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
+    );
 
     info!("Saving namespaces");
     ns_trie.save();

@@ -3,7 +3,7 @@ pub mod prefixcc;
 use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
-use log::debug;
+use log::{debug, warn};
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
@@ -21,6 +21,7 @@ pub enum Message {
 }
 
 pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
+    debug!("Building IRI trie");
     let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)

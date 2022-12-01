@@ -3,7 +3,8 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
 };
 
-use crate::{ns_trie::NamespaceTrie, trie::Node};
+use crate::{ns_trie::NamespaceTrie, seg_tree::SegTree, trie::Node};
+use log::{debug, info, warn};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -222,17 +223,6 @@ pub trait IriTrieExt {
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
     fn infer_namespaces_1(&self) -> Vec<String>;
     fn infer_namespaces_2(&self) -> Vec<String>;
-
-    //fn infer_namespaces(&self) -> Vec<String>;
-    //fn infer_namespaces_aux(
-    //    &self,
-    //    prev_cand: String,
-    //    prev_node: &Option<(String, u32)>,
-    //    cur_str: String,
-    //    cur_char: char,
-    //    acc: &mut HashSet<String>,
-    //);
-    //fn infer_namespaces_aux(&self, last_cand: String, cur_str: String, acc: &mut Vec<String>);
 }
 
 impl IriTrieExt for IriTrie {
@@ -311,6 +301,7 @@ impl IriTrieExt for IriTrie {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }
+        warn!("IRIs with unknwon namespaces: {}", self.count(),);
     }
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
