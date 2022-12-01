@@ -36,7 +36,12 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
 
+    let mut i = 0;
     loop {
+        i += 1;
+        if i % 1_000_000 == 0 {
+            debug!("Read {i} resources so far")
+        }
         if running == 0 {
             break;
         }
@@ -77,7 +82,7 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
     pool.spawn(move || {
         let mut graph = parse(&path);
         print!("\r");
-        debug!("inferring from {:?}", path);
+        debug!("parsing {:?}", path);
         graph
             .parse_all(&mut |t| {
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {

@@ -6,11 +6,11 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
 use rio_api::model::{Literal, NamedNode, Subject, Term};
-use rio_turtle::TurtleError;
 use rio_turtle::TurtleFormatter;
+use rio_turtle::{TurtleError, TurtleParser};
 use std::fmt::format;
 use std::fs::{write, OpenOptions};
-use std::io::Write;
+use std::io::{BufRead, Write};
 use std::{
     collections::BTreeMap,
     error::Error,
@@ -75,15 +75,22 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
     let mut running = paths.len();
     let (tx, rx) = channel::<Message>();
 
-    for path in paths {
-        spawn(&pool, &tx, path, ns_trie);
-    }
+    pool.scope(move |s| {
+        for path in paths {
+            let tx = tx.clone();
+            s.spawn(move |_| {
+                debug!("parsing {:?}", path);
+                let mut graph = parse(&path);
+                proc_triples(path, &mut graph, &tx, ns_trie);
+            });
+        }
+    });
 
     let mut i = 0;
     loop {
         i += 1;
-        if i % 1000 == 0 {
-            debug!("Normalized {i} triples")
+        if i % 1_000_000 == 0 {
+            debug!("Normalized {i} triples so far")
         }
         if running == 0 {
             break;
@@ -98,11 +105,11 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
                     triples.add((subject, predicate, object));
                 }
                 Message::CouldNotNormalizeTriple { err } => {
-                    if let UnknownNamespaceError { iri } = err {
-                        let msg = format!("Unknown namespace for resource {iri}");
-                        warn!("{msg}");
-                        //log_error_to_file(msg);
-                    }
+                    //if let UnknownNamespaceError { iri } = err {
+                    //    let msg = format!("Unknown namespace for resource {iri}");
+                    //    warn!("{msg}");
+                    //    //log_error_to_file(msg);
+                    //}
                 }
                 Message::Finished => {
                     running -= 1;
@@ -112,6 +119,42 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
     }
 
     return triples;
+}
+fn proc_triples(
+    path: PathBuf,
+    graph: &mut TurtleParser<impl BufRead>,
+    tx: &Sender<Message>,
+    ns_trie: &NamespaceTrie,
+) {
+    let mut i = 0;
+    graph
+        .parse_all(&mut |t| {
+            if i == 0 {
+                debug!("started processing triples from {:?}", path);
+                i += 1;
+            }
+            let subject = handle_subject(t.subject, ns_trie);
+            let predicate = handle_predicate(t.predicate, ns_trie);
+            let object = handle_object(t.object, ns_trie);
+
+            if let Err(err) = subject {
+                tx.send(Message::CouldNotNormalizeTriple { err })
+            } else if let Err(err) = predicate {
+                tx.send(Message::CouldNotNormalizeTriple { err })
+            } else if let Err(err) = object {
+                tx.send(Message::CouldNotNormalizeTriple { err })
+            } else {
+                tx.send(Message::NormalizedTriple {
+                    subject: subject.unwrap().to_string(),
+                    predicate: predicate.unwrap(),
+                    object: object.unwrap().to_string(),
+                })
+            }
+            .unwrap();
+            Ok(()) as Result<(), TurtleError>
+        })
+        .unwrap();
+    tx.send(Message::Finished).unwrap();
 }
 
 fn log_error_to_file(err: String) {
