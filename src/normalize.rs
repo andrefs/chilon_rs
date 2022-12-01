@@ -129,21 +129,29 @@ fn proc_triples(
     let mut i = 0;
     graph
         .parse_all(&mut |t| {
-            if i == 0 {
-                debug!("started processing triples from {:?}", path);
-                i += 1;
-            }
             let subject = handle_subject(t.subject, ns_trie);
             let predicate = handle_predicate(t.predicate, ns_trie);
             let object = handle_object(t.object, ns_trie);
 
             if let Err(err) = subject {
+                if i == 0 {
+                    debug!("Sending first tx (1)");
+                }
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else if let Err(err) = predicate {
+                if i == 0 {
+                    debug!("Sending first tx (2)");
+                }
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else if let Err(err) = object {
+                if i == 0 {
+                    debug!("Sending (first tx (3)");
+                }
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else {
+                if i == 0 {
+                    debug!("Sending (first tx (4)");
+                }
                 tx.send(Message::NormalizedTriple {
                     subject: subject.unwrap().to_string(),
                     predicate: predicate.unwrap(),
@@ -151,6 +159,10 @@ fn proc_triples(
                 })
             }
             .unwrap();
+            if i == 0 {
+                debug!("First tx sent");
+                i += 1;
+            }
             Ok(()) as Result<(), TurtleError>
         })
         .unwrap();
