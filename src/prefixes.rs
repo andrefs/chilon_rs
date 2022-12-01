@@ -38,16 +38,16 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
 
     let mut i = 0;
     loop {
-        i += 1;
-        if i % 1_000_000 == 0 {
-            debug!("Read {i} resources so far")
-        }
         if running == 0 {
             break;
         }
         if let Ok(message) = rx.recv() {
             match message {
                 Message::Resource { iri, position } => {
+                    i += 1;
+                    if i % 1_000_000 == 1 {
+                        debug!("Read {i} resources so far");
+                    }
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
                     if res.is_none() || res.unwrap().1.is_empty() {
                         let stats = NodeStats::new_terminal(position);
@@ -83,8 +83,16 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
         let mut graph = parse(&path);
         print!("\r");
         debug!("parsing {:?}", path);
+        let mut i = 0;
+        let tind = rayon::current_thread_index();
         graph
             .parse_all(&mut |t| {
+                i += 1;
+                if i % 1_000_000 == 1 {
+                    if let Some(index) = tind {
+                        debug!("[Thread#{:?}] Parsed {i} triples so far", index);
+                    }
+                }
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
                     tx.send(Message::Resource {
                         iri: iri.to_owned(),

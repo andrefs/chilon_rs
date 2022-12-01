@@ -73,50 +73,54 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
         .build()
         .unwrap();
     let mut running = paths.len();
-    let (tx, rx) = channel::<Message>();
 
-    pool.scope(move |s| {
+    pool.scope(|s| {
+        let (tx, rx) = channel::<Message>();
         for path in paths {
             let tx = tx.clone();
             s.spawn(move |_| {
                 debug!("parsing {:?}", path);
                 let mut graph = parse(&path);
                 proc_triples(path, &mut graph, &tx, ns_trie);
+                debug!("XXXX 1");
             });
+            debug!("XXXX 2");
         }
-    });
+        debug!("XXXX 3");
 
-    let mut i = 0;
-    loop {
-        i += 1;
-        if i % 1_000_000 == 0 {
-            debug!("Normalized {i} triples so far")
-        }
-        if running == 0 {
-            break;
-        }
-        if let Ok(message) = rx.recv() {
-            match message {
-                Message::NormalizedTriple {
-                    subject,
-                    predicate,
-                    object,
-                } => {
-                    triples.add((subject, predicate, object));
-                }
-                Message::CouldNotNormalizeTriple { err } => {
-                    //if let UnknownNamespaceError { iri } = err {
-                    //    let msg = format!("Unknown namespace for resource {iri}");
-                    //    warn!("{msg}");
-                    //    //log_error_to_file(msg);
-                    //}
-                }
-                Message::Finished => {
-                    running -= 1;
+        let mut i = 0;
+        loop {
+            i += 1;
+            //if i % 1_000_000 == 1 {
+            debug!("Normalized {i} triples so far");
+            //}
+            if running == 0 {
+                break;
+            }
+            if let Ok(message) = rx.recv() {
+                match message {
+                    Message::NormalizedTriple {
+                        subject,
+                        predicate,
+                        object,
+                    } => {
+                        triples.add((subject, predicate, object));
+                    }
+                    Message::CouldNotNormalizeTriple { err } => {
+                        //if let UnknownNamespaceError { iri } = err {
+                        //    let msg = format!("Unknown namespace for resource {iri}");
+                        //    warn!("{msg}");
+                        //    //log_error_to_file(msg);
+                        //}
+                    }
+                    Message::Finished => {
+                        running -= 1;
+                    }
                 }
             }
         }
-    }
+    });
+    debug!("XXXX 4");
 
     return triples;
 }
@@ -159,10 +163,10 @@ fn proc_triples(
                 })
             }
             .unwrap();
-            if i == 0 {
-                debug!("First tx sent");
-                i += 1;
-            }
+            //if i == 0 {
+            debug!("{i} tx sent");
+            i += 1;
+            //}
             Ok(()) as Result<(), TurtleError>
         })
         .unwrap();
