@@ -1,7 +1,7 @@
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::util::gen_file_name;
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
@@ -67,7 +67,7 @@ pub enum Message {
 
 pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> TripleFreq {
     let mut triples = TripleFreq::new();
-    let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
+    let n_workers = std::cmp::min(paths.len() + 1, num_cpus::get() - 2);
     let pool = ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
@@ -79,21 +79,18 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
         for path in paths {
             let tx = tx.clone();
             s.spawn(move |_| {
-                debug!("parsing {:?}", path);
+                debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
-                proc_triples(path, &mut graph, &tx, ns_trie);
-                debug!("XXXX 1");
+                proc_triples(&mut graph, &tx, ns_trie);
             });
-            debug!("XXXX 2");
         }
-        debug!("XXXX 3");
 
         let mut i = 0;
         loop {
             i += 1;
-            //if i % 1_000_000 == 1 {
-            debug!("Normalized {i} triples so far");
-            //}
+            if i % 1_000_000 == 1 {
+                trace!("Normalized {i} triples so far");
+            }
             if running == 0 {
                 break;
             }
@@ -120,42 +117,39 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
             }
         }
     });
-    debug!("XXXX 4");
 
     return triples;
 }
 fn proc_triples(
-    path: PathBuf,
     graph: &mut TurtleParser<impl BufRead>,
     tx: &Sender<Message>,
     ns_trie: &NamespaceTrie,
 ) {
+    let tind = rayon::current_thread_index();
     let mut i = 0;
     graph
         .parse_all(&mut |t| {
+            i += 1;
+            if i % 1_000_000 == 1 {
+                if let Some(index) = tind {
+                    trace!("[Thread#{:?}] Parsed {i} triples so far", index);
+                }
+            }
             let subject = handle_subject(t.subject, ns_trie);
             let predicate = handle_predicate(t.predicate, ns_trie);
             let object = handle_object(t.object, ns_trie);
 
             if let Err(err) = subject {
-                if i == 0 {
-                    debug!("Sending first tx (1)");
-                }
+                if i == 0 {}
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else if let Err(err) = predicate {
-                if i == 0 {
-                    debug!("Sending first tx (2)");
-                }
+                if i == 0 {}
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else if let Err(err) = object {
-                if i == 0 {
-                    debug!("Sending (first tx (3)");
-                }
+                if i == 0 {}
                 tx.send(Message::CouldNotNormalizeTriple { err })
             } else {
-                if i == 0 {
-                    debug!("Sending (first tx (4)");
-                }
+                if i == 0 {}
                 tx.send(Message::NormalizedTriple {
                     subject: subject.unwrap().to_string(),
                     predicate: predicate.unwrap(),
@@ -163,10 +157,7 @@ fn proc_triples(
                 })
             }
             .unwrap();
-            //if i == 0 {
-            debug!("{i} tx sent");
-            i += 1;
-            //}
+
             Ok(()) as Result<(), TurtleError>
         })
         .unwrap();

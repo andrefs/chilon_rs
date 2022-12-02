@@ -3,7 +3,7 @@ pub mod prefixcc;
 use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
@@ -46,7 +46,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 Message::Resource { iri, position } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
-                        debug!("Read {i} resources so far");
+                        trace!("Read {i} resources so far");
                     }
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
                     if res.is_none() || res.unwrap().1.is_empty() {
@@ -90,7 +90,7 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 i += 1;
                 if i % 1_000_000 == 1 {
                     if let Some(index) = tind {
-                        debug!("[Thread#{:?}] Parsed {i} triples so far", index);
+                        trace!("[Thread#{:?}] Parsed {i} triples so far", index);
                     }
                 }
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
