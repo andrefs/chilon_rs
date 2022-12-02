@@ -63,7 +63,6 @@ fn main() {
         iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
     );
 
-    info!("Saving namespaces");
     ns_trie.save();
 
     /*********************

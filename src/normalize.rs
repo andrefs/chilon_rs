@@ -59,15 +59,15 @@ pub enum Message {
         predicate: String,
         object: String,
     },
-    CouldNotNormalizeTriple {
-        err: UnknownNamespaceError,
+    NamespaceUnknown {
+        iri: String,
     },
     Finished,
 }
 
 pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> TripleFreq {
     let mut triples = TripleFreq::new();
-    let n_workers = std::cmp::min(paths.len() + 1, num_cpus::get() - 2);
+    let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     let pool = ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
@@ -103,7 +103,7 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
                     } => {
                         triples.add((subject, predicate, object));
                     }
-                    Message::CouldNotNormalizeTriple { err } => {
+                    Message::NamespaceUnknown { iri: err } => {
                         //if let UnknownNamespaceError { iri } = err {
                         //    let msg = format!("Unknown namespace for resource {iri}");
                         //    warn!("{msg}");
@@ -135,27 +135,47 @@ fn proc_triples(
                     trace!("[Thread#{:?}] Parsed {i} triples so far", index);
                 }
             }
+
             let subject = handle_subject(t.subject, ns_trie);
             let predicate = handle_predicate(t.predicate, ns_trie);
             let object = handle_object(t.object, ns_trie);
 
-            if let Err(err) = subject {
+            if let Err(UnknownNamespaceError { iri: _ }) = subject {
                 if i == 0 {}
-                tx.send(Message::CouldNotNormalizeTriple { err })
-            } else if let Err(err) = predicate {
-                if i == 0 {}
-                tx.send(Message::CouldNotNormalizeTriple { err })
-            } else if let Err(err) = object {
-                if i == 0 {}
-                tx.send(Message::CouldNotNormalizeTriple { err })
-            } else {
-                if i == 0 {}
-                tx.send(Message::NormalizedTriple {
-                    subject: subject.unwrap().to_string(),
-                    predicate: predicate.unwrap(),
-                    object: object.unwrap().to_string(),
+                tx.send(Message::NamespaceUnknown {
+                    iri: t.subject.to_string(),
                 })
+                .unwrap();
             }
+            if let Err(UnknownNamespaceError { iri: _ }) = predicate {
+                if i == 0 {}
+                tx.send(Message::NamespaceUnknown {
+                    iri: t.predicate.to_string(),
+                })
+                .unwrap();
+            }
+            if let Err(UnknownNamespaceError { iri: _ }) = object {
+                if i == 0 {}
+                tx.send(Message::NamespaceUnknown {
+                    iri: t.object.to_string(),
+                })
+                .unwrap();
+            }
+
+            tx.send(Message::NormalizedTriple {
+                subject: match subject {
+                    Ok(ns) => ns.clone(),
+                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+                },
+                predicate: match predicate {
+                    Ok(ns) => ns.clone(),
+                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+                },
+                object: match object {
+                    Ok(ns) => ns.clone(),
+                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+                },
+            })
             .unwrap();
 
             Ok(()) as Result<(), TurtleError>
@@ -176,41 +196,6 @@ fn log_error_to_file(err: String) {
         .open(file_path.clone())
         .unwrap();
     writeln!(fd, "{}", err).unwrap();
-}
-
-fn spawn(pool: &ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: &NamespaceTrie) {
-    let tx = tx.clone();
-
-    pool.scope(move |s| {
-        s.spawn(move |_| {
-            debug!("parsing {:?}", path);
-            let mut graph = parse(&path);
-            graph
-                .parse_all(&mut |t| {
-                    let subject = handle_subject(t.subject, ns_trie);
-                    let predicate = handle_predicate(t.predicate, ns_trie);
-                    let object = handle_object(t.object, ns_trie);
-
-                    if let Err(err) = subject {
-                        tx.send(Message::CouldNotNormalizeTriple { err })
-                    } else if let Err(err) = predicate {
-                        tx.send(Message::CouldNotNormalizeTriple { err })
-                    } else if let Err(err) = object {
-                        tx.send(Message::CouldNotNormalizeTriple { err })
-                    } else {
-                        tx.send(Message::NormalizedTriple {
-                            subject: subject.unwrap().to_string(),
-                            predicate: predicate.unwrap(),
-                            object: object.unwrap().to_string(),
-                        })
-                    }
-                    .unwrap();
-                    Ok(()) as Result<(), TurtleError>
-                })
-                .unwrap();
-            tx.send(Message::Finished).unwrap();
-        });
-    });
 }
 
 fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {

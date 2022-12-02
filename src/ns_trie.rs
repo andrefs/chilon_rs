@@ -13,6 +13,7 @@ pub trait SaveTrie {
 impl SaveTrie for NamespaceTrie {
     fn save(&self) {
         let file_path = gen_file_name("results/all-prefixes".to_string(), "json".to_string());
+        info!("Saving namespaces in {}", file_path);
         let mut ns_map = HashMap::<String, String>::new();
         for (ns, node) in self.iter_leaves() {
             ns_map.insert(node.value.as_ref().unwrap().clone(), ns);

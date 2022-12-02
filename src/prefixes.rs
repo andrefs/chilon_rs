@@ -81,8 +81,7 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
 
     pool.spawn(move || {
         let mut graph = parse(&path);
-        print!("\r");
-        debug!("parsing {:?}", path);
+        debug!("Parsing {:?}", path);
         let mut i = 0;
         let tind = rayon::current_thread_index();
         graph
