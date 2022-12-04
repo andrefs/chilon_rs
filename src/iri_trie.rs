@@ -19,6 +19,8 @@ pub struct Stats {
 #[derive(Debug, Clone, Copy)]
 pub struct NodeStats {
     pub own: Option<Stats>,
+    pub own_uniq: usize,
+    pub desc_uniq: usize,
     pub desc: Stats,
 }
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +36,9 @@ impl NodeStats {
     pub fn new() -> NodeStats {
         NodeStats {
             own: None,
+            own_uniq: 0,
             desc: Default::default(),
+            desc_uniq: 0,
         }
     }
 
@@ -54,6 +58,8 @@ impl NodeStats {
                     ..Default::default()
                 }),
             },
+            desc_uniq: 0,
+            own_uniq: 1,
             desc: Default::default(),
         }
     }
@@ -68,12 +74,19 @@ impl IriTrieStatsExt for IriTrie {
     fn stats(&self) -> NodeStats {
         match self.value {
             None => NodeStats::new(),
-            Some(NodeStats { own, desc }) => NodeStats {
+            Some(NodeStats {
+                own,
+                desc,
+                desc_uniq,
+                own_uniq,
+            }) => NodeStats {
                 own: match own {
                     None => Default::default(),
                     Some(s) => Some(s),
                 },
                 desc,
+                desc_uniq,
+                own_uniq,
             },
         }
     }
@@ -87,6 +100,8 @@ impl Default for NodeStats {
         NodeStats {
             own: None,
             desc: Default::default(),
+            desc_uniq: 0,
+            own_uniq: 0,
         }
     }
 }
@@ -142,46 +157,49 @@ pub fn dec_stats(parent: &mut IriTrie, _: char, child: &IriTrie) {
 }
 
 pub fn upd_stats_visitor(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
-    update_desc_stats(node);
+    update_stats(node);
 }
 
-pub fn update_desc_stats(node: &mut IriTrie) {
-    let desc_s = 0 + node
+pub fn update_stats(node: &mut IriTrie) {
+    let (desc_s, desc_p, desc_o, desc_uniq) = node
         .children
         .iter()
         .map(|(_, child)| {
-            let stats = child.stats();
-            return if let Some(c) = stats.own { c.s } else { 0 } + stats.desc.s;
+            let child_stats = child.stats();
+            let own = child_stats.own.unwrap_or_default();
+            (
+                own.s + child_stats.desc.s,
+                own.p + child_stats.desc.p,
+                own.o + child_stats.desc.o,
+                child_stats.desc_uniq + child_stats.own_uniq,
+            )
         })
-        .sum::<u32>();
-    let desc_p = 0 + node
-        .children
-        .iter()
-        .map(|(_, child)| {
-            let stats = child.stats();
-            return if let Some(c) = stats.own { c.p } else { 0 } + stats.desc.p;
-        })
-        .sum::<u32>();
-    let desc_o = 0 + node
-        .children
-        .iter()
-        .map(|(_, child)| {
-            let stats = child.stats();
-            return if let Some(c) = stats.own { c.o } else { 0 } + stats.desc.o;
-        })
-        .sum::<u32>();
+        .fold(
+            (0, 0, 0, 0),
+            |(desc_s, desc_p, desc_o, desc_uniq), (delta_s, delta_p, delta_o, delta_uniq)| {
+                (
+                    desc_s + delta_s,
+                    desc_p + delta_p,
+                    desc_o + delta_o,
+                    desc_uniq + delta_uniq,
+                )
+            },
+        );
+
     let desc_total = desc_s + desc_p + desc_o;
 
-    let desc_stats = Some(NodeStats {
+    let stats = Some(NodeStats {
         desc: Stats {
             s: desc_s,
             p: desc_p,
             o: desc_o,
             total: desc_total,
         },
+        desc_uniq,
         own: node.stats().own,
+        own_uniq: node.stats().own_uniq,
     });
-    node.set_stats(desc_stats);
+    node.set_stats(stats);
 }
 
 pub struct NodeIter<'a, T> {
@@ -341,8 +359,8 @@ mod tests {
         let pos = TriplePos::S;
         let stats = NodeStats::new_terminal(pos);
         let mut t = Node::new();
-        t.insert_fn("ab", stats, Some(&update_desc_stats));
-        t.insert_fn("abcde", stats, Some(&update_desc_stats));
+        t.insert_fn("ab", stats, Some(&update_stats));
+        t.insert_fn("abcde", stats, Some(&update_stats));
         t.remove_fn("abcd", true, Some(&upd_stats_visitor));
 
         assert_eq!(t.value.unwrap().desc.s, 1);

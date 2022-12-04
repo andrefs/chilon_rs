@@ -58,10 +58,10 @@ fn main() {
     debug!("Removing IRIs with inferred namespaces");
     iri_trie.remove_known_prefixes(&inferred);
 
-    warn!(
-        "IRIs without namespace: {:?}",
-        iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
-    );
+    //warn!(
+    //    "IRIs without namespace: {:?}",
+    //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
+    //);
 
     ns_trie.save();
 
