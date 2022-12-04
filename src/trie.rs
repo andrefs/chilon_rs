@@ -79,14 +79,21 @@ impl<T: Debug> Node<T> {
     where
         S: Borrow<str>,
     {
-        self.insert_fn(key, value, None::<&dyn Fn(&mut Node<T>) -> u32>)
+        self.insert_fn(
+            key,
+            value,
+            &InsertFnVisitors {
+                node: None::<&dyn Fn(&mut Node<T>)>,
+                terminal: None::<&dyn Fn(&mut Node<T>)>,
+            },
+        )
     }
 
-    pub fn insert_fn<U, S: ?Sized>(
+    pub fn insert_fn<S: ?Sized>(
         &mut self,
         key: &S,
         value: T,
-        cb: Option<&dyn Fn(&mut Node<T>) -> U>,
+        visitors: &InsertFnVisitors<T>,
     ) -> Option<T>
     where
         S: Borrow<str>,
@@ -96,7 +103,7 @@ impl<T: Debug> Node<T> {
         if k.is_empty() {
             self.is_terminal = true;
             let old_val = mem::replace(&mut self.value, Some(value));
-            if let Some(f) = cb {
+            if let Some(f) = visitors.terminal {
                 f(self);
             }
 
@@ -108,8 +115,8 @@ impl<T: Debug> Node<T> {
 
         if self.children.contains_key(&first_char) {
             let child_node = self.children.get_mut(&first_char).unwrap();
-            let res = child_node.insert_fn(rest, value, cb);
-            if let Some(f) = cb {
+            let res = child_node.insert_fn(rest, value, visitors);
+            if let Some(f) = visitors.node {
                 f(self);
             }
             return res;
@@ -120,9 +127,9 @@ impl<T: Debug> Node<T> {
             children: BTreeMap::new(),
             value: None,
         };
-        let res = new_node.insert_fn(rest, value, cb);
+        let res = new_node.insert_fn(rest, value, visitors);
         self.children.insert(first_char, new_node);
-        if let Some(f) = cb {
+        if let Some(f) = visitors.node {
             f(self);
         }
         res
@@ -320,6 +327,10 @@ impl<T: Debug> Node<T> {
     }
 }
 
+pub struct InsertFnVisitors<'a, T> {
+    pub node: Option<&'a dyn Fn(&mut Node<T>)>,
+    pub terminal: Option<&'a dyn Fn(&mut Node<T>)>,
+}
 enum MatchType {
     FullQuery,
     FullPath,
@@ -516,7 +527,9 @@ mod tests {
         t.insert("this is more", 2);
         t.insert("this is more words", 3);
         let must_be_terminal = false;
-        let res = t.longest_prefix("this is more wo", must_be_terminal);
+        let (_, res) = t
+            .longest_prefix("this is more wo", must_be_terminal)
+            .unwrap();
         let expected: Vec<char> = "this is more wo".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
@@ -527,7 +540,7 @@ mod tests {
         t.insert("this is more", 2);
         t.insert("this is more words", 3);
         let must_be_terminal = false;
-        let res = t.longest_prefix("this is weeks", must_be_terminal);
+        let (_, res) = t.longest_prefix("this is weeks", must_be_terminal).unwrap();
         let expected: Vec<char> = "this is w".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
@@ -541,7 +554,7 @@ mod tests {
         let must_be_terminal = true;
         let res = t.longest_prefix("this is more wo", must_be_terminal);
         let expected: Vec<char> = "this is more ".chars().collect();
-        let (node, s) = res.unwrap();
+        let (_, s) = res.unwrap();
         assert_eq!(s.chars().collect::<Vec<_>>(), expected);
     }
 

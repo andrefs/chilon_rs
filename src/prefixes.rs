@@ -1,8 +1,9 @@
 pub mod prefixcc;
 
-use crate::iri_trie::{update_desc_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
+use crate::iri_trie::{update_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
+use crate::trie::InsertFnVisitors;
 use log::{debug, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
@@ -51,7 +52,14 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
                     if res.is_none() || res.unwrap().1.is_empty() {
                         let stats = NodeStats::new_terminal(position);
-                        iri_trie.insert_fn(&iri, stats, Some(&update_desc_stats));
+                        iri_trie.insert_fn(
+                            &iri,
+                            stats,
+                            &InsertFnVisitors {
+                                node: Some(&update_stats),
+                                terminal: None,
+                            },
+                        );
                     }
                 }
                 Message::PrefixDecl { namespace, alias } => {
