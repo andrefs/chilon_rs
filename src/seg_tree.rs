@@ -1,11 +1,10 @@
 #![feature(btree_drain_filter)]
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashSet},
-    fmt::format,
+    collections::{BTreeMap, BTreeSet},
 };
 
-use crate::iri_trie::{IriTrie, Stats};
+use crate::iri_trie::IriTrie;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegTree {
@@ -21,7 +20,7 @@ impl SegTree {
                 SegTree {
                     children: BTreeMap::new(),
                     value: match iri_trie.value {
-                        Some(stats) => stats.desc.total as usize,
+                        Some(stats) => stats.desc,
                         None => 0,
                     },
                 },
@@ -33,7 +32,7 @@ impl SegTree {
                 let sub_tree = SegTree {
                     children: BTreeMap::new(),
                     value: match node.value {
-                        Some(stats) => stats.desc.total as usize,
+                        Some(stats) => stats.desc,
                         None => 0,
                     },
                 };

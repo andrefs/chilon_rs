@@ -100,6 +100,7 @@ impl<T: Debug> Node<T> {
             if let Some(f) = visitors.terminal {
                 f(self);
             }
+            return;
         }
 
         let first_char = k.chars().next().unwrap();
@@ -107,10 +108,11 @@ impl<T: Debug> Node<T> {
 
         if self.children.contains_key(&first_char) {
             let child_node = self.children.get_mut(&first_char).unwrap();
-            let res = child_node.insert_fn(rest, value, visitors);
+            child_node.insert_fn(rest, value, visitors);
             if let Some(f) = visitors.node {
                 f(self);
             }
+            return;
         }
 
         let mut new_node = Node {
@@ -118,7 +120,7 @@ impl<T: Debug> Node<T> {
             children: BTreeMap::new(),
             value: None,
         };
-        let res = new_node.insert_fn(rest, value, visitors);
+        new_node.insert_fn(rest, value, visitors);
         self.children.insert(first_char, new_node);
         if let Some(f) = visitors.node {
             f(self);

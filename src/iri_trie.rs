@@ -63,8 +63,9 @@ pub fn upd_stats_visitor(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
 }
 
 pub fn inc_own(node: &mut IriTrie) {
-    let stats = node.stats();
+    let mut stats = node.stats();
     stats.own += 1;
+    node.set_stats(Some(stats));
 }
 
 pub fn update_stats(node: &mut IriTrie) {
