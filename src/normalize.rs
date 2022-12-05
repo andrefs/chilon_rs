@@ -54,6 +54,7 @@ impl TripleFreqFns for TripleFreq {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Message {
     NormalizedTriple {
         subject: String,
@@ -93,14 +94,18 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
         loop {
             i += 1;
             if i % 1_000_000 == 1 {
-                trace!(
-                    "Normalized {i} triples so far ({} triples/s)",
-                    (i - last_i) / start.elapsed().as_millis() * 1000
-                );
+                let elapsed = start.elapsed().as_millis();
+                if elapsed != 0 {
+                    trace!(
+                        "Normalized {i} triples so far ({} triples/s)",
+                        ((i - last_i) / elapsed) * 1000
+                    );
+                }
                 last_i = i;
                 start = Instant::now();
             }
             if running == 0 {
+                info!("All threads finished");
                 break;
             }
             if let Ok(message) = rx.recv() {
@@ -145,11 +150,14 @@ fn proc_triples(
     graph
         .parse_all(&mut |t| {
             i += 1;
-            if i % 1_000_000 == 1 {
-                trace!(
-                    "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                    (i - last_i) / start.elapsed().as_millis() * 1000
-                );
+            if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
+                let elapsed = start.elapsed().as_millis();
+                if elapsed != 0 {
+                    trace!(
+                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                        ((i - last_i) / elapsed) * 1000
+                    );
+                }
                 last_i = i;
                 start = Instant::now();
             }

@@ -27,11 +27,11 @@ impl SaveTrie for NamespaceTrie {
 }
 
 pub trait InferredNamespaces {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>);
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) -> Vec<String>;
 }
 
 impl InferredNamespaces for NamespaceTrie {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) {
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) -> Vec<String> {
         let mut aliases = Node::<String>::new();
         for (ns, node) in self.iter() {
             if let Some(alias) = node.value.clone() {
@@ -52,6 +52,17 @@ impl InferredNamespaces for NamespaceTrie {
                 }
             }
         }
+
+        return aliases
+            .iter_leaves()
+            .filter_map(|(_, node)| {
+                if node.value.is_some() {
+                    Some(node.value.clone().unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
 }
 

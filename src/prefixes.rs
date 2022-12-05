@@ -51,23 +51,26 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 Message::Resource { iri } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
-                        trace!(
-                            "Read {i} resources so far ({} resources/s)",
-                            (i - last_i) / start.elapsed().as_millis() * 1000
-                        );
+                        let elapsed = start.elapsed().as_millis();
+                        if elapsed != 0 {
+                            trace!(
+                                "Read {i} resources so far ({} resources/s)",
+                                ((i - last_i) / elapsed) * 1000
+                            );
+                        }
                         last_i = i;
                         start = Instant::now();
                     }
 
                     let stats = NodeStats::new_terminal();
-                    iri_trie.insert_fn(
-                        &iri,
-                        stats,
-                        &InsertFnVisitors {
-                            node: Some(&update_stats),
-                            terminal: Some(&inc_own),
-                        },
-                    );
+                    //iri_trie.insert_fn(
+                    //    &iri,
+                    //    stats,
+                    //    &InsertFnVisitors {
+                    //        node: Some(&update_stats),
+                    //        terminal: Some(&inc_own),
+                    //    },
+                    //);
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
@@ -97,22 +100,25 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie:
     pool.spawn_fifo(move || {
         let mut graph = parse(&path);
         debug!("Parsing {:?}", path);
-        let mut i = 0;
         let tid = if let Some(id) = rayon::current_thread_index() {
             id.to_string()
         } else {
             "".to_string()
         };
+        let mut i = 0;
         let mut start = Instant::now();
         let mut last_i = 0;
         graph
             .parse_all(&mut |t| {
                 i += 1;
                 if i % 1_000_000 == 1 {
-                    trace!(
-                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                        (i - last_i) / start.elapsed().as_millis() * 1000
-                    );
+                    let elapsed = start.elapsed().as_millis();
+                    if elapsed != 0 {
+                        trace!(
+                            "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                            ((i - last_i) / elapsed) * 1000
+                        );
+                    }
                     last_i = i;
                     start = Instant::now();
                 }

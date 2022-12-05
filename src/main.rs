@@ -49,10 +49,10 @@ fn main() {
     let inferred = seg_tree.infer_namespaces();
 
     debug!("Adding inferred namespaces");
-    ns_trie.add_inferred_namespaces(&inferred);
+    let added = ns_trie.add_inferred_namespaces(&inferred);
 
     debug!("Removing IRIs with inferred namespaces");
-    iri_trie.remove_known_prefixes(&inferred);
+    iri_trie.remove_known_prefixes(&added);
 
     //warn!(
     //    "IRIs without namespace: {:?}",
