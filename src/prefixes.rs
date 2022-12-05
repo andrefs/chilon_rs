@@ -63,14 +63,14 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     }
 
                     let stats = NodeStats::new_terminal();
-                    //iri_trie.insert_fn(
-                    //    &iri,
-                    //    stats,
-                    //    &InsertFnVisitors {
-                    //        node: Some(&update_stats),
-                    //        terminal: Some(&inc_own),
-                    //    },
-                    //);
+                    iri_trie.insert_fn(
+                        &iri,
+                        stats,
+                        &InsertFnVisitors {
+                            node: Some(&update_stats),
+                            terminal: Some(&inc_own),
+                        },
+                    );
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
