@@ -11,6 +11,7 @@ use rio_turtle::{TurtleError, TurtleParser};
 use std::fmt::format;
 use std::fs::{write, OpenOptions};
 use std::io::{BufRead, Write};
+use std::time::Instant;
 use std::{
     collections::BTreeMap,
     error::Error,
@@ -68,17 +69,18 @@ pub enum Message {
 pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> TripleFreq {
     let mut triples = TripleFreq::new();
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
+    info!("Creating pool with {n_workers} threads");
     let pool = ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
         .unwrap();
     let mut running = paths.len();
 
-    pool.scope(|s| {
+    pool.scope_fifo(|s| {
         let (tx, rx) = channel::<Message>();
         for path in paths {
             let tx = tx.clone();
-            s.spawn(move |_| {
+            s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &tx, ns_trie);
@@ -86,10 +88,17 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
         }
 
         let mut i = 0;
+        let mut last_i = 0;
+        let mut start = Instant::now();
         loop {
             i += 1;
             if i % 1_000_000 == 1 {
-                trace!("Normalized {i} triples so far");
+                trace!(
+                    "Normalized {i} triples so far ({} triples/s)",
+                    (i - last_i) / start.elapsed().as_millis() * 1000
+                );
+                last_i = i;
+                start = Instant::now();
             }
             if running == 0 {
                 break;
@@ -125,15 +134,24 @@ fn proc_triples(
     tx: &Sender<Message>,
     ns_trie: &NamespaceTrie,
 ) {
-    let tind = rayon::current_thread_index();
+    let tid = if let Some(id) = rayon::current_thread_index() {
+        id.to_string()
+    } else {
+        "".to_string()
+    };
     let mut i = 0;
+    let mut last_i = 0;
+    let mut start = Instant::now();
     graph
         .parse_all(&mut |t| {
             i += 1;
             if i % 1_000_000 == 1 {
-                if let Some(index) = tind {
-                    trace!("[Thread#{:?}] Parsed {i} triples so far", index);
-                }
+                trace!(
+                    "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                    (i - last_i) / start.elapsed().as_millis() * 1000
+                );
+                last_i = i;
+                start = Instant::now();
             }
 
             let subject = handle_subject(t.subject, ns_trie);

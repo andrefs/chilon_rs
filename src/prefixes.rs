@@ -4,10 +4,11 @@ use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::trie::InsertFnVisitors;
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 use std::{
     path::PathBuf,
     sync::mpsc::{channel, Sender},
@@ -23,7 +24,8 @@ pub enum Message {
 
 pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
     debug!("Building IRI trie");
-    let n_workers = std::cmp::min(paths.len(), num_cpus::get() - 2);
+    let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
+    info!("Creating pool with {n_workers} threads");
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
@@ -32,12 +34,14 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     let (tx, rx) = channel::<Message>();
 
     for path in paths {
-        spawn(&pool, &tx, path);
+        spawn(&pool, &tx, path, ns_trie.to_owned());
     }
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
 
     let mut i = 0;
+    let mut start = Instant::now();
+    let mut last_i = 0;
     loop {
         if running == 0 {
             break;
@@ -47,20 +51,23 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 Message::Resource { iri } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
-                        trace!("Read {i} resources so far");
-                    }
-                    let res = ns_trie.longest_prefix(iri.as_str(), true);
-                    if res.is_none() || res.unwrap().1.is_empty() {
-                        let stats = NodeStats::new_terminal();
-                        iri_trie.insert_fn(
-                            &iri,
-                            stats,
-                            &InsertFnVisitors {
-                                node: Some(&update_stats),
-                                terminal: Some(&inc_own),
-                            },
+                        trace!(
+                            "Read {i} resources so far ({} resources/s)",
+                            (i - last_i) / start.elapsed().as_millis() * 1000
                         );
+                        last_i = i;
+                        start = Instant::now();
                     }
+
+                    let stats = NodeStats::new_terminal();
+                    iri_trie.insert_fn(
+                        &iri,
+                        stats,
+                        &InsertFnVisitors {
+                            node: Some(&update_stats),
+                            terminal: Some(&inc_own),
+                        },
+                    );
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
@@ -84,37 +91,58 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     return iri_trie;
 }
 
-fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
+fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: NamespaceTrie) {
     let tx = tx.clone();
 
-    pool.spawn(move || {
+    pool.spawn_fifo(move || {
         let mut graph = parse(&path);
         debug!("Parsing {:?}", path);
         let mut i = 0;
-        let tind = rayon::current_thread_index();
+        let tid = if let Some(id) = rayon::current_thread_index() {
+            id.to_string()
+        } else {
+            "".to_string()
+        };
+        let mut start = Instant::now();
+        let mut last_i = 0;
         graph
             .parse_all(&mut |t| {
                 i += 1;
                 if i % 1_000_000 == 1 {
-                    if let Some(index) = tind {
-                        trace!("[Thread#{:?}] Parsed {i} triples so far", index);
+                    trace!(
+                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                        (i - last_i) / start.elapsed().as_millis() * 1000
+                    );
+                    last_i = i;
+                    start = Instant::now();
+                }
+                // subject
+                if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+                    let res = ns_trie.longest_prefix(iri, true);
+                    if res.is_none() || res.unwrap().1.is_empty() {
+                        tx.send(Message::Resource {
+                            iri: iri.to_owned(),
+                        })
+                        .unwrap();
                     }
                 }
-                if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+                // predicate
+                let res = ns_trie.longest_prefix(t.predicate.iri, true);
+                if res.is_none() || res.unwrap().1.is_empty() {
                     tx.send(Message::Resource {
-                        iri: iri.to_owned(),
+                        iri: t.predicate.iri.to_owned(),
                     })
                     .unwrap();
                 }
-                tx.send(Message::Resource {
-                    iri: t.predicate.iri.to_owned(),
-                })
-                .unwrap();
+                // object
                 if let Term::NamedNode(NamedNode { iri }) = t.object {
-                    tx.send(Message::Resource {
-                        iri: iri.to_owned(),
-                    })
-                    .unwrap();
+                    let res = ns_trie.longest_prefix(iri, true);
+                    if res.is_none() || res.unwrap().1.is_empty() {
+                        tx.send(Message::Resource {
+                            iri: iri.to_owned(),
+                        })
+                        .unwrap();
+                    }
                 }
 
                 Ok(()) as Result<(), TurtleError>

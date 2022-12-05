@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{trie::Node, util::gen_file_name};
-use log::{debug, info};
+use log::{debug, info, warn};
 use url::Url;
 
 pub type NamespaceTrie = Node<String>;
@@ -40,12 +40,16 @@ impl InferredNamespaces for NamespaceTrie {
         }
 
         for ns in inferred.iter() {
-            let url_obj = Url::parse(ns.as_str()).unwrap();
-            if url_obj.has_host() {
-                let alias = gen_alias(url_obj, &aliases);
-                debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
-                self.insert(ns, alias.clone());
-                aliases.insert(&alias.clone(), ns.clone());
+            match Url::parse(ns.as_str()) {
+                Err(err) => warn!("Could not parse IRI {ns}: {err}"),
+                Ok(url_obj) => {
+                    if url_obj.has_host() {
+                        let alias = gen_alias(url_obj, &aliases);
+                        debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
+                        self.insert(ns, alias.clone());
+                        aliases.insert(&alias.clone(), ns.clone());
+                    }
+                }
             }
         }
     }
