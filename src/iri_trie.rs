@@ -1,10 +1,10 @@
 use std::{
     borrow::Borrow,
-    collections::{BTreeMap, HashSet, VecDeque},
+    collections::{BTreeMap, VecDeque},
 };
 
-use crate::{ns_trie::NamespaceTrie, seg_tree::SegTree, trie::Node};
-use log::{debug, info, warn};
+use crate::trie::Node;
+use log::warn;
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
