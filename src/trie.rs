@@ -75,7 +75,7 @@ impl<T: Debug> Node<T> {
         return self.children.get_mut(&ch);
     }
 
-    pub fn insert<S: ?Sized>(&mut self, key: &S, value: T) -> Option<T>
+    pub fn insert<S: ?Sized>(&mut self, key: &S, value: T)
     where
         S: Borrow<str>,
     {
@@ -89,12 +89,7 @@ impl<T: Debug> Node<T> {
         )
     }
 
-    pub fn insert_fn<S: ?Sized>(
-        &mut self,
-        key: &S,
-        value: T,
-        visitors: &InsertFnVisitors<T>,
-    ) -> Option<T>
+    pub fn insert_fn<S: ?Sized>(&mut self, key: &S, value: T, visitors: &InsertFnVisitors<T>)
     where
         S: Borrow<str>,
     {
@@ -102,12 +97,9 @@ impl<T: Debug> Node<T> {
 
         if k.is_empty() {
             self.is_terminal = true;
-            let old_val = mem::replace(&mut self.value, Some(value));
             if let Some(f) = visitors.terminal {
                 f(self);
             }
-
-            return old_val;
         }
 
         let first_char = k.chars().next().unwrap();
@@ -119,7 +111,6 @@ impl<T: Debug> Node<T> {
             if let Some(f) = visitors.node {
                 f(self);
             }
-            return res;
         }
 
         let mut new_node = Node {
@@ -132,7 +123,6 @@ impl<T: Debug> Node<T> {
         if let Some(f) = visitors.node {
             f(self);
         }
-        res
     }
 
     pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool)

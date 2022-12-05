@@ -1,6 +1,6 @@
 pub mod prefixcc;
 
-use crate::iri_trie::{update_stats, IriTrie, IriTrieExt, NodeStats, TriplePos};
+use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::trie::InsertFnVisitors;
@@ -16,7 +16,7 @@ use std::{
 use rio_api::parser::TriplesParser;
 
 pub enum Message {
-    Resource { iri: String, position: TriplePos },
+    Resource { iri: String },
     PrefixDecl { namespace: String, alias: String },
     Finished,
 }
@@ -44,20 +44,20 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         }
         if let Ok(message) = rx.recv() {
             match message {
-                Message::Resource { iri, position } => {
+                Message::Resource { iri } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
                         trace!("Read {i} resources so far");
                     }
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
                     if res.is_none() || res.unwrap().1.is_empty() {
-                        let stats = NodeStats::new_terminal(position);
+                        let stats = NodeStats::new_terminal();
                         iri_trie.insert_fn(
                             &iri,
                             stats,
                             &InsertFnVisitors {
                                 node: Some(&update_stats),
-                                terminal: None,
+                                terminal: Some(&inc_own),
                             },
                         );
                     }
@@ -103,19 +103,16 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf) {
                 if let Subject::NamedNode(NamedNode { iri }) = t.subject {
                     tx.send(Message::Resource {
                         iri: iri.to_owned(),
-                        position: TriplePos::S,
                     })
                     .unwrap();
                 }
                 tx.send(Message::Resource {
                     iri: t.predicate.iri.to_owned(),
-                    position: TriplePos::P,
                 })
                 .unwrap();
                 if let Term::NamedNode(NamedNode { iri }) = t.object {
                     tx.send(Message::Resource {
                         iri: iri.to_owned(),
-                        position: TriplePos::O,
                     })
                     .unwrap();
                 }
