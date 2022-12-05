@@ -32,22 +32,13 @@ pub trait InferredNamespaces {
 
 impl InferredNamespaces for NamespaceTrie {
     fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) {
-        //let mut used_alias = self
-        //    .iter()
-        //    .filter_map(|(_, node)| node.value.clone())
-        //    .collect::<BTreeSet<_>>();
         let mut aliases = Node::<String>::new();
         for (ns, node) in self.iter() {
             if let Some(alias) = node.value.clone() {
                 aliases.insert(&alias, ns);
             }
         }
-        //let mut aliases = BTreeMap::<String, String>::new();
-        //for (ns, node) in self.iter() {
-        //    if let Some(alias) = node.value.clone() {
-        //        aliases.insert(alias.clone(), ns);
-        //    }
-        //}
+
         for ns in inferred.iter() {
             let url_obj = Url::parse(ns.as_str()).unwrap();
             if url_obj.has_host() {
@@ -66,6 +57,7 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
     let (tld, alias_cand) = (*rev_domains.next().unwrap(), *rev_domains.next().unwrap());
 
     let mut alias = alias_cand.to_string();
+    let alias_abbrv = alias.chars().take(5).collect::<String>();
 
     // check if already exists
     let conflict = aliases.find(&alias, true);
@@ -84,11 +76,12 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
         .collect::<Vec<_>>();
     let mut rev_confl_domains = confl_domains.iter().rev();
     let confl_tld = *rev_confl_domains.next().unwrap();
-    let alias_abbrv = alias.chars().take(5).collect::<String>();
-    let alias_tld = format!("{}{}", alias_abbrv, confl_tld);
+    if tld != confl_tld {
+        let alias_tld = format!("{}{}", alias_abbrv, confl_tld);
 
-    if !aliases.contains_key(&alias_tld) {
-        return alias_tld;
+        if !aliases.contains_key(&alias_tld) {
+            return alias_tld;
+        }
     }
 
     // check if last segment is different
