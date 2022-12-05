@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs::write,
 };
 
@@ -36,39 +36,81 @@ impl InferredNamespaces for NamespaceTrie {
         //    .iter()
         //    .filter_map(|(_, node)| node.value.clone())
         //    .collect::<BTreeSet<_>>();
-        let mut alias_trie = Node::<String>::new();
+        let mut aliases = Node::<String>::new();
         for (ns, node) in self.iter() {
             if let Some(alias) = node.value.clone() {
-                alias_trie.insert(&alias, ns);
+                aliases.insert(&alias, ns);
             }
         }
+        //let mut aliases = BTreeMap::<String, String>::new();
+        //for (ns, node) in self.iter() {
+        //    if let Some(alias) = node.value.clone() {
+        //        aliases.insert(alias.clone(), ns);
+        //    }
+        //}
         for ns in inferred.iter() {
             let url_obj = Url::parse(ns.as_str()).unwrap();
             if url_obj.has_host() {
-                let domains = url_obj.host_str().unwrap().split('.').collect::<Vec<_>>();
-                let mut rev_domains = domains.iter().rev();
-                let (tld, alias_cand) =
-                    (*rev_domains.next().unwrap(), *rev_domains.next().unwrap());
-
-                let mut alias = alias_cand.to_string();
-
-                if alias_trie.contains_key(alias.as_str()) {
-                    let alias_tld = format!("{}{}", alias, tld);
-                    alias = alias_tld.clone();
-                    if alias_trie.contains_key(alias.as_str()) {
-                        let mut count = 2;
-                        while alias_trie.contains_key(alias.as_str()) {
-                            alias = format!("{}{}", alias_tld, count);
-                            count += 1;
-                        }
-                    }
-                }
+                let alias = gen_alias(url_obj, &aliases);
                 debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
                 self.insert(ns, alias.clone());
-                alias_trie.insert(&alias, ns.clone());
+                aliases.insert(&alias.clone(), ns.clone());
             }
         }
     }
 }
 
-//fn noConflictAlias(url1: String, url2: String, alias1: String) -> String {}
+fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
+    let domains = url_obj.host_str().unwrap().split('.').collect::<Vec<_>>();
+    let mut rev_domains = domains.iter().rev();
+    let (tld, alias_cand) = (*rev_domains.next().unwrap(), *rev_domains.next().unwrap());
+
+    let mut alias = alias_cand.to_string();
+
+    // check if already exists
+    let conflict = aliases.find(&alias, true);
+    if let None = conflict {
+        return alias;
+    }
+
+    // check if tlds are different
+    let confl_url = conflict.unwrap().value.clone().unwrap();
+    let confl_url_obj = Url::parse(&confl_url).unwrap();
+
+    let confl_domains = confl_url_obj
+        .host_str()
+        .unwrap()
+        .split('.')
+        .collect::<Vec<_>>();
+    let mut rev_confl_domains = confl_domains.iter().rev();
+    let confl_tld = *rev_confl_domains.next().unwrap();
+    let alias_abbrv = alias.chars().take(5).collect::<String>();
+    let alias_tld = format!("{}{}", alias_abbrv, confl_tld);
+
+    if !aliases.contains_key(&alias_tld) {
+        return alias_tld;
+    }
+
+    // check if last segment is different
+    let segs = url_obj.path_segments();
+    let confl_segs = confl_url_obj.path_segments();
+    if segs.is_some() && confl_segs.is_some() {
+        let last_seg = segs.unwrap().last();
+        let confl_last_seg = confl_segs.unwrap().last();
+        if last_seg.is_some() && confl_last_seg.is_some() && last_seg != confl_last_seg {
+            let alias_seg = format!("{}{}", alias_abbrv, last_seg.unwrap());
+            if !aliases.contains_key(&alias_seg) {
+                return alias_seg;
+            }
+        }
+    }
+
+    // generate new number to add to alias
+    let mut count = 2;
+    while aliases.contains_key(alias.as_str()) {
+        alias = format!("{}{}", alias_abbrv, count);
+        count += 1;
+    }
+
+    return alias;
+}
