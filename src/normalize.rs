@@ -303,7 +303,9 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
         formatter
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
-                predicate: NamedNode { iri: "a".clone() },
+                predicate: NamedNode {
+                    iri: format!("{rdf}type").as_str(),
+                },
                 object: NamedNode {
                     iri: format!("{rdf}Statement").as_str(),
                 }
