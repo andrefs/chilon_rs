@@ -48,6 +48,7 @@ pub fn load() -> NamespaceTrie {
     buf_reader.read_to_string(&mut s).unwrap();
 
     let map: PrefixMap = serde_json::from_str(s.as_str()).unwrap();
+    println!("MAAAAAP {:#?}", map);
     return map_to_trie(map);
 }
 

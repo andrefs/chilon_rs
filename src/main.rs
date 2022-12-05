@@ -11,16 +11,12 @@ mod seg_tree;
 mod trie;
 mod util;
 
-use crate::iri_trie::NodeStats;
-use crate::iri_trie::Stats;
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
-use crate::prefixes::infer_namespaces;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use clap::Parser;
-use log::warn;
 use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
@@ -51,6 +47,7 @@ fn main() {
 
     let seg_tree = SegTree::from(&iri_trie);
     let inferred = seg_tree.infer_namespaces();
+    println!("INFERRED {:#?}", inferred);
 
     debug!("Adding inferred namespaces");
     ns_trie.add_inferred_namespaces(&inferred);

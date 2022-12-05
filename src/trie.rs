@@ -99,6 +99,8 @@ impl<T: Debug> Node<T> {
             self.is_terminal = true;
             if let Some(f) = visitors.terminal {
                 f(self);
+            } else {
+                self.value = Some(value);
             }
             return;
         }
