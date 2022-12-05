@@ -47,7 +47,6 @@ fn main() {
 
     let seg_tree = SegTree::from(&iri_trie);
     let inferred = seg_tree.infer_namespaces();
-    println!("INFERRED {:#?}", inferred);
 
     debug!("Adding inferred namespaces");
     ns_trie.add_inferred_namespaces(&inferred);

@@ -66,7 +66,7 @@ impl SegTree {
 
 fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
     let MAX_NS = 5;
-    let MIN_NS_SIZE = 1;
+    let MIN_NS_SIZE = 20;
 
     while h.len() < MAX_NS {
         let h_len = h.len();
@@ -78,13 +78,9 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
                         .node
                         .children
                         .iter()
-                        .filter(|(ns, n)| n.could_be_ns(MIN_NS_SIZE))
+                        .filter(|(_, n)| n.could_be_ns(MIN_NS_SIZE))
                         .collect::<Vec<_>>();
-                    //suitable
-                    //    .iter()
-                    //    .for_each(|(ns, n)| println!("child {ns} {}", n.value));
-                    println!("{} {}", item.namespace, suitable.len());
-                    if item.children + h_len <= MAX_NS {
+                    if !suitable.is_empty() && ((suitable.len() + h_len) <= MAX_NS) {
                         found = true;
                         return true;
                     }
@@ -98,10 +94,8 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
             Some(parent) => {
                 h.remove(&parent);
 
-                println!("    REMOVING {}", parent.namespace);
                 for (seg, node) in parent.node.children {
                     if node.could_be_ns(MIN_NS_SIZE) {
-                        println!("    INSERTING {}{seg}", parent.namespace);
                         h.insert(NamespaceCandidate {
                             size: node.value,
                             children: node.children.len(),
