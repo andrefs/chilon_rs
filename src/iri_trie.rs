@@ -20,16 +20,25 @@ pub struct Stats {
 pub struct NodeStats {
     pub own: usize,
     pub desc: usize,
+    pub uniq_desc: usize,
 }
 pub type IriTrie = Node<NodeStats>; // todo finish
 
 impl NodeStats {
     pub fn new() -> NodeStats {
-        NodeStats { own: 0, desc: 0 }
+        NodeStats {
+            own: 0,
+            desc: 0,
+            uniq_desc: 0,
+        }
     }
 
     pub fn new_terminal() -> NodeStats {
-        NodeStats { own: 1, desc: 0 }
+        NodeStats {
+            own: 1,
+            desc: 0,
+            uniq_desc: 0,
+        }
     }
 }
 
@@ -49,7 +58,11 @@ impl IriTrieStatsExt for IriTrie {
 
 impl Default for NodeStats {
     fn default() -> Self {
-        NodeStats { desc: 0, own: 0 }
+        NodeStats {
+            desc: 0,
+            own: 0,
+            uniq_desc: 0,
+        }
     }
 }
 
@@ -69,17 +82,25 @@ pub fn inc_own(node: &mut IriTrie) {
 }
 
 pub fn update_stats(node: &mut IriTrie) {
-    let desc = node
+    let (desc, uniq_desc) = node
         .children
         .iter()
         .map(|(_, child)| {
             let child_stats = child.stats();
-            child_stats.own + child_stats.desc
+            let desc = child_stats.own + child_stats.desc;
+            let uniq_desc = if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
+            (desc, uniq_desc)
         })
-        .fold(0, |desc, delta| desc + delta);
+        .fold(
+            (0, 0),
+            |(desc, uniq_desc), (delta_desc, delta_uniq_desc)| {
+                (desc + delta_desc, uniq_desc + delta_uniq_desc)
+            },
+        );
 
     let stats = Some(NodeStats {
         desc,
+        uniq_desc,
         own: node.stats().own,
     });
     node.set_stats(stats);
@@ -198,9 +219,13 @@ impl IriTrieExt for IriTrie {
             self.remove_prefix(namespace);
         }
         warn!(
-            "IRIs with unknown namespaces: {} {:#?}",
-            self.count(),
-            self.value
+            "IRIs with unknown namespaces: {} ({} occurrences) {:?}",
+            self.value.unwrap().uniq_desc,
+            self.value.unwrap().desc,
+            self.iter_leaves()
+                .take(100)
+                .map(|x| x.0)
+                .collect::<Vec<_>>()
         );
     }
 
