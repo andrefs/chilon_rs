@@ -197,7 +197,11 @@ impl IriTrieExt for IriTrie {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }
-        warn!("IRIs with unknwon namespaces: {}", self.count(),);
+        warn!(
+            "IRIs with unknown namespaces: {} {:#?}",
+            self.count(),
+            self.value
+        );
     }
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {

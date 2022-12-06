@@ -3,6 +3,7 @@ pub mod prefixcc;
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
+use crate::seg_tree::SegTree;
 use crate::trie::InsertFnVisitors;
 use log::{debug, error, info, trace, warn};
 use rio_api::formatter::TriplesFormatter;
@@ -15,6 +16,7 @@ use std::{
     sync::mpsc::{channel, Sender},
 };
 
+use crate::ns_trie::InferredNamespaces;
 use rio_api::parser::TriplesParser;
 
 pub enum Message {
@@ -59,6 +61,22 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                                 ((i - last_i) / elapsed) * 1000
                             );
                         }
+
+                        if let Some(size) = iri_trie.value {
+                            let IRI_SIZE = 5_000_000;
+                            if size.desc > IRI_SIZE {
+                                warn!("Size of IRI trie over {IRI_SIZE}, inferring namespaces");
+                                let seg_tree = SegTree::from(&iri_trie);
+                                let inferred = seg_tree.infer_namespaces();
+
+                                debug!("Adding inferred namespaces");
+                                let added = ns_trie.add_inferred_namespaces(&inferred);
+
+                                debug!("Removing IRIs with inferred namespaces");
+                                iri_trie.remove_known_prefixes(&added);
+                            }
+                        }
+
                         last_i = i;
                         start = Instant::now();
                     }

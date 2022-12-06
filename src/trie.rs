@@ -1,8 +1,7 @@
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, VecDeque},
-    fmt::{Debug, Display},
-    mem,
+    fmt::Debug,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
