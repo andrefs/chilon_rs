@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::trie::Node;
-use log::warn;
+use log::{info, warn};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -219,14 +219,15 @@ impl IriTrieExt for IriTrie {
             self.remove_prefix(namespace);
         }
         warn!(
-            "IRIs with unknown namespaces: {} ({} occurrences) {:?}",
+            "IRIs with unknown namespaces: {} ({} occurrences).",
             self.value.unwrap().uniq_desc,
             self.value.unwrap().desc,
-            self.iter_leaves()
-                .take(100)
-                .map(|x| x.0)
-                .collect::<Vec<_>>()
         );
+        let examples = self.iter_leaves().take(10).map(|x| x.0).collect::<Vec<_>>();
+        // 1 example is the root node
+        if examples.len() > 1 {
+            info!("10 examples: {:#?}", examples);
+        }
     }
 
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {

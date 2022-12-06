@@ -3,7 +3,7 @@ use std::{
     fs::write,
 };
 
-use crate::{trie::Node, util::gen_file_name};
+use crate::{ns_trie, trie::Node, util::gen_file_name};
 use log::{debug, info, warn};
 use url::Url;
 
@@ -32,6 +32,7 @@ pub trait InferredNamespaces {
 
 impl InferredNamespaces for NamespaceTrie {
     fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) -> Vec<String> {
+        let mut added = Node::<String>::new();
         let mut aliases = Node::<String>::new();
         for (ns, node) in self.iter() {
             if let Some(alias) = node.value.clone() {
@@ -43,17 +44,20 @@ impl InferredNamespaces for NamespaceTrie {
             match Url::parse(ns.as_str()) {
                 Err(err) => warn!("Could not parse IRI {ns}: {err}"),
                 Ok(url_obj) => {
-                    if url_obj.has_host() {
-                        let alias = gen_alias(url_obj, &aliases);
-                        debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
-                        self.insert(ns, alias.clone());
-                        aliases.insert(&alias.clone(), ns.clone());
+                    if !url_obj.has_host() {
+                        warn!("IRI {ns} does not have host");
+                        continue;
                     }
+                    let alias = gen_alias(url_obj, &aliases);
+                    debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
+                    self.insert(ns, alias.clone());
+                    aliases.insert(&alias.clone(), ns.clone());
+                    added.insert(&alias.clone(), ns.clone());
                 }
             }
         }
 
-        return aliases
+        return added
             .iter_leaves()
             .filter_map(|(_, node)| {
                 if node.value.is_some() {
