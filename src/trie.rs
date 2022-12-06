@@ -209,8 +209,7 @@ impl<T: Debug> Node<T> {
             must_be_terminal,
             must_match_fully: true,
         };
-        let last_term = None;
-        let res = self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
+        let res = self.longest_prefix_aux(s, lpo);
         return if let Some((node, _)) = res {
             Some(node)
         } else {
@@ -223,58 +222,48 @@ impl<T: Debug> Node<T> {
             must_be_terminal,
             must_match_fully: false,
         };
-        let last_term = None;
-
-        return self.longest_prefix_aux(s, "".to_string(), last_term, lpo);
+        self.longest_prefix_aux(s, lpo)
     }
 
-    fn longest_prefix_aux<'a, S>(
-        &'a self,
-        str_left: &S,
-        str_acc: String,
-        mut last_terminal: FindResults<'a, T>,
-        opts: LongestPrefOpts,
-    ) -> FindResults<T>
-    where
-        S: ?Sized + Borrow<str>,
-    {
-        let sl: &str = str_left.borrow();
+    fn longest_prefix_aux(&self, s: &str, lpo: LongestPrefOpts) -> Option<(&Node<T>, String)> {
+        let mut last_term = None;
+        let mut str_acc = "".to_string();
+        let mut str_left = s;
+        let mut cur_node = self;
 
-        if sl.is_empty() {
-            if !self.is_terminal && opts.must_be_terminal {
-                if opts.must_match_fully {
-                    return None;
-                } else {
-                    return last_terminal;
+        loop {
+            if str_left.is_empty() {
+                if !cur_node.is_terminal && lpo.must_be_terminal {
+                    if lpo.must_match_fully {
+                        return None;
+                    } else {
+                        return last_term;
+                    }
                 }
+                return Some((cur_node, str_acc.clone()));
             }
-            return Some((self, str_acc.clone()));
-        }
 
-        let first_char = sl.chars().next().unwrap();
-        let rest = &sl[first_char.len_utf8()..];
+            let first_char = str_left.chars().next().unwrap();
+            str_left = &str_left[first_char.len_utf8()..];
 
-        let next_node = self.children.get(&first_char);
-        if self.children.is_empty() || next_node.is_none() {
-            if opts.must_match_fully {
-                return None;
+            let next_node = cur_node.children.get(&first_char);
+            if cur_node.children.is_empty() || next_node.is_none() {
+                if lpo.must_match_fully {
+                    return None;
+                }
+                if !cur_node.is_terminal && lpo.must_be_terminal {
+                    return last_term;
+                }
+                return Some((cur_node, str_acc.clone()));
             }
-            if !self.is_terminal && opts.must_be_terminal {
-                return last_terminal;
+
+            if cur_node.is_terminal {
+                last_term = Some((self, format!("{str_acc}{first_char}")));
             }
-            return Some((self, str_acc.clone()));
-        }
 
-        if self.is_terminal {
-            last_terminal = Some((self, format!("{str_acc}{first_char}")));
+            cur_node = next_node.unwrap();
+            str_acc = format!("{str_acc}{first_char}");
         }
-
-        return next_node.unwrap().longest_prefix_aux(
-            rest,
-            format!("{str_acc}{first_char}"),
-            last_terminal,
-            opts,
-        );
     }
 
     pub fn traverse(&self, f: &impl Fn(String, &T)) {
