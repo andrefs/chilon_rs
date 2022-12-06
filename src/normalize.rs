@@ -1,7 +1,7 @@
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::util::gen_file_name;
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
@@ -147,67 +147,68 @@ fn proc_triples(
     let mut i = 0;
     let mut last_i = 0;
     let mut start = Instant::now();
-    graph
-        .parse_all(&mut |t| {
-            i += 1;
-            if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
-                let elapsed = start.elapsed().as_millis();
-                if elapsed != 0 {
-                    trace!(
-                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                        ((i - last_i) / elapsed) * 1000
-                    );
-                }
-                last_i = i;
-                start = Instant::now();
-            }
+    while !graph.is_end() {
+        i += 1;
 
-            let subject = handle_subject(t.subject, ns_trie);
-            let predicate = handle_predicate(t.predicate, ns_trie);
-            let object = handle_object(t.object, ns_trie);
-
-            if let Err(UnknownNamespaceError { iri: _ }) = subject {
-                if i == 0 {}
-                tx.send(Message::NamespaceUnknown {
-                    iri: t.subject.to_string(),
-                })
-                .unwrap();
+        if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
+            let elapsed = start.elapsed().as_millis();
+            if elapsed != 0 {
+                trace!(
+                    "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                    ((i - last_i) as u128 / elapsed) * 1000
+                );
             }
-            if let Err(UnknownNamespaceError { iri: _ }) = predicate {
-                if i == 0 {}
-                tx.send(Message::NamespaceUnknown {
-                    iri: t.predicate.to_string(),
-                })
-                .unwrap();
-            }
-            if let Err(UnknownNamespaceError { iri: _ }) = object {
-                if i == 0 {}
-                tx.send(Message::NamespaceUnknown {
-                    iri: t.object.to_string(),
-                })
-                .unwrap();
-            }
+            last_i = i;
+            start = Instant::now();
+        }
+        if let Err(err) = graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie)) {
+            error!("Error processing triple {}", err);
+        }
+    }
+    tx.send(Message::Finished).unwrap();
+}
 
-            tx.send(Message::NormalizedTriple {
-                subject: match subject {
-                    Ok(ns) => ns.clone(),
-                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
-                },
-                predicate: match predicate {
-                    Ok(ns) => ns.clone(),
-                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
-                },
-                object: match object {
-                    Ok(ns) => ns.clone(),
-                    Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
-                },
-            })
-            .unwrap();
+fn proc_triple<E>(t: Triple, tx: &Sender<Message>, ns_trie: &NamespaceTrie) -> Result<(), E> {
+    let subject = handle_subject(t.subject, ns_trie);
+    let predicate = handle_predicate(t.predicate, ns_trie);
+    let object = handle_object(t.object, ns_trie);
 
-            Ok(()) as Result<(), TurtleError>
+    if let Err(UnknownNamespaceError { iri: _ }) = subject {
+        tx.send(Message::NamespaceUnknown {
+            iri: t.subject.to_string(),
         })
         .unwrap();
-    tx.send(Message::Finished).unwrap();
+    }
+    if let Err(UnknownNamespaceError { iri: _ }) = predicate {
+        tx.send(Message::NamespaceUnknown {
+            iri: t.predicate.to_string(),
+        })
+        .unwrap();
+    }
+    if let Err(UnknownNamespaceError { iri: _ }) = object {
+        tx.send(Message::NamespaceUnknown {
+            iri: t.object.to_string(),
+        })
+        .unwrap();
+    }
+
+    tx.send(Message::NormalizedTriple {
+        subject: match subject {
+            Ok(ns) => ns.clone(),
+            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+        },
+        predicate: match predicate {
+            Ok(ns) => ns.clone(),
+            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+        },
+        object: match object {
+            Ok(ns) => ns.clone(),
+            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+        },
+    })
+    .unwrap();
+
+    Ok(()) as Result<(), E>
 }
 
 fn log_error_to_file(err: String) {

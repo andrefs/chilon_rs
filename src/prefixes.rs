@@ -4,8 +4,9 @@ use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::trie::InsertFnVisitors;
-use log::{debug, info, trace, warn};
-use rio_api::model::{NamedNode, Subject, Term};
+use log::{debug, error, info, trace, warn};
+use rio_api::formatter::TriplesFormatter;
+use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -108,52 +109,26 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie:
         let mut i = 0;
         let mut start = Instant::now();
         let mut last_i = 0;
-        graph
-            .parse_all(&mut |t| {
-                i += 1;
-                if i % 1_000_000 == 1 {
-                    let elapsed = start.elapsed().as_millis();
-                    if elapsed != 0 {
-                        trace!(
-                            "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                            ((i - last_i) / elapsed) * 1000
-                        );
-                    }
-                    last_i = i;
-                    start = Instant::now();
-                }
-                // subject
-                if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-                    let res = ns_trie.longest_prefix(iri, true);
-                    if res.is_none() || res.unwrap().1.is_empty() {
-                        tx.send(Message::Resource {
-                            iri: iri.to_owned(),
-                        })
-                        .unwrap();
-                    }
-                }
-                // predicate
-                let res = ns_trie.longest_prefix(t.predicate.iri, true);
-                if res.is_none() || res.unwrap().1.is_empty() {
-                    tx.send(Message::Resource {
-                        iri: t.predicate.iri.to_owned(),
-                    })
-                    .unwrap();
-                }
-                // object
-                if let Term::NamedNode(NamedNode { iri }) = t.object {
-                    let res = ns_trie.longest_prefix(iri, true);
-                    if res.is_none() || res.unwrap().1.is_empty() {
-                        tx.send(Message::Resource {
-                            iri: iri.to_owned(),
-                        })
-                        .unwrap();
-                    }
-                }
 
-                Ok(()) as Result<(), TurtleError>
-            })
-            .unwrap();
+        while !graph.is_end() {
+            i += 1;
+            if i % 1_000_000 == 1 {
+                let elapsed = start.elapsed().as_millis();
+                if elapsed != 0 {
+                    trace!(
+                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                        ((i - last_i) / elapsed) * 1000
+                    );
+                }
+                last_i = i;
+                start = Instant::now();
+            }
+
+            graph
+                .parse_step(&mut |t| proc_triple(t, &tx, &ns_trie))
+                .unwrap_or_else(|err| error!("Error processing triple {}", err));
+        }
+
         for (alias, namespace) in graph.prefixes().iter() {
             tx.send(Message::PrefixDecl {
                 namespace: namespace.to_string(),
@@ -165,11 +140,39 @@ fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie:
     });
 }
 
-pub fn infer_namespaces(iri_trie: &IriTrie) -> Vec<String> {
-    let mut res: Vec<String> = Vec::new();
-    for ns in iri_trie.iter_leaves() {
-        res.push(ns.0);
+fn proc_triple(
+    t: Triple,
+    tx: &Sender<Message>,
+    ns_trie: &NamespaceTrie,
+) -> Result<(), TurtleError> {
+    // subject
+    if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+        let res = ns_trie.longest_prefix(iri, true);
+        if res.is_none() || res.unwrap().1.is_empty() {
+            tx.send(Message::Resource {
+                iri: iri.to_owned(),
+            })
+            .unwrap();
+        }
+    }
+    // predicate
+    let res = ns_trie.longest_prefix(t.predicate.iri, true);
+    if res.is_none() || res.unwrap().1.is_empty() {
+        tx.send(Message::Resource {
+            iri: t.predicate.iri.to_owned(),
+        })
+        .unwrap();
+    }
+    // object
+    if let Term::NamedNode(NamedNode { iri }) = t.object {
+        let res = ns_trie.longest_prefix(iri, true);
+        if res.is_none() || res.unwrap().1.is_empty() {
+            tx.send(Message::Resource {
+                iri: iri.to_owned(),
+            })
+            .unwrap();
+        }
     }
 
-    return res;
+    Ok(()) as Result<(), TurtleError>
 }
