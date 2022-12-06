@@ -4,6 +4,8 @@ use std::{
     fmt::Debug,
 };
 
+use crate::iri_trie::IriTrie;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     pub value: Option<T>,
@@ -92,43 +94,39 @@ impl<T: Debug> Node<T> {
     where
         S: Borrow<str>,
     {
-        let mut node = self;
-        let mut k: &str = key.borrow();
+        let k: &str = key.borrow();
 
-        loop {
-            if k.is_empty() {
-                node.is_terminal = true;
-                if let Some(f) = visitors.terminal {
-                    f(node);
-                } else {
-                    node.value = Some(value);
-                }
-                return;
+        if k.is_empty() {
+            self.is_terminal = true;
+            if let Some(f) = visitors.terminal {
+                f(self);
+            } else {
+                self.value = Some(value);
             }
+            return;
+        }
 
-            let first_char = k.chars().next().unwrap();
-            k = &k[first_char.len_utf8()..];
+        let first_char = k.chars().next().unwrap();
+        let rest = &k[first_char.len_utf8()..];
 
-            if node.children.contains_key(&first_char) {
-                node = node.children.get_mut(&first_char).unwrap();
-                if let Some(f) = visitors.node {
-                    f(node);
-                }
-                continue;
-            }
-
-            node.children.insert(
-                first_char,
-                Node {
-                    is_terminal: false,
-                    children: BTreeMap::new(),
-                    value: None,
-                },
-            );
-            node = node.children.get_mut(&first_char).unwrap();
+        if self.children.contains_key(&first_char) {
+            let child_node = self.children.get_mut(&first_char).unwrap();
+            child_node.insert_fn(rest, value, visitors);
             if let Some(f) = visitors.node {
-                f(node);
+                f(self);
             }
+            return;
+        }
+
+        let mut new_node = Node {
+            is_terminal: false,
+            children: BTreeMap::new(),
+            value: None,
+        };
+        new_node.insert_fn(rest, value, visitors);
+        self.children.insert(first_char, new_node);
+        if let Some(f) = visitors.node {
+            f(self);
         }
     }
 
