@@ -1,8 +1,10 @@
 #![feature(btree_drain_filter)]
+use log::info;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
 };
+use url::Url;
 
 use crate::iri_trie::IriTrie;
 
@@ -13,7 +15,7 @@ pub struct SegTree {
 }
 
 impl SegTree {
-    fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String) {
+    fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
         if iri_trie.children.is_empty() {
             self.children.insert(
                 word_acc,
@@ -29,6 +31,15 @@ impl SegTree {
         }
         for (c, node) in &iri_trie.children {
             if ['/', '#'].contains(&c) {
+                let ns_cand = format!("{prev_str}{word_acc}{c}");
+                let url_obj = Url::parse(ns_cand.as_str());
+
+                // this is not a URL or the kind we want
+                //if url_obj.is_err() || !url_obj.unwrap().has_host() {
+                //    println!("    error parsing, will continue current segment");
+                //    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                //}
+
                 let sub_tree = SegTree {
                     children: BTreeMap::new(),
                     value: match node.value {
@@ -39,9 +50,13 @@ impl SegTree {
                 self.children
                     .entry(format!("{word_acc}{c}"))
                     .or_insert(sub_tree)
-                    .from_aux(&node, "".to_string());
+                    .from_aux(
+                        &node,
+                        "".to_string(),
+                        format!("{prev_str}{word_acc}{c}").as_str(),
+                    );
             } else {
-                self.from_aux(&node, format!("{word_acc}{c}"));
+                self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
             }
         }
     }
@@ -65,14 +80,19 @@ impl SegTree {
 }
 
 fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
+    info!("infer_namespaces_aux");
     let MAX_NS = 5;
     let MIN_NS_SIZE = 20;
+    let mut expanded = 0;
+    let mut added = true;
 
-    while h.len() < MAX_NS {
+    while added && (expanded < MAX_NS) {
+        added = false;
         let h_len = h.len();
         let mut found = false;
         match h
             .drain_filter(|item| {
+                println!("CHECKING {}", item.namespace);
                 if !found {
                     let suitable = item
                         .node
@@ -82,9 +102,11 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
                         .collect::<Vec<_>>();
                     if !suitable.is_empty() && ((suitable.len() + h_len) <= MAX_NS) {
                         found = true;
+                        println!("    YES");
                         return true;
                     }
                 }
+                println!("    NOPE");
                 return false;
             })
             .collect::<Vec<_>>()
@@ -93,9 +115,13 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
         {
             Some(parent) => {
                 h.remove(&parent);
+                println!("REMOVING {}", parent.namespace);
 
                 for (seg, node) in parent.node.children {
                     if node.could_be_ns(MIN_NS_SIZE) {
+                        expanded += 1;
+                        added = true;
+                        println!("ADDING {}{seg}", parent.namespace);
                         h.insert(NamespaceCandidate {
                             size: node.value,
                             children: node.children.len(),
@@ -117,7 +143,7 @@ impl From<&IriTrie> for SegTree {
             children: BTreeMap::new(),
         };
 
-        res.from_aux(iri_trie, "".to_string());
+        res.from_aux(iri_trie, "".to_string(), "");
 
         return res;
     }

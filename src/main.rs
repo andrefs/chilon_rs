@@ -45,7 +45,9 @@ fn main() {
     //debug!("Removing IRI trie leaves");
     //iri_trie.remove_leaves();
 
+    info!("Inferring namespaces from IRIs left");
     let seg_tree = SegTree::from(&iri_trie);
+    info!("XXXXXXX 1");
     let inferred = seg_tree.infer_namespaces();
 
     debug!("Adding inferred namespaces");
