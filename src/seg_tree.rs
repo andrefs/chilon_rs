@@ -38,6 +38,7 @@ impl SegTree {
                 //if url_obj.is_err() || !url_obj.unwrap().has_host() {
                 //    println!("    error parsing, will continue current segment");
                 //    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                //    return;
                 //}
 
                 let sub_tree = SegTree {
@@ -63,12 +64,16 @@ impl SegTree {
 
     pub fn infer_namespaces(&self) -> Vec<String> {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
-        h.insert(NamespaceCandidate {
-            size: self.value,
-            children: self.children.len(),
-            namespace: "".to_string(),
-            node: self.clone(),
-        });
+
+        // self is empty string root node
+        for (ns, st) in self.children.iter() {
+            h.insert(NamespaceCandidate {
+                size: st.value,
+                children: st.children.len(),
+                namespace: ns.to_string(),
+                node: st.clone(),
+            });
+        }
 
         infer_namespaces_aux(&mut h);
 
@@ -80,13 +85,19 @@ impl SegTree {
 }
 
 fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
-    info!("infer_namespaces_aux");
+    for x in h.iter() {
+        info!(
+            "infer_namespaces_aux {} {} {}",
+            x.namespace, x.size, x.children
+        );
+    }
     let MAX_NS = 5;
     let MIN_NS_SIZE = 20;
     let mut expanded = 0;
     let mut added = true;
 
-    while added && (expanded < MAX_NS) {
+    //while added && (expanded < MAX_NS) {
+    while h.len() < MAX_NS {
         added = false;
         let h_len = h.len();
         let mut found = false;
