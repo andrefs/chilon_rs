@@ -35,11 +35,11 @@ impl SegTree {
                 let url_obj = Url::parse(ns_cand.as_str());
 
                 // this is not a URL or the kind we want
-                //if url_obj.is_err() || !url_obj.unwrap().has_host() {
-                //    println!("    error parsing, will continue current segment");
-                //    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
-                //    return;
-                //}
+                if url_obj.is_err() || !url_obj.unwrap().has_host() {
+                    println!("    error parsing, will continue current segment");
+                    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                    return;
+                }
 
                 let sub_tree = SegTree {
                     children: BTreeMap::new(),
@@ -96,14 +96,14 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
     let mut expanded = 0;
     let mut added = true;
 
-    //while added && (expanded < MAX_NS) {
-    while h.len() < MAX_NS {
+    while added && (expanded < MAX_NS) {
+        //while h.len() < MAX_NS {
         added = false;
         let h_len = h.len();
         let mut found = false;
         match h
             .drain_filter(|item| {
-                println!("CHECKING {}", item.namespace);
+                println!("CHECKING {} {expanded}", item.namespace);
                 if !found {
                     let suitable = item
                         .node
@@ -126,13 +126,14 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
         {
             Some(parent) => {
                 h.remove(&parent);
-                println!("REMOVING {}", parent.namespace);
+                expanded -= 1;
+                println!("REMOVING {} {expanded}", parent.namespace);
 
                 for (seg, node) in parent.node.children {
                     if node.could_be_ns(MIN_NS_SIZE) {
                         expanded += 1;
                         added = true;
-                        println!("ADDING {}{seg}", parent.namespace);
+                        println!("ADDING {}{seg} {expanded}", parent.namespace);
                         h.insert(NamespaceCandidate {
                             size: node.value,
                             children: node.children.len(),
