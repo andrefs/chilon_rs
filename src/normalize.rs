@@ -196,15 +196,15 @@ fn proc_triple<E>(t: Triple, tx: &Sender<Message>, ns_trie: &NamespaceTrie) -> R
     tx.send(Message::NormalizedTriple {
         subject: match subject {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
         },
         predicate: match predicate {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
         },
         object: match object {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "[UNKNOWN]".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
         },
     })
     .unwrap();
@@ -228,7 +228,7 @@ fn log_error_to_file(err: String) {
 
 fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
     match sub {
-        Subject::BlankNode(_) => Ok("[BLANK]".to_string()),
+        Subject::BlankNode(_) => Ok("BLANK".to_string()),
         Subject::Triple(_) => unimplemented!(),
         Subject::NamedNode(n) => handle_named_node(n, ns_trie),
     }
@@ -243,7 +243,7 @@ fn handle_predicate(
 
 fn handle_object(obj: Term, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
     match obj {
-        Term::BlankNode(_) => Ok("[BLANK]".to_string()),
+        Term::BlankNode(_) => Ok("BLANK".to_string()),
         Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
         Term::Literal(lit) => Ok(handle_literal(lit)),
@@ -272,12 +272,12 @@ fn handle_named_node(
 
 fn handle_literal(lit: Literal) -> String {
     match lit {
-        Literal::Simple { value: _ } => "[LITERAL:string]".to_string(),
+        Literal::Simple { value: _ } => "LITERAL-string".to_string(),
         Literal::LanguageTaggedString {
             value: _,
             language: _,
-        } => "[LITERAL:lang-string]".to_string(),
-        Literal::Typed { value: _, datatype } => format!("[LITERAL:{datatype}]").to_string(),
+        } => "LITERAL-lang-string".to_string(),
+        Literal::Typed { value: _, datatype } => format!("LITERAL-{datatype}").to_string(),
     }
 }
 
@@ -298,11 +298,9 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
         .unwrap();
 
     writeln!(fd, "@base <http://andrefs.com/graph-summ/v1#> .").unwrap();
-    writeln!(
-        fd,
-        "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ."
-    )
-    .unwrap();
+    writeln!(fd, "").unwrap();
+
+    let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     let mut formatter = TurtleFormatter::new(fd);
 
@@ -311,12 +309,15 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
 
         formatter
             .format(&Triple {
-                subject: NamedNode { iri: &t_id }.into(),
+                subject: NamedNode {
+                    iri: format!("#{}", &t_id).as_str(),
+                }
+                .into(),
                 predicate: NamedNode {
-                    iri: format!("rdf:type").as_str(),
+                    iri: format!("{rdf}type").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("rdf:Statement").as_str(),
+                    iri: format!("{rdf}Statement").as_str(),
                 }
                 .into(),
             })
@@ -325,45 +326,57 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
         id_count += 1;
         formatter
             .format(&Triple {
-                subject: NamedNode { iri: &t_id }.into(),
+                subject: NamedNode {
+                    iri: format!("#{}", &t_id).as_str(),
+                }
+                .into(),
                 predicate: NamedNode {
-                    iri: format!("rdf:subject").as_str(),
+                    iri: format!("{rdf}subject").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("<#{}>", tf.0).as_str(),
+                    iri: format!("#{}", tf.0).as_str(),
                 }
                 .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: NamedNode { iri: &t_id }.into(),
+                subject: NamedNode {
+                    iri: format!("#{}", &t_id).as_str(),
+                }
+                .into(),
                 predicate: NamedNode {
-                    iri: format!("rdf:predicate").as_str(),
+                    iri: format!("{rdf}predicate").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("<#{}>", tf.1).as_str(),
+                    iri: format!("#{}", tf.1).as_str(),
                 }
                 .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: NamedNode { iri: &t_id }.into(),
+                subject: NamedNode {
+                    iri: format!("#{}", &t_id).as_str(),
+                }
+                .into(),
                 predicate: NamedNode {
-                    iri: format!("rdf:object").as_str(),
+                    iri: format!("{rdf}object").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("<#{}>", tf.2).as_str(),
+                    iri: format!("#{}", tf.2).as_str(),
                 }
                 .into(),
             })
             .unwrap();
         formatter
             .format(&Triple {
-                subject: NamedNode { iri: &t_id }.into(),
+                subject: NamedNode {
+                    iri: format!("#{}", &t_id).as_str(),
+                }
+                .into(),
                 predicate: NamedNode {
-                    iri: format!("<#occurrences>").as_str(),
+                    iri: format!("#occurrences").as_str(),
                 },
                 object: Literal::Simple {
                     value: tf.3.to_string().as_str(),
