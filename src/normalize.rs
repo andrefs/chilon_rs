@@ -8,6 +8,7 @@ use rio_api::model::Triple;
 use rio_api::model::{Literal, NamedNode, Subject, Term};
 use rio_turtle::TurtleFormatter;
 use rio_turtle::{TurtleError, TurtleParser};
+use std::collections::BTreeSet;
 use std::fmt::format;
 use std::fs::{write, OpenOptions};
 use std::io::{BufRead, Write};
@@ -286,29 +287,36 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
     let file_path = gen_file_name(base_path, ext);
     info!("Saving graph summary to {}", file_path);
 
+    let used_alias = BTreeSet::<String>::new();
+
     let mut id_count = 1;
 
-    let base_url = "http://andrefs.com/graph-summ/v1/".clone();
-    let fd = OpenOptions::new()
+    let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
         .open(file_path)
         .unwrap();
-    let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+
+    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1#> .").unwrap();
+    writeln!(
+        fd,
+        "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ."
+    )
+    .unwrap();
 
     let mut formatter = TurtleFormatter::new(fd);
 
     for tf in nts.iter_all() {
-        let t_id = format!("{base_url}t{:0width$}", id_count, width = 4);
+        let t_id = format!("t{:0width$}", id_count, width = 4);
 
         formatter
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
-                    iri: format!("{rdf}type").as_str(),
+                    iri: format!("rdf:type").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("{rdf}Statement").as_str(),
+                    iri: format!("rdf:Statement").as_str(),
                 }
                 .into(),
             })
@@ -319,10 +327,10 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
-                    iri: format!("{rdf}subject").as_str(),
+                    iri: format!("rdf:subject").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("{base_url}{}", tf.0).as_str(),
+                    iri: format!("<#{}>", tf.0).as_str(),
                 }
                 .into(),
             })
@@ -331,10 +339,10 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
-                    iri: format!("{rdf}predicate").as_str(),
+                    iri: format!("rdf:predicate").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("{base_url}{}", tf.1).as_str(),
+                    iri: format!("<#{}>", tf.1).as_str(),
                 }
                 .into(),
             })
@@ -343,10 +351,10 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
-                    iri: format!("{rdf}object").as_str(),
+                    iri: format!("rdf:object").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("{base_url}{}", tf.2).as_str(),
+                    iri: format!("<#{}>", tf.2).as_str(),
                 }
                 .into(),
             })
@@ -355,7 +363,7 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
             .format(&Triple {
                 subject: NamedNode { iri: &t_id }.into(),
                 predicate: NamedNode {
-                    iri: format!("{base_url}occurrences").as_str(),
+                    iri: format!("<#occurrences>").as_str(),
                 },
                 object: Literal::Simple {
                     value: tf.3.to_string().as_str(),

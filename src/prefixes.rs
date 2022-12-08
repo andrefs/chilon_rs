@@ -57,15 +57,15 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                         let elapsed = start.elapsed().as_millis();
                         if elapsed != 0 {
                             trace!(
-                                "Read {i} resources so far ({} resources/s)",
+                                "Received {i} resources so far ({} resources/s)",
                                 ((i - last_i) / elapsed) * 1000
                             );
                         }
 
                         if let Some(size) = iri_trie.value {
-                            let IRI_SIZE = 5_000_000;
-                            if size.desc > IRI_SIZE {
-                                warn!("Size of IRI trie over {IRI_SIZE}, inferring namespaces");
+                            let IRI_TRIE_SIZE = 5_000_000;
+                            if size.desc > IRI_TRIE_SIZE {
+                                warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
                                 let seg_tree = SegTree::from(&iri_trie);
                                 let inferred = seg_tree.infer_namespaces();
 
