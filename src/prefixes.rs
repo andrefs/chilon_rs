@@ -44,7 +44,6 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
 
     let mut i = 0;
     let mut start = Instant::now();
-    let mut last_i = 0;
     loop {
         if running == 0 {
             break;
@@ -54,13 +53,10 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 Message::Resource { iri } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
-                        let elapsed = start.elapsed().as_millis();
-                        if elapsed != 0 {
-                            trace!(
-                                "Received {i} resources so far ({} resources/s)",
-                                ((i - last_i) / elapsed) * 1000
-                            );
-                        }
+                        trace!(
+                            "Received {i} resources so far (total seconds elapsed: {}s)",
+                            start.elapsed().as_secs()
+                        );
 
                         if let Some(size) = iri_trie.value {
                             let IRI_TRIE_SIZE = 5_000_000;
@@ -76,9 +72,6 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                                 iri_trie.remove_known_prefixes(&added);
                             }
                         }
-
-                        last_i = i;
-                        start = Instant::now();
                     }
 
                     let stats = NodeStats::new_terminal();
