@@ -43,7 +43,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     let mut local_ns = BTreeMap::<String, String>::new();
 
     let mut i = 0;
-    let mut start = Instant::now();
+    let start = Instant::now();
     loop {
         if running == 0 {
             break;
