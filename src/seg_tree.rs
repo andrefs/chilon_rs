@@ -1,5 +1,4 @@
 #![feature(btree_drain_filter)]
-use log::info;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -37,7 +36,6 @@ impl SegTree {
 
                 // this is not a URL or the kind we want
                 if url_obj.is_err() || !url_obj.unwrap().has_host() {
-                    println!("    error parsing, will continue current segment");
                     self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
                     return;
                 }
@@ -91,12 +89,6 @@ impl SegTree {
 }
 
 fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize) {
-    for x in h.iter() {
-        info!(
-            "infer_namespaces_aux {} {} {}",
-            x.namespace, x.size, x.children
-        );
-    }
     let MAX_NS = 5;
     let mut expanded = 0;
     let mut added = true;
@@ -108,7 +100,6 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
         let mut found = false;
         match h
             .drain_filter(|item| {
-                println!("CHECKING {} {expanded}", item.namespace);
                 if !found {
                     let suitable = item
                         .node
@@ -118,11 +109,9 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
                         .collect::<Vec<_>>();
                     if !suitable.is_empty() && ((suitable.len() + h_len) <= MAX_NS) {
                         found = true;
-                        println!("    YES");
                         return true;
                     }
                 }
-                println!("    NOPE");
                 return false;
             })
             .collect::<Vec<_>>()
@@ -132,13 +121,11 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
             Some(parent) => {
                 h.remove(&parent);
                 expanded -= 1;
-                println!("REMOVING {} {expanded}", parent.namespace);
 
                 for (seg, node) in parent.node.children {
                     if node.could_be_ns(MIN_NS_SIZE) {
                         expanded += 1;
                         added = true;
-                        println!("ADDING {}{seg} {expanded}", parent.namespace);
                         h.insert(NamespaceCandidate {
                             size: node.value,
                             children: node.children.len(),
