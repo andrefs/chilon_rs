@@ -1,21 +1,19 @@
 use crate::ns_trie::NamespaceTrie;
 use crate::parse::parse;
 use crate::util::gen_file_name;
-use log::{debug, error, info, trace, warn};
-use rayon::{ThreadPool, ThreadPoolBuilder};
+use log::{debug, error, info, trace};
+use rayon::ThreadPoolBuilder;
 use rio_api::formatter::TriplesFormatter;
 use rio_api::model::Triple;
 use rio_api::model::{Literal, NamedNode, Subject, Term};
 use rio_turtle::TurtleFormatter;
 use rio_turtle::{TurtleError, TurtleParser};
 use std::collections::BTreeSet;
-use std::fmt::format;
-use std::fs::{write, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::{BufRead, Write};
 use std::time::Instant;
 use std::{
     collections::BTreeMap,
-    error::Error,
     path::PathBuf,
     sync::mpsc::{channel, Sender},
 };

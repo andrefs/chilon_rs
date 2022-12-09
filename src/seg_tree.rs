@@ -3,6 +3,7 @@ use log::info;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
+    usize,
 };
 use url::Url;
 
@@ -62,29 +63,34 @@ impl SegTree {
         }
     }
 
-    pub fn infer_namespaces(&self) -> Vec<String> {
+    pub fn infer_namespaces(&self) -> Vec<(String, usize)> {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
+        let MIN_NS_SIZE = 20;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
-            h.insert(NamespaceCandidate {
-                size: st.value,
-                children: st.children.len(),
-                namespace: ns.to_string(),
-                node: st.clone(),
-            });
+            // include only children worthy of being namespaces
+            if st.could_be_ns(MIN_NS_SIZE) {
+                h.insert(NamespaceCandidate {
+                    size: st.value,
+                    children: st.children.len(),
+                    namespace: ns.to_string(),
+                    node: st.clone(),
+                });
+            }
         }
 
-        infer_namespaces_aux(&mut h);
+        infer_namespaces_aux(&mut h, MIN_NS_SIZE);
 
-        return h.iter().map(|ns| ns.namespace.clone()).collect();
+        return h.iter().map(|ns| (ns.namespace.clone(), ns.size)).collect();
     }
+
     pub fn could_be_ns(&self, MIN_NS_SIZE: usize) -> bool {
         self.value >= MIN_NS_SIZE
     }
 }
 
-fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
+fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize) {
     for x in h.iter() {
         info!(
             "infer_namespaces_aux {} {} {}",
@@ -92,7 +98,6 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>) {
         );
     }
     let MAX_NS = 5;
-    let MIN_NS_SIZE = 20;
     let mut expanded = 0;
     let mut added = true;
 

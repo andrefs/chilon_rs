@@ -27,11 +27,11 @@ impl SaveTrie for NamespaceTrie {
 }
 
 pub trait InferredNamespaces {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) -> Vec<String>;
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String>;
 }
 
 impl InferredNamespaces for NamespaceTrie {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<String>) -> Vec<String> {
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String> {
         let mut added = Node::<String>::new();
         let mut aliases = Node::<String>::new();
         for (ns, node) in self.iter() {
@@ -40,7 +40,7 @@ impl InferredNamespaces for NamespaceTrie {
             }
         }
 
-        for ns in inferred.iter() {
+        for (ns, size) in inferred.iter() {
             match Url::parse(ns.as_str()) {
                 Err(err) => warn!("Could not parse IRI {ns}: {err}"),
                 Ok(url_obj) => {
@@ -49,7 +49,10 @@ impl InferredNamespaces for NamespaceTrie {
                         continue;
                     }
                     let alias = gen_alias(url_obj, &aliases);
-                    debug!("Adding new namespace {} -> {} to namespace trie", alias, ns);
+                    debug!(
+                        "Adding new namespace {} -> {} to namespace trie (size: {size})",
+                        alias, ns
+                    );
                     self.insert(ns, alias.clone());
                     aliases.insert(&alias.clone(), ns.clone());
                     added.insert(&alias.clone(), ns.clone());
