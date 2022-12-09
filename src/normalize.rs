@@ -285,7 +285,7 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
     let file_path = gen_file_name(base_path, ext);
     info!("Saving graph summary to {}", file_path);
 
-    let used_alias = BTreeSet::<String>::new();
+    let used_alias = BTreeSet::<String>::new(); // TODO
 
     let mut id_count = 1;
 

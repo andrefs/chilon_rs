@@ -1,9 +1,6 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-    fs::write,
-};
+use std::{collections::HashMap, fs::write};
 
-use crate::{ns_trie, trie::Node, util::gen_file_name};
+use crate::{trie::Node, util::gen_file_name};
 use log::{debug, info, warn};
 use url::Url;
 

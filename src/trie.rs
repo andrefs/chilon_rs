@@ -4,8 +4,6 @@ use std::{
     fmt::Debug,
 };
 
-use crate::iri_trie::IriTrie;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     pub value: Option<T>,
