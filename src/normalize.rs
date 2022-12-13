@@ -161,7 +161,7 @@ fn proc_triples(
             start = Instant::now();
         }
         if let Err(err) = graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie)) {
-            error!("Error processing triple {}", err);
+            error!("Error processing triple: {}", err);
         }
     }
     tx.send(Message::Finished).unwrap();
