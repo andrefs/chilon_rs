@@ -220,7 +220,7 @@ impl IriTrieExt for IriTrie {
         }
         warn!(
             "IRIs with unknown namespaces: {} ({} occurrences).",
-            self.value.unwrap().uniq_desc,
+            self.count(),
             self.value.unwrap().desc,
         );
         let examples = self.iter_leaves().take(10).map(|x| x.0).collect::<Vec<_>>();

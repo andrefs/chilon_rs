@@ -7,8 +7,9 @@ use crate::seg_tree::SegTree;
 use crate::trie::InsertFnVisitors;
 use log::{debug, error, info, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
-use rio_turtle::TurtleError;
+use rio_turtle::{TurtleError, TurtleParser};
 use std::collections::BTreeMap;
+use std::io::BufRead;
 use std::time::Instant;
 use std::{
     path::PathBuf,
@@ -33,13 +34,21 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
         .build()
         .unwrap();
     let mut running = paths.len();
-    let (tx, rx) = channel::<Message>();
 
-    for path in paths {
-        spawn(&pool, &tx, path, ns_trie.to_owned());
-    }
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
+
+    pool.scope_fifo(|s| {
+        let (tx, rx) = channel::<Message>();
+        for path in paths {
+            let tx = tx.clone();
+            s.spawn_fifo(move |_| {
+                debug!("Parsing {:?}", path);
+                let mut graph = parse(&path);
+                proc_triples(&mut graph, &tx);
+            });
+        }
+
 
     let mut i = 0;
     let start = Instant::now();
@@ -53,12 +62,14 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     i += 1;
                     if i % 1_000_000 == 1 {
                         trace!(
-                            "Received {i} resources so far (total seconds elapsed: {}s)",
+                            "Received {i} resources so far (trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
+                            ns_trie.count_terminals(),
+                            iri_trie.count(),
                             start.elapsed().as_secs()
                         );
 
                         if let Some(size) = iri_trie.value {
-                            let IRI_TRIE_SIZE = 5_000_000;
+                            let IRI_TRIE_SIZE = 1_000_000;
                             if size.desc > IRI_TRIE_SIZE {
                                 warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
                                 let seg_tree = SegTree::from(&iri_trie);
@@ -73,15 +84,18 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                         }
                     }
 
-                    let stats = NodeStats::new_terminal();
-                    iri_trie.insert_fn(
-                        &iri,
-                        stats,
-                        &InsertFnVisitors {
-                            node: Some(&update_stats),
-                            terminal: Some(&inc_own),
-                        },
-                    );
+                    let res = ns_trie.longest_prefix(iri.as_str(), true);
+                    if res.is_none() || res.unwrap().1.is_empty() {
+                                let stats = NodeStats::new_terminal();
+                                iri_trie.insert_fn(
+                                    &iri,
+                                    stats,
+                                    &InsertFnVisitors {
+                                        node: Some(&update_stats),
+                                        terminal: Some(&inc_own),
+                                    },
+                                );
+                    }
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
@@ -93,6 +107,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             }
         }
     }
+    });
 
     // local file prefix decls are only sent in the end
     // remove the prefix and add to other prefix trie
@@ -105,83 +120,66 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     return iri_trie;
 }
 
-fn spawn(pool: &rayon::ThreadPool, tx: &Sender<Message>, path: PathBuf, ns_trie: NamespaceTrie) {
+fn proc_triples(graph: &mut TurtleParser<impl BufRead>, tx: &Sender<Message>) {
     let tx = tx.clone();
 
-    pool.spawn_fifo(move || {
-        let mut graph = parse(&path);
-        debug!("Parsing {:?}", path);
-        let tid = if let Some(id) = rayon::current_thread_index() {
-            id.to_string()
-        } else {
-            "".to_string()
-        };
-        let mut i = 0;
-        let mut start = Instant::now();
-        let mut last_i = 0;
+    let tid = if let Some(id) = rayon::current_thread_index() {
+        id.to_string()
+    } else {
+        "".to_string()
+    };
+    let mut i = 0;
+    let mut start = Instant::now();
+    let mut last_i = 0;
 
-        while !graph.is_end() {
-            i += 1;
-            if i % 1_000_000 == 1 {
-                let elapsed = start.elapsed().as_millis();
-                if elapsed != 0 {
-                    trace!(
-                        "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                        ((i - last_i) / elapsed) * 1000
-                    );
-                }
-                last_i = i;
-                start = Instant::now();
+    while !graph.is_end() {
+        i += 1;
+        if i % 1_000_000 == 1 {
+            let elapsed = start.elapsed().as_millis();
+            if elapsed != 0 {
+                trace!(
+                    "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
+                    ((i - last_i) / elapsed) * 1000
+                );
             }
-
-            graph
-                .parse_step(&mut |t| proc_triple(t, &tx, &ns_trie))
-                .unwrap_or_else(|err| error!("Error processing triple {}", err));
+            last_i = i;
+            start = Instant::now();
         }
 
-        for (alias, namespace) in graph.prefixes().iter() {
-            tx.send(Message::PrefixDecl {
-                namespace: namespace.to_string(),
-                alias: alias.to_string(),
-            })
-            .unwrap()
-        }
-        tx.send(Message::Finished).unwrap();
-    });
+        graph
+            .parse_step(&mut |t| proc_triple(t, &tx))
+            .unwrap_or_else(|err| error!("Error processing triple {}", err));
+    }
+
+    for (alias, namespace) in graph.prefixes().iter() {
+        tx.send(Message::PrefixDecl {
+            namespace: namespace.to_string(),
+            alias: alias.to_string(),
+        })
+        .unwrap()
+    }
+    tx.send(Message::Finished).unwrap();
 }
 
-fn proc_triple(
-    t: Triple,
-    tx: &Sender<Message>,
-    ns_trie: &NamespaceTrie,
-) -> Result<(), TurtleError> {
+fn proc_triple(t: Triple, tx: &Sender<Message>) -> Result<(), TurtleError> {
     // subject
     if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-        let res = ns_trie.longest_prefix(iri, true);
-        if res.is_none() || res.unwrap().1.is_empty() {
-            tx.send(Message::Resource {
-                iri: iri.to_owned(),
-            })
-            .unwrap();
-        }
-    }
-    // predicate
-    let res = ns_trie.longest_prefix(t.predicate.iri, true);
-    if res.is_none() || res.unwrap().1.is_empty() {
         tx.send(Message::Resource {
-            iri: t.predicate.iri.to_owned(),
+            iri: iri.to_owned(),
         })
         .unwrap();
     }
+    // predicate
+    tx.send(Message::Resource {
+        iri: t.predicate.iri.to_owned(),
+    })
+    .unwrap();
     // object
     if let Term::NamedNode(NamedNode { iri }) = t.object {
-        let res = ns_trie.longest_prefix(iri, true);
-        if res.is_none() || res.unwrap().1.is_empty() {
-            tx.send(Message::Resource {
-                iri: iri.to_owned(),
-            })
-            .unwrap();
-        }
+        tx.send(Message::Resource {
+            iri: iri.to_owned(),
+        })
+        .unwrap();
     }
 
     Ok(()) as Result<(), TurtleError>

@@ -17,11 +17,10 @@ use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use clap::Parser;
-use log::{debug, info};
+use log::{debug, info, trace};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
-use rand::{thread_rng, Rng};
 use simple_logger::SimpleLogger;
 
 fn main() {
@@ -38,12 +37,6 @@ fn main() {
     // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
     info!("Getting namespaces");
     let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
-
-    // /// TESTING STUFF
-    // debug_unknown_namespaces(&mut iri_trie);
-
-    //debug!("Removing IRI trie leaves");
-    //iri_trie.remove_leaves();
 
     info!("Inferring namespaces from IRIs left");
     let seg_tree = SegTree::from(&iri_trie);

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::write};
 
 use crate::{trie::Node, util::gen_file_name};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use url::Url;
 
 pub type NamespaceTrie = Node<String>;
@@ -45,19 +45,31 @@ impl InferredNamespaces for NamespaceTrie {
                         warn!("IRI {ns} does not have host");
                         continue;
                     }
-                    let alias = gen_alias(url_obj, &aliases);
-                    debug!(
-                        "Adding new namespace {} -> {} to namespace trie (size: {size})",
-                        alias, ns
-                    );
-                    self.insert(ns, alias.clone());
-                    aliases.insert(&alias.clone(), ns.clone());
-                    added.insert(&alias.clone(), ns.clone());
+                    if let Some((node, ns)) =
+                        self.longest_prefix(url_obj.to_string().as_str(), true)
+                    {
+                        debug!(
+                            "Inferred namespace {ns} already in trie with alias {}",
+                            node.value.as_ref().unwrap()
+                        );
+                    }
+                    let alias_opt = gen_alias(url_obj, &aliases);
+                    if let Some(alias) = alias_opt {
+                        debug!(
+                            "Adding new namespace {} -> {} to namespace trie (size: {size})",
+                            alias, ns
+                        );
+                        self.insert(ns, alias.clone());
+                        aliases.insert(&alias.clone(), ns.clone());
+                        added.insert(&alias, ns.clone());
+                    } else {
+                        warn!("gen_alias() returned None for {}", ns);
+                    }
                 }
             }
         }
 
-        return added
+        let res = added
             .iter_leaves()
             .filter_map(|(_, node)| {
                 if node.value.is_some() {
@@ -66,11 +78,12 @@ impl InferredNamespaces for NamespaceTrie {
                     None
                 }
             })
-            .collect();
+            .collect::<Vec<String>>();
+        return res;
     }
 }
 
-fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
+fn gen_alias(url_obj: Url, aliases: &Node<String>) -> Option<String> {
     let domains = url_obj.host_str().unwrap().split('.').collect::<Vec<_>>();
     let mut rev_domains = domains.iter().rev();
     let (tld, alias_cand) = (*rev_domains.next().unwrap(), *rev_domains.next().unwrap());
@@ -81,12 +94,15 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
     // check if already exists
     let conflict = aliases.find(&alias, true);
     if let None = conflict {
-        return alias;
+        return Some(alias);
     }
 
     // check if tlds are different
     let confl_url = conflict.unwrap().value.clone().unwrap();
     let confl_url_obj = Url::parse(&confl_url).unwrap();
+    if confl_url_obj.to_string() == url_obj.to_string() {
+        return None;
+    }
 
     let confl_domains = confl_url_obj
         .host_str()
@@ -99,7 +115,7 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
         let alias_tld = format!("{}{}", alias_abbrv, confl_tld);
 
         if !aliases.contains_key(&alias_tld) {
-            return alias_tld;
+            return Some(alias_tld);
         }
     }
 
@@ -112,7 +128,7 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
         if last_seg.is_some() && confl_last_seg.is_some() && last_seg != confl_last_seg {
             let alias_seg = format!("{}{}", alias_abbrv, last_seg.unwrap());
             if !aliases.contains_key(&alias_seg) {
-                return alias_seg;
+                return Some(alias_seg);
             }
         }
     }
@@ -124,5 +140,5 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> String {
         count += 1;
     }
 
-    return alias;
+    return Some(alias);
 }
