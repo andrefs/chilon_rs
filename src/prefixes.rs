@@ -63,8 +63,8 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     if i % 1_000_000 == 1 {
                         trace!(
                             "Received {i} resources so far (trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
-                            ns_trie.count_terminals(),
                             iri_trie.count(),
+                            ns_trie.count_terminals(),
                             start.elapsed().as_secs()
                         );
 
