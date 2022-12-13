@@ -45,7 +45,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
-                proc_triples(&mut graph, &tx);
+                proc_triples(&mut graph, &path, &tx);
             });
         }
 
@@ -120,7 +120,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     return iri_trie;
 }
 
-fn proc_triples(graph: &mut TurtleParser<impl BufRead>, tx: &Sender<Message>) {
+fn proc_triples(graph: &mut TurtleParser<impl BufRead>, path: &PathBuf, tx: &Sender<Message>) {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {
@@ -148,7 +148,9 @@ fn proc_triples(graph: &mut TurtleParser<impl BufRead>, tx: &Sender<Message>) {
 
         graph
             .parse_step(&mut |t| proc_triple(t, &tx))
-            .unwrap_or_else(|err| error!("Error processing triple {}", err));
+            .unwrap_or_else(|err| {
+                error!("Error processing file {}: {}", path.to_string_lossy(), err)
+            });
     }
 
     for (alias, namespace) in graph.prefixes().iter() {

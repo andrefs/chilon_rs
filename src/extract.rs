@@ -12,3 +12,5 @@ pub fn extract(path: &PathBuf) -> impl BufRead {
     let stream = BufReader::new(dec);
     return stream;
 }
+
+// pub fn compress(stream, path) {}

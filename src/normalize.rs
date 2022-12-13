@@ -83,7 +83,7 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
             s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
-                proc_triples(&mut graph, &tx, ns_trie);
+                proc_triples(&mut graph, &path, &tx, ns_trie);
             });
         }
 
@@ -135,6 +135,7 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
 }
 fn proc_triples(
     graph: &mut TurtleParser<impl BufRead>,
+    path: &PathBuf,
     tx: &Sender<Message>,
     ns_trie: &NamespaceTrie,
 ) {
@@ -161,7 +162,7 @@ fn proc_triples(
             start = Instant::now();
         }
         if let Err(err) = graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie)) {
-            error!("Error processing triple: {}", err);
+            error!("Error processing file {}: {}", path.to_string_lossy(), err);
         }
     }
     tx.send(Message::Finished).unwrap();
