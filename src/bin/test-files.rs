@@ -42,6 +42,7 @@ fn main() {
                     error!("Error processing file {}: {}", path.to_string_lossy(), err);
                 });
         }
+
         info!("File {} seems ok.", path.to_string_lossy());
     }
 }
