@@ -54,6 +54,10 @@ let mut last_i = 0;
 
     loop {
         if running == 0 {
+
+
+
+
             break;
         }
         if let Ok(message) = rx.recv() {

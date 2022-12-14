@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::write};
 
 use crate::{trie::Node, util::gen_file_name};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use url::Url;
 
 pub type NamespaceTrie = Node<String>;
@@ -84,9 +84,20 @@ impl InferredNamespaces for NamespaceTrie {
 }
 
 fn gen_alias(url_obj: Url, aliases: &Node<String>) -> Option<String> {
-    let domains = url_obj.host_str().unwrap().split('.').collect::<Vec<_>>();
-    let mut rev_domains = domains.iter().rev();
-    let (tld, alias_cand) = (*rev_domains.next().unwrap(), *rev_domains.next().unwrap());
+    let mut domains = url_obj
+        .host_str()
+        .unwrap_or_else(|| panic!("Url {} has no host str", url_obj.to_string()))
+        .split('.');
+
+    let alias_cand = domains.next().unwrap_or_else(|| {
+        panic!(
+            "domains is empty! {:#?} {:#?} {:#?}",
+            url_obj.to_string(),
+            url_obj,
+            domains
+        )
+    });
+    let tld = domains.last();
 
     let mut alias = alias_cand.to_string();
     let alias_abbrv = alias.chars().take(5).collect::<String>();
@@ -111,7 +122,7 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> Option<String> {
         .collect::<Vec<_>>();
     let mut rev_confl_domains = confl_domains.iter().rev();
     let confl_tld = *rev_confl_domains.next().unwrap();
-    if tld != confl_tld {
+    if tld.is_some() && tld.unwrap() != confl_tld {
         let alias_tld = format!("{}{}", alias_abbrv, confl_tld);
 
         if !aliases.contains_key(&alias_tld) {
