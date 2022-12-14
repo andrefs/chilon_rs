@@ -51,7 +51,9 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
 
 
     let mut i = 0;
-    let start = Instant::now();
+    let mut start = Instant::now();
+let mut last_i = 0;
+
     loop {
         if running == 0 {
             break;
@@ -61,12 +63,16 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                 Message::Resource { iri } => {
                     i += 1;
                     if i % 1_000_000 == 1 {
-                        trace!(
-                            "Received {i} resources so far (trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
+                        let elapsed = start.elapsed().as_millis();
+                        if elapsed != 0 {
+                            trace!(
+                                "Received {i} resources so far ({} resources/s, trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
+                                ((i - last_i) / elapsed) * 1000,
                             iri_trie.count(),
                             ns_trie.count_terminals(),
                             start.elapsed().as_secs()
-                        );
+                            );
+                        }
 
                         if let Some(size) = iri_trie.value {
                             let IRI_TRIE_SIZE = 1_000_000;
@@ -82,6 +88,8 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                                 iri_trie.remove_known_prefixes(&added);
                             }
                         }
+                                    last_i = i;
+                        start = Instant::now();
                     }
 
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
@@ -120,7 +128,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     return iri_trie;
 }
 
-fn proc_triples(graph: &mut TurtleParser<impl BufRead>, path: &PathBuf, tx: &Sender<Message>) {
+fn proc_triples(graph: &mut TurtleParser<impl BufRead>, path: &PathBuf, tx: &SyncSender<Message>) {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {
@@ -163,7 +171,7 @@ fn proc_triples(graph: &mut TurtleParser<impl BufRead>, path: &PathBuf, tx: &Sen
     tx.send(Message::Finished).unwrap();
 }
 
-fn proc_triple(t: Triple, tx: &Sender<Message>) -> Result<(), TurtleError> {
+fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(), TurtleError> {
     // subject
     if let Subject::NamedNode(NamedNode { iri }) = t.subject {
         tx.send(Message::Resource {
