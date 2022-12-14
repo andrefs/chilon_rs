@@ -10,11 +10,9 @@ use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::{TurtleError, TurtleParser};
 use std::collections::BTreeMap;
 use std::io::BufRead;
+use std::sync::mpsc::SyncSender;
 use std::time::Instant;
-use std::{
-    path::PathBuf,
-    sync::mpsc::{channel, Sender},
-};
+use std::{path::PathBuf, sync::mpsc::sync_channel};
 
 use crate::ns_trie::InferredNamespaces;
 use rio_api::parser::TriplesParser;
@@ -39,7 +37,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     let mut local_ns = BTreeMap::<String, String>::new();
 
     pool.scope_fifo(|s| {
-        let (tx, rx) = channel::<Message>();
+        let (tx, rx) = sync_channel::<Message>(100);
         for path in paths {
             let tx = tx.clone();
             s.spawn_fifo(move |_| {
