@@ -169,7 +169,7 @@ fn proc_triples(
         if let Err(err) =
             graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown))
         {
-            error!("Error processing file {}: {}", path.to_string_lossy(), err);
+            error!("Error normalizing file {}: {}", path.to_string_lossy(), err);
         }
     }
     tx.send(Message::Finished).unwrap();

@@ -39,7 +39,7 @@ fn main() {
                     Ok(())
                 })
                 .unwrap_or_else(|err: TurtleError| {
-                    error!("Error processing file {}: {}", path.to_string_lossy(), err);
+                    error!("Error testing file {}: {}", path.to_string_lossy(), err);
                 });
         }
 
