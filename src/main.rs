@@ -40,13 +40,16 @@ fn main() {
 
     info!("Inferring namespaces from IRIs left");
     let seg_tree = SegTree::from(&iri_trie);
-    let inferred = seg_tree.infer_namespaces();
+    let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
     debug!("Adding inferred namespaces");
     let added = ns_trie.add_inferred_namespaces(&inferred);
 
     debug!("Removing IRIs with inferred namespaces");
-    iri_trie.remove_known_prefixes(&added);
+    iri_trie.remove_prefixes(&added);
+
+    debug!("Removing IRIs with garbage collected namespaces");
+    iri_trie.remove_prefixes(&gbg_collected);
 
     //warn!(
     //    "IRIs without namespace: {:?}",

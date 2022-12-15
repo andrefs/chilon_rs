@@ -64,7 +64,7 @@ let mut last_i = 0;
             match message {
                 Message::Resource { iri } => {
                     i += 1;
-                    if i % 1_000_000 == 1 {
+                    if i % 1_00_000 == 1 {
                         let elapsed = start.elapsed().as_millis();
                         if elapsed != 0 {
                             trace!(
@@ -77,17 +77,20 @@ let mut last_i = 0;
                         }
 
                         if let Some(size) = iri_trie.value {
-                            let IRI_TRIE_SIZE = 1_000_000;
+                            let IRI_TRIE_SIZE = 1_00_000;
                             if size.desc > IRI_TRIE_SIZE {
                                 warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
                                 let seg_tree = SegTree::from(&iri_trie);
-                                let inferred = seg_tree.infer_namespaces();
+                                let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
                                 debug!("Adding inferred namespaces");
                                 let added = ns_trie.add_inferred_namespaces(&inferred);
 
-                                debug!("Removing IRIs with inferred namespaces");
-                                iri_trie.remove_known_prefixes(&added);
+                                debug!("Removing {} IRIs with inferred namespaces", added.len());
+                                iri_trie.remove_prefixes(&added);
+
+                                debug!("Removing {} IRIs with garbage collected namespaces", gbg_collected.len());
+                                iri_trie.remove_prefixes(&gbg_collected);
                             }
                         }
                                     last_i = i;
@@ -122,7 +125,7 @@ let mut last_i = 0;
     // local file prefix decls are only sent in the end
     // remove the prefix and add to other prefix trie
 
-    iri_trie.remove_known_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
+    iri_trie.remove_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
     for (namespace, alias) in local_ns.iter() {
         ns_trie.insert(&namespace.clone(), alias.clone());
     }

@@ -1,5 +1,5 @@
 #![feature(btree_drain_filter)]
-use log::debug;
+use log::{debug, trace};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -18,18 +18,21 @@ pub struct SegTree {
 impl SegTree {
     fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
         if iri_trie.children.is_empty() {
-            self.children.insert(
-                word_acc,
-                SegTree {
-                    children: BTreeMap::new(),
-                    value: match iri_trie.value {
-                        Some(stats) => stats.desc,
-                        None => 0,
+            if !word_acc.is_empty() {
+                self.children.insert(
+                    word_acc,
+                    SegTree {
+                        children: BTreeMap::new(),
+                        value: match iri_trie.value {
+                            Some(stats) => stats.desc,
+                            None => 0,
+                        },
                     },
-                },
-            );
+                );
+            }
             return;
         }
+
         for (c, node) in &iri_trie.children {
             if ['/', '#'].contains(&c) {
                 let ns_cand = format!("{prev_str}{word_acc}{c}");
@@ -62,12 +65,18 @@ impl SegTree {
         }
     }
 
-    pub fn infer_namespaces(&self) -> Vec<(String, usize)> {
+    pub fn infer_namespaces(&self) -> (Vec<(String, usize)>, Vec<String>) {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
+        let mut gbg_collected: Vec<String> = Vec::new();
         let MIN_NS_SIZE = 1000;
+        let MIN_DOMAIN_OCCURS = 100;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
+            if st.value < MIN_DOMAIN_OCCURS {
+                gbg_collected.push(ns.to_string());
+            }
+
             // include only children worthy of being namespaces
             if st.could_be_ns(MIN_NS_SIZE) {
                 h.insert(NamespaceCandidate {
@@ -79,21 +88,11 @@ impl SegTree {
             }
         }
 
-        let MIN_DOMAIN_OCCURS = 20;
-        h.drain_filter(|item| {
-            if item.size < MIN_DOMAIN_OCCURS {
-                debug!(
-                    "Removing IRI trie domain {} for low number of occurrences: {}",
-                    item.namespace, item.size
-                );
-                return true;
-            }
-            return false;
-        });
-
         infer_namespaces_aux(&mut h, MIN_NS_SIZE);
 
-        return h.iter().map(|ns| (ns.namespace.clone(), ns.size)).collect();
+        let inferred = h.iter().map(|ns| (ns.namespace.clone(), ns.size)).collect();
+
+        return (inferred, gbg_collected);
     }
 
     pub fn could_be_ns(&self, MIN_NS_SIZE: usize) -> bool {
