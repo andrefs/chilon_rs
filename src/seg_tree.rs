@@ -1,4 +1,5 @@
 #![feature(btree_drain_filter)]
+use log::debug;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
@@ -63,7 +64,7 @@ impl SegTree {
 
     pub fn infer_namespaces(&self) -> Vec<(String, usize)> {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
-        let MIN_NS_SIZE = 20;
+        let MIN_NS_SIZE = 1000;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
@@ -77,6 +78,18 @@ impl SegTree {
                 });
             }
         }
+
+        let MIN_DOMAIN_OCCURS = 20;
+        h.drain_filter(|item| {
+            if item.size < MIN_DOMAIN_OCCURS {
+                debug!(
+                    "Removing IRI trie domain {} for low number of occurrences: {}",
+                    item.namespace, item.size
+                );
+                return true;
+            }
+            return false;
+        });
 
         infer_namespaces_aux(&mut h, MIN_NS_SIZE);
 
@@ -98,6 +111,7 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
         added = false;
         let h_len = h.len();
         let mut found = false;
+
         match h
             .drain_filter(|item| {
                 if !found {
