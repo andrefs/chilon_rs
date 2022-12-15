@@ -30,40 +30,41 @@ fn main() {
     /**********************
      * Prepare namespaces *
      **********************/
-
     info!("Loading namespaces from Prefix.cc");
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
-    // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
-    info!("Getting namespaces");
-    let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
+    if cli.infer_ns {
+        // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
+        info!("Getting namespaces");
+        let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
-    info!("Inferring namespaces from IRIs left");
-    let seg_tree = SegTree::from(&iri_trie);
-    let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+        info!("Inferring namespaces from IRIs left");
+        let seg_tree = SegTree::from(&iri_trie);
+        let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
-    debug!("Adding inferred namespaces");
-    let added = ns_trie.add_inferred_namespaces(&inferred);
+        debug!("Adding inferred namespaces");
+        let added = ns_trie.add_inferred_namespaces(&inferred);
 
-    debug!("Removing IRIs with inferred namespaces");
-    iri_trie.remove_prefixes(&added);
+        debug!("Removing IRIs with inferred namespaces");
+        iri_trie.remove_prefixes(&added);
 
-    debug!("Removing IRIs with garbage collected namespaces");
-    iri_trie.remove_prefixes(&gbg_collected);
+        debug!("Removing IRIs with garbage collected namespaces");
+        iri_trie.remove_prefixes(&gbg_collected);
 
-    //warn!(
-    //    "IRIs without namespace: {:?}",
-    //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
-    //);
+        //warn!(
+        //    "IRIs without namespace: {:?}",
+        //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
+        //);
 
-    ns_trie.save();
+        ns_trie.save();
+    }
 
     /*********************
      * Normalize triples *
      *********************/
 
     info!("Normalizing triples");
-    let nts = normalize_triples(cli.files.clone(), &mut ns_trie); // TODO improve
+    let nts = normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown); // TODO improve
 
     debug!("saving normalized triples");
     save_normalized_triples(&nts);

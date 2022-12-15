@@ -64,7 +64,7 @@ let mut last_i = 0;
             match message {
                 Message::Resource { iri } => {
                     i += 1;
-                    if i % 1_00_000 == 1 {
+                    if i % 1_000_000 == 1 {
                         let elapsed = start.elapsed().as_millis();
                         if elapsed != 0 {
                             trace!(
@@ -77,7 +77,7 @@ let mut last_i = 0;
                         }
 
                         if let Some(size) = iri_trie.value {
-                            let IRI_TRIE_SIZE = 1_00_000;
+                            let IRI_TRIE_SIZE = 1_000_000;
                             if size.desc > IRI_TRIE_SIZE {
                                 warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
                                 let seg_tree = SegTree::from(&iri_trie);

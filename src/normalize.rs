@@ -66,7 +66,11 @@ pub enum Message {
     Finished,
 }
 
-pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> TripleFreq {
+pub fn normalize_triples(
+    paths: Vec<PathBuf>,
+    ns_trie: &NamespaceTrie,
+    ignore_unknown: bool,
+) -> TripleFreq {
     let mut triples = TripleFreq::new();
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -83,7 +87,7 @@ pub fn normalize_triples(paths: Vec<PathBuf>, ns_trie: &NamespaceTrie) -> Triple
             s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
-                proc_triples(&mut graph, &path, &tx, ns_trie);
+                proc_triples(&mut graph, &path, &tx, ns_trie, ignore_unknown);
             });
         }
 
@@ -138,6 +142,7 @@ fn proc_triples(
     path: &PathBuf,
     tx: &Sender<Message>,
     ns_trie: &NamespaceTrie,
+    ignore_unknown: bool,
 ) {
     let tid = if let Some(id) = rayon::current_thread_index() {
         id.to_string()
@@ -161,18 +166,26 @@ fn proc_triples(
             last_i = i;
             start = Instant::now();
         }
-        if let Err(err) = graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie)) {
+        if let Err(err) =
+            graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown))
+        {
             error!("Error processing file {}: {}", path.to_string_lossy(), err);
         }
     }
     tx.send(Message::Finished).unwrap();
 }
 
-fn proc_triple<E>(t: Triple, tx: &Sender<Message>, ns_trie: &NamespaceTrie) -> Result<(), E> {
+fn proc_triple<E>(
+    t: Triple,
+    tx: &Sender<Message>,
+    ns_trie: &NamespaceTrie,
+    ignore_unknown: bool,
+) -> Result<(), E> {
     let subject = handle_subject(t.subject, ns_trie);
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
 
+    if !ignore_unknown {}
     if let Err(UnknownNamespaceError { iri: _ }) = subject {
         tx.send(Message::NamespaceUnknown {
             iri: t.subject.to_string(),
@@ -190,6 +203,18 @@ fn proc_triple<E>(t: Triple, tx: &Sender<Message>, ns_trie: &NamespaceTrie) -> R
             iri: t.object.to_string(),
         })
         .unwrap();
+    }
+
+    if ignore_unknown {
+        if let Err(UnknownNamespaceError) = subject {
+            return Ok(());
+        }
+        if let Err(UnknownNamespaceError) = predicate {
+            return Ok(());
+        }
+        if let Err(UnknownNamespaceError) = object {
+            return Ok(());
+        }
     }
 
     tx.send(Message::NormalizedTriple {
