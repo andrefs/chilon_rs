@@ -23,4 +23,5 @@ log = "0.4.0"
 simple_logger = {version = "4.0.0", features = ["stderr"]}
 url = "2.3.1"
 rand = "0.8.5"
+unicode-segmentation = "1.10.0"
 # spinners = "4.1.0"

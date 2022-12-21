@@ -13,6 +13,7 @@ use std::io::BufRead;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 use std::{path::PathBuf, sync::mpsc::sync_channel};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ns_trie::InferredNamespaces;
 use rio_api::parser::TriplesParser;
@@ -180,22 +181,37 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(), TurtleError> {
     // subject
     if let Subject::NamedNode(NamedNode { iri }) = t.subject {
         tx.send(Message::Resource {
-            iri: iri.to_owned(),
+            iri: normalize_iri(iri),
         })
         .unwrap();
     }
     // predicate
     tx.send(Message::Resource {
-        iri: t.predicate.iri.to_owned(),
+        iri: normalize_iri(t.predicate.iri),
     })
     .unwrap();
     // object
     if let Term::NamedNode(NamedNode { iri }) = t.object {
         tx.send(Message::Resource {
-            iri: iri.to_owned(),
+            iri: normalize_iri(iri),
         })
         .unwrap();
     }
 
     Ok(()) as Result<(), TurtleError>
+}
+
+// TODO: improve IRI normalization
+fn normalize_iri(iri: &str) -> String {
+    let IRI_MAX_LENGTH = 200;
+
+    if iri.len() > IRI_MAX_LENGTH {
+        UnicodeSegmentation::graphemes(iri, true)
+            .map(|x| x.to_string())
+            .take(IRI_MAX_LENGTH)
+            .collect::<Vec<String>>()
+            .join("")
+    } else {
+        iri.to_string()
+    }
 }
