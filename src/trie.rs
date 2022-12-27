@@ -216,6 +216,7 @@ impl<T: Debug> Node<T> {
         };
     }
 
+    /// Returns the node corresponding to the longest prefix and the longest prefix String
     pub fn longest_prefix(&self, s: &str, must_be_terminal: bool) -> Option<(&Node<T>, String)> {
         let lpo = LongestPrefOpts {
             must_be_terminal,

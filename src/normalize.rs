@@ -1,24 +1,21 @@
-use crate::ns_trie::NamespaceTrie;
-use crate::parse::parse;
-use crate::util::gen_file_name;
+use crate::{ns_trie::NamespaceTrie, parse::parse, util::gen_file_name};
 use log::{debug, error, info, trace};
 use rayon::ThreadPoolBuilder;
-use rio_api::formatter::TriplesFormatter;
-use rio_api::model::Triple;
-use rio_api::model::{Literal, NamedNode, Subject, Term};
-use rio_turtle::TurtleFormatter;
-use rio_turtle::{TurtleError, TurtleParser};
-use std::collections::BTreeSet;
-use std::fs::OpenOptions;
-use std::io::{BufRead, Write};
-use std::time::Instant;
+use rio_api::{
+    formatter::TriplesFormatter,
+    model::Triple,
+    model::{Literal, NamedNode, Subject, Term},
+    parser::TriplesParser,
+};
+use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
+    fs::OpenOptions,
+    io::{BufRead, Write},
     path::PathBuf,
     sync::mpsc::{channel, Sender},
+    time::Instant,
 };
-
-use rio_api::parser::TriplesParser;
 
 type TripleFreq = BTreeMap<String, TripleFreqSec>;
 type TripleFreqSec = BTreeMap<String, TripleFreqThird>;
@@ -56,9 +53,9 @@ impl TripleFreqFns for TripleFreq {
 #[derive(Debug, Clone)]
 pub enum Message {
     NormalizedTriple {
-        subject: String,
-        predicate: String,
-        object: String,
+        subject: NormalizedResource,
+        predicate: NormalizedResource,
+        object: NormalizedResource,
     },
     NamespaceUnknown {
         iri: String,
@@ -66,19 +63,64 @@ pub enum Message {
     Finished,
 }
 
+#[derive(Debug, Clone)]
+pub enum NormalizedResource {
+    Unknown,
+    BlankNode,
+    Literal(Lit),
+    NamedNode(NNode),
+}
+
+#[derive(Debug, Clone)]
+pub struct Lit {
+    data_type: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NNode {
+    alias: String,
+    namespace: String,
+}
+
+impl From<NormalizedResource> for String {
+    fn from(nr: NormalizedResource) -> Self {
+        match nr {
+            NormalizedResource::Unknown => "UNKNOWN".to_string(),
+            NormalizedResource::BlankNode => "BLANK".to_string(),
+            NormalizedResource::Literal(Lit { data_type }) => match data_type {
+                None => "STRING".into(),
+                Some(dt) => {
+                    if dt == "lang-string" {
+                        "LANG-STRING".to_string()
+                    } else {
+                        dt.to_string()
+                    }
+                }
+            },
+            NormalizedResource::NamedNode(NNode {
+                alias,
+                namespace: _,
+            }) => alias,
+        }
+    }
+}
+
 pub fn normalize_triples(
     paths: Vec<PathBuf>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-) -> TripleFreq {
+) -> (TripleFreq, BTreeMap<String, String>) {
     let mut triples = TripleFreq::new();
+    let mut used_ns = BTreeMap::<String, String>::new();
+
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
+
+    let mut running = paths.len();
     let pool = ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
         .unwrap();
-    let mut running = paths.len();
 
     pool.scope_fifo(|s| {
         let (tx, rx) = channel::<Message>();
@@ -94,6 +136,7 @@ pub fn normalize_triples(
         let mut i = 0;
         let mut last_i = 0;
         let mut start = Instant::now();
+
         loop {
             i += 1;
             if i % 1_000_000 == 1 {
@@ -118,9 +161,23 @@ pub fn normalize_triples(
                         predicate,
                         object,
                     } => {
-                        triples.add((subject, predicate, object));
+                        triples.add((
+                            subject.clone().into(),
+                            predicate.clone().into(),
+                            object.clone().into(),
+                        ));
+                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
+                            used_ns.insert(alias, namespace);
+                        }
+                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate
+                        {
+                            used_ns.insert(alias, namespace);
+                        }
+                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = object {
+                            used_ns.insert(alias, namespace);
+                        }
                     }
-                    Message::NamespaceUnknown { iri: err } => {
+                    Message::NamespaceUnknown { iri: _ } => {
                         //if let UnknownNamespaceError { iri } = err {
                         //    let msg = format!("Unknown namespace for resource {iri}");
                         //    warn!("{msg}");
@@ -135,8 +192,9 @@ pub fn normalize_triples(
         }
     });
 
-    return triples;
+    return (triples, used_ns);
 }
+
 fn proc_triples(
     graph: &mut TurtleParser<impl BufRead>,
     path: &PathBuf,
@@ -220,15 +278,15 @@ fn proc_triple<E>(
     tx.send(Message::NormalizedTriple {
         subject: match subject {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
         },
         predicate: match predicate {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
         },
         object: match object {
             Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => "UNKNOWN".to_string(),
+            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
         },
     })
     .unwrap();
@@ -250,9 +308,12 @@ fn log_error_to_file(err: String) {
     writeln!(fd, "{}", err).unwrap();
 }
 
-fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
+fn handle_subject(
+    sub: Subject,
+    ns_trie: &NamespaceTrie,
+) -> Result<NormalizedResource, UnknownNamespaceError> {
     match sub {
-        Subject::BlankNode(_) => Ok("BLANK".to_string()),
+        Subject::BlankNode(_) => Ok(NormalizedResource::BlankNode),
         Subject::Triple(_) => unimplemented!(),
         Subject::NamedNode(n) => handle_named_node(n, ns_trie),
     }
@@ -261,13 +322,16 @@ fn handle_subject(sub: Subject, ns_trie: &NamespaceTrie) -> Result<String, Unkno
 fn handle_predicate(
     pred: NamedNode,
     ns_trie: &NamespaceTrie,
-) -> Result<String, UnknownNamespaceError> {
+) -> Result<NormalizedResource, UnknownNamespaceError> {
     handle_named_node(pred, ns_trie)
 }
 
-fn handle_object(obj: Term, ns_trie: &NamespaceTrie) -> Result<String, UnknownNamespaceError> {
+fn handle_object(
+    obj: Term,
+    ns_trie: &NamespaceTrie,
+) -> Result<NormalizedResource, UnknownNamespaceError> {
     match obj {
-        Term::BlankNode(_) => Ok("BLANK".to_string()),
+        Term::BlankNode(_) => Ok(NormalizedResource::BlankNode),
         Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
         Term::Literal(lit) => Ok(handle_literal(lit)),
@@ -282,11 +346,15 @@ pub struct UnknownNamespaceError {
 fn handle_named_node(
     n: NamedNode,
     ns_trie: &NamespaceTrie,
-) -> Result<String, UnknownNamespaceError> {
+) -> Result<NormalizedResource, UnknownNamespaceError> {
     let res = ns_trie.longest_prefix(n.iri, true);
-    if let Some((node, _)) = res {
+    if let Some((node, ns)) = res {
         if node.value.is_some() {
-            return Ok(node.value.as_ref().unwrap().clone());
+            return Ok(NormalizedResource::NamedNode(NNode {
+                alias: node.value.as_ref().unwrap().clone(),
+                namespace: ns,
+            }));
+            //return Ok(node.value.as_ref().unwrap().clone());
         }
     }
     return Err(UnknownNamespaceError {
@@ -294,24 +362,26 @@ fn handle_named_node(
     });
 }
 
-fn handle_literal(lit: Literal) -> String {
+fn handle_literal(lit: Literal) -> NormalizedResource {
     match lit {
-        Literal::Simple { value: _ } => "LITERAL-string".to_string(),
+        Literal::Simple { value: _ } => NormalizedResource::Literal(Lit { data_type: None }),
         Literal::LanguageTaggedString {
             value: _,
             language: _,
-        } => "LITERAL-lang-string".to_string(),
-        Literal::Typed { value: _, datatype } => format!("LITERAL-{datatype}").to_string(),
+        } => NormalizedResource::Literal(Lit {
+            data_type: Some("lang-string".into()),
+        }),
+        Literal::Typed { value: _, datatype } => NormalizedResource::Literal(Lit {
+            data_type: Some(datatype.to_string()),
+        }),
     }
 }
 
-pub fn save_normalized_triples(nts: &TripleFreq) {
+pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, String>) {
     let base_path = "results/output".to_string();
     let ext = "ttl".to_string();
     let file_path = gen_file_name(base_path, ext);
     info!("Saving graph summary to {}", file_path);
-
-    let used_alias = BTreeSet::<String>::new(); // TODO
 
     let mut id_count = 1;
 
@@ -328,15 +398,36 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
 
     let mut formatter = TurtleFormatter::new(fd);
 
-    for tf in nts.iter_all() {
-        let t_id = format!("t{:0width$}", id_count, width = 4);
-
+    // print namespace alias
+    for (alias, namespace) in used_ns {
         formatter
             .format(&Triple {
                 subject: NamedNode {
-                    iri: format!("#{}", &t_id).as_str(),
+                    iri: alias.as_str(),
                 }
                 .into(),
+                predicate: NamedNode {
+                    iri: "namespacePrefix",
+                }
+                .into(),
+                object: NamedNode {
+                    iri: namespace.as_str(),
+                }
+                .into(),
+            })
+            .unwrap();
+    }
+    fd = formatter.finish().unwrap();
+    writeln!(fd, "").unwrap();
+
+    formatter = TurtleFormatter::new(fd);
+    for tf in nts.iter_all() {
+        let t_id = format!("t{:0width$}", id_count, width = 4);
+
+        // declare statement id
+        formatter
+            .format(&Triple {
+                subject: NamedNode { iri: t_id.as_str() }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}type").as_str(),
                 },
@@ -346,64 +437,51 @@ pub fn save_normalized_triples(nts: &TripleFreq) {
                 .into(),
             })
             .unwrap();
-
         id_count += 1;
+
+        // declare statement subject
         formatter
             .format(&Triple {
-                subject: NamedNode {
-                    iri: format!("#{}", &t_id).as_str(),
-                }
-                .into(),
+                subject: NamedNode { iri: t_id.as_str() }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}subject").as_str(),
                 },
-                object: NamedNode {
-                    iri: format!("#{}", tf.0).as_str(),
-                }
-                .into(),
+                object: NamedNode { iri: tf.0.as_str() }.into(),
             })
             .unwrap();
+
+        // declare statement predicate
         formatter
             .format(&Triple {
-                subject: NamedNode {
-                    iri: format!("#{}", &t_id).as_str(),
-                }
-                .into(),
+                subject: NamedNode { iri: t_id.as_str() }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}predicate").as_str(),
                 },
-                object: NamedNode {
-                    iri: format!("#{}", tf.1).as_str(),
-                }
-                .into(),
+                object: NamedNode { iri: tf.1.as_str() }.into(),
             })
             .unwrap();
+
+        // declare statement object
         formatter
             .format(&Triple {
-                subject: NamedNode {
-                    iri: format!("#{}", &t_id).as_str(),
-                }
-                .into(),
+                subject: NamedNode { iri: t_id.as_str() }.into(),
                 predicate: NamedNode {
                     iri: format!("{rdf}object").as_str(),
                 },
-                object: NamedNode {
-                    iri: format!("#{}", tf.2).as_str(),
-                }
-                .into(),
+                object: NamedNode { iri: tf.2.as_str() }.into(),
             })
             .unwrap();
+
+        // declare number of occurrences
         formatter
             .format(&Triple {
-                subject: NamedNode {
-                    iri: format!("#{}", &t_id).as_str(),
-                }
-                .into(),
-                predicate: NamedNode {
-                    iri: format!("#occurrences").as_str(),
-                },
-                object: Literal::Simple {
+                subject: NamedNode { iri: t_id.as_str() }.into(),
+                predicate: NamedNode { iri: "occurrences" },
+                object: Literal::Typed {
                     value: tf.3.to_string().as_str(),
+                    datatype: NamedNode {
+                        iri: "http://www.w3.org/2001/XMLSchema#integer",
+                    },
                 }
                 .into(),
             })

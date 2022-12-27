@@ -64,8 +64,8 @@ fn main() {
      *********************/
 
     info!("Normalizing triples");
-    let nts = normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown); // TODO improve
+    let (nts, used_ns) = normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown); // TODO improve
 
     debug!("saving normalized triples");
-    save_normalized_triples(&nts);
+    save_normalized_triples(&nts, used_ns);
 }
