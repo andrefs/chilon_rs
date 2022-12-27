@@ -30,6 +30,7 @@ fn main() {
     /**********************
      * Prepare namespaces *
      **********************/
+
     info!("Loading namespaces from Prefix.cc");
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
