@@ -417,21 +417,25 @@ fn handle_literal(
     }
 }
 
-pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, String>) {
+pub fn save_normalized_triples(
+    nts: &TripleFreq,
+    used_ns: BTreeMap<String, String>,
+    min_occurs: Option<i32>,
+) -> String {
     let base_path = "results/output".to_string();
     let ext = "ttl".to_string();
     let file_path = gen_file_name(base_path, ext);
     info!("Saving graph summary to {}", file_path);
 
-    let mut id_count = 1;
+    let mut id_count = 0;
 
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(file_path)
+        .open(file_path.clone())
         .unwrap();
 
-    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1#> .").unwrap();
+    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1> .").unwrap();
     writeln!(fd, "").unwrap();
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
@@ -462,7 +466,23 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
 
     formatter = TurtleFormatter::new(fd);
     for tf in nts.iter_all() {
-        let t_id = format!("t{:0width$}", id_count, width = 4);
+        if min_occurs.is_some() && tf.3 < min_occurs.unwrap() {
+            continue;
+        }
+
+        id_count += 1;
+        let t_id = format!("#t{:0width$}", id_count, width = 4);
+
+        // declare groups link
+        formatter
+            .format(&Triple {
+                subject: NamedNode { iri: t_id.as_str() }.into(),
+                predicate: NamedNode {
+                    iri: format!("{rdf}type").as_str(),
+                },
+                object: NamedNode { iri: "#GroupsLink" }.into(),
+            })
+            .unwrap();
 
         // declare statement id
         formatter
@@ -477,7 +497,6 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 .into(),
             })
             .unwrap();
-        id_count += 1;
 
         // declare statement subject
         formatter
@@ -486,7 +505,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}subject").as_str(),
                 },
-                object: NamedNode { iri: tf.0.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.0).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -497,7 +519,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}predicate").as_str(),
                 },
-                object: NamedNode { iri: tf.1.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.1).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -508,7 +533,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}object").as_str(),
                 },
-                object: NamedNode { iri: tf.2.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.2).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -516,7 +544,9 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
         formatter
             .format(&Triple {
                 subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode { iri: "occurrences" },
+                predicate: NamedNode {
+                    iri: "#occurrences",
+                },
                 object: Literal::Typed {
                     value: tf.3.to_string().as_str(),
                     datatype: NamedNode {
@@ -526,8 +556,8 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 .into(),
             })
             .unwrap();
-
-        id_count += 1;
     }
     formatter.finish().unwrap();
+
+    return file_path;
 }
