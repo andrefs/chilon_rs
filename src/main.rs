@@ -10,12 +10,14 @@ mod prefixes;
 mod seg_tree;
 mod trie;
 mod util;
+mod visualization;
 
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
+use chilon_rs::visualization::{dump_json, load_summary};
 use clap::Parser;
 use log::{debug, info};
 use normalize::normalize_triples;
@@ -70,4 +72,11 @@ fn main() {
     debug!("saving normalized triples");
     let path = save_normalized_triples(&nts, used_ns, Some(10)); // min_occurs = 10
 
+    /*****************
+     * Visualization *
+     *****************/
+
+    //let mut summ = load_summary(path);
+
+    dump_json(path);
 }
