@@ -10,3 +10,4 @@ pub mod prefixes;
 pub mod seg_tree;
 pub mod trie;
 pub mod util;
+pub mod visualization;
