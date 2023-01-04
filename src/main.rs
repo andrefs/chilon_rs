@@ -12,12 +12,16 @@ mod trie;
 mod util;
 mod visualization;
 
+use std::fs;
+
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
+use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, load_summary, render_vis};
+use chrono::prelude::*;
 use clap::Parser;
 use log::{debug, info};
 use normalize::normalize_triples;
@@ -28,6 +32,13 @@ use simple_logger::SimpleLogger;
 fn main() {
     let cli = Cli::parse();
     SimpleLogger::new().init().unwrap();
+
+    let out = gen_file_name(
+        format!("results/{}", Utc::now().format("%Y%m%d")),
+        "".to_string(),
+    );
+    let outf = out.as_str();
+    fs::create_dir(outf).unwrap();
 
     /**********************
      * Prepare namespaces *
@@ -59,7 +70,7 @@ fn main() {
         //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
         //);
 
-        ns_trie.save();
+        ns_trie.save(outf);
     }
 
     /*********************
@@ -67,10 +78,11 @@ fn main() {
      *********************/
 
     info!("Normalizing triples");
-    let (nts, used_ns) = normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown);
+    let (nts, used_ns) =
+        normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
 
     debug!("saving normalized triples");
-    let path = save_normalized_triples(&nts, used_ns, Some(10)); // min_occurs = 10
+    save_normalized_triples(&nts, used_ns, Some(10), outf); // min_occurs = 10
 
     /*****************
      * Visualization *
@@ -78,7 +90,7 @@ fn main() {
 
     //let mut summ = load_summary(path);
 
-    let vis_data = build_data(path);
-    dump_json(&vis_data);
-    render_vis(&vis_data);
+    let vis_data = build_data(outf);
+    dump_json(&vis_data, outf);
+    render_vis(&vis_data, outf);
 }

@@ -1,5 +1,5 @@
-use crate::{ns_trie::NamespaceTrie, parse::parse, util::gen_file_name};
-use log::{debug, error, info, trace};
+use crate::{ns_trie::NamespaceTrie, parse::parse};
+use log::{debug, error, info, trace, warn};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
@@ -9,10 +9,10 @@ use rio_api::{
 };
 use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs::OpenOptions,
     io::{BufRead, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc::{channel, Sender},
     time::Instant,
 };
@@ -123,6 +123,7 @@ pub fn normalize_triples(
     paths: Vec<PathBuf>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
+    outf: &str,
 ) -> (TripleFreq, BTreeMap<String, String>) {
     let mut triples = TripleFreq::new();
     let mut used_ns = BTreeMap::<String, String>::new();
@@ -150,6 +151,14 @@ pub fn normalize_triples(
         let mut i = 0;
         let mut last_i = 0;
         let mut start = Instant::now();
+
+        let file_path = Path::new(".").join(outf).join("errors.log");
+
+        let mut fd = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(file_path.clone())
+            .unwrap();
 
         loop {
             i += 1;
@@ -201,12 +210,11 @@ pub fn normalize_triples(
                             _ => {}
                         }
                     }
-                    Message::NamespaceUnknown { iri: _ } => {
-                        //if let UnknownNamespaceError { iri } = err {
-                        //    let msg = format!("Unknown namespace for resource {iri}");
-                        //    warn!("{msg}");
-                        //    //log_error_to_file(msg);
-                        //}
+                    Message::NamespaceUnknown { iri } => {
+                        let msg = format!("Unknown namespace for resource {iri}");
+                        warn!("{msg}");
+                        writeln!(fd, "Unknown namespace for resource {iri}").unwrap();
+                        //log_error_to_file(fd, msg);
                     }
                     Message::Finished => {
                         running -= 1;
@@ -318,20 +326,6 @@ fn proc_triple<E>(
     Ok(()) as Result<(), E>
 }
 
-fn log_error_to_file(err: String) {
-    let base_path = "results/errors".to_string();
-    let ext = "log".to_string();
-    let file_path = gen_file_name(base_path, ext);
-
-    let mut fd = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .append(true)
-        .open(file_path.clone())
-        .unwrap();
-    writeln!(fd, "{}", err).unwrap();
-}
-
 fn handle_subject(
     sub: Subject,
     ns_trie: &NamespaceTrie,
@@ -421,11 +415,10 @@ pub fn save_normalized_triples(
     nts: &TripleFreq,
     used_ns: BTreeMap<String, String>,
     min_occurs: Option<i32>,
-) -> String {
-    let base_path = "results/output".to_string();
-    let ext = "ttl".to_string();
-    let file_path = gen_file_name(base_path, ext);
-    info!("Saving graph summary to {}", file_path);
+    outf: &str,
+) {
+    let file_path = Path::new(".").join(outf).join("output.ttl");
+    info!("Saving graph summary to {}", file_path.to_string_lossy());
 
     let mut id_count = 0;
 
@@ -558,6 +551,4 @@ pub fn save_normalized_triples(
             .unwrap();
     }
     formatter.finish().unwrap();
-
-    return file_path;
 }
