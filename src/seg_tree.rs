@@ -1,5 +1,4 @@
 #![feature(btree_drain_filter)]
-use log::{debug, trace};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},

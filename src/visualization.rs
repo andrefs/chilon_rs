@@ -13,8 +13,6 @@ use url::Url;
 
 use tera::{Context, Tera};
 
-use crate::util::gen_file_name;
-
 pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let file =
         File::open(path.clone()).unwrap_or_else(|e| panic!("Could not open file {}: {e}", path));
