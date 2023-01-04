@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::trie::Node;
-use log::{info, trace, warn};
+use log::{info, warn};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
