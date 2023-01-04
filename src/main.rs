@@ -17,7 +17,7 @@ use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
-use chilon_rs::visualization::{dump_json, load_summary};
+use chilon_rs::visualization::{build_data, dump_json, load_summary, render_vis};
 use clap::Parser;
 use log::{debug, info};
 use normalize::normalize_triples;
@@ -78,5 +78,7 @@ fn main() {
 
     //let mut summ = load_summary(path);
 
-    dump_json(path);
+    let vis_data = build_data(path);
+    dump_json(&vis_data);
+    render_vis(&vis_data);
 }
