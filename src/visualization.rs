@@ -1,22 +1,28 @@
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use oxigraph::{
     io::GraphFormat,
     model::{GraphName, Quad},
     sparql::QueryResults,
     store::Store,
 };
+
 use rio_api::{
     model::{NamedNode, Term},
     parser::TriplesParser,
 };
 use rio_turtle::{TurtleError, TurtleParser};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs::File,
+    fs::{File, OpenOptions},
     io::{BufRead, BufReader},
 };
 use url::Url;
+
+use tera::{Context, Tera};
+
+use crate::util::gen_file_name;
 
 pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let file =
@@ -49,7 +55,7 @@ pub struct VisEdge {
     label: String,
 }
 
-pub fn dump_json(path: String) {
+pub fn build_data(path: String) -> VisData {
     let file =
         File::open(path.clone()).unwrap_or_else(|e| panic!("Could not open file {}: {e}", path));
     let buf_reader = BufReader::new(file);
@@ -181,5 +187,39 @@ pub fn dump_json(path: String) {
         nodes: nodes.into_values().collect::<Vec<_>>(),
     };
 
-    println!("{}", serde_json::to_string_pretty(&data).unwrap(),)
+    return data;
+}
+
+pub fn dump_json(data: &VisData) {
+    let base_path = "results/vis-data".to_string();
+    let ext = "json".to_string();
+    let file_path = gen_file_name(base_path, ext);
+    info!("Saving visualization data to {}", file_path);
+
+    let mut fd = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_path.clone())
+        .unwrap();
+
+    writeln!(fd, "{}", serde_json::to_string_pretty(&data).unwrap()).unwrap();
+}
+
+pub fn render_vis(data: &VisData) {
+    let mut tera = Tera::new("templates/**/*.js").unwrap();
+    let mut ctx = Context::new();
+    ctx.insert("data", &data);
+
+    let base_path = "results/script".to_string();
+    let ext = "js".to_string();
+    let file_path = gen_file_name(base_path, ext);
+    info!("Rendering visualization to {}", file_path);
+
+    let mut fd = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_path.clone())
+        .unwrap();
+
+    tera.render_to("script.js", &ctx, fd).unwrap();
 }
