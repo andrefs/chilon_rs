@@ -68,12 +68,19 @@ pub enum NormalizedResource {
     Unknown,
     BlankNode,
     Literal(Lit),
+    TypedLiteral(TypedLit),
     NamedNode(NNode),
 }
 
 #[derive(Debug, Clone)]
 pub struct Lit {
     data_type: Option<String>,
+}
+#[derive(Debug, Clone)]
+pub struct TypedLit {
+    namespace: String,
+    alias: String,
+    iri: String,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +104,13 @@ impl From<NormalizedResource> for String {
                     }
                 }
             },
+            NormalizedResource::TypedLiteral(TypedLit {
+                namespace,
+                alias,
+                iri,
+            }) => {
+                format!("{}:{}", alias, &iri[namespace.len()..])
+            }
             NormalizedResource::NamedNode(NNode {
                 alias,
                 namespace: _,
@@ -334,7 +348,7 @@ fn handle_object(
         Term::BlankNode(_) => Ok(NormalizedResource::BlankNode),
         Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
-        Term::Literal(lit) => Ok(handle_literal(lit)),
+        Term::Literal(lit) => handle_literal(lit, ns_trie),
     }
 }
 
@@ -362,18 +376,34 @@ fn handle_named_node(
     });
 }
 
-fn handle_literal(lit: Literal) -> NormalizedResource {
+fn handle_literal(
+    lit: Literal,
+    ns_trie: &NamespaceTrie,
+) -> Result<NormalizedResource, UnknownNamespaceError> {
     match lit {
-        Literal::Simple { value: _ } => NormalizedResource::Literal(Lit { data_type: None }),
+        Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { data_type: None })),
         Literal::LanguageTaggedString {
             value: _,
             language: _,
-        } => NormalizedResource::Literal(Lit {
+        } => Ok(NormalizedResource::Literal(Lit {
             data_type: Some("lang-string".into()),
-        }),
-        Literal::Typed { value: _, datatype } => NormalizedResource::Literal(Lit {
-            data_type: Some(datatype.to_string()),
-        }),
+        })),
+        Literal::Typed { value: _, datatype } => {
+            let res = ns_trie.longest_prefix(datatype.iri, true);
+            if let Some((node, ns)) = res {
+                if node.value.is_some() {
+                    let alias = node.value.as_ref().unwrap().clone();
+                    return Ok(NormalizedResource::TypedLiteral(TypedLit {
+                        namespace: ns,
+                        alias,
+                        iri: datatype.iri.to_string(),
+                    }));
+                }
+            }
+            return Err(UnknownNamespaceError {
+                iri: datatype.iri.to_string(),
+            });
+        }
     }
 }
 
