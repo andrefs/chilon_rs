@@ -10,7 +10,7 @@ use rio_api::{
 use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
 use std::{
     collections::BTreeMap,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::{BufRead, Write},
     path::{Path, PathBuf},
     sync::mpsc::{channel, Sender},
@@ -178,53 +178,62 @@ pub fn normalize_triples(
                 break;
             }
             if let Ok(message) = rx.recv() {
-                match message {
-                    Message::NormalizedTriple {
-                        subject,
-                        predicate,
-                        object,
-                    } => {
-                        triples.add((
-                            subject.clone().into(),
-                            predicate.clone().into(),
-                            object.clone().into(),
-                        ));
-                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
-                            used_ns.insert(alias, namespace);
-                        }
-                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate
-                        {
-                            used_ns.insert(alias, namespace);
-                        }
-                        match object {
-                            NormalizedResource::NamedNode(NNode { alias, namespace }) => {
-                                used_ns.insert(alias, namespace);
-                            }
-                            NormalizedResource::TypedLiteral(TypedLit {
-                                namespace,
-                                alias,
-                                iri: _,
-                            }) => {
-                                used_ns.insert(alias, namespace);
-                            }
-                            _ => {}
-                        }
-                    }
-                    Message::NamespaceUnknown { iri } => {
-                        let msg = format!("Unknown namespace for resource '{iri}'");
-                        warn!("{msg}");
-                        writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-                        //log_error_to_file(fd, msg);
-                    }
-                    Message::Finished => {
-                        running -= 1;
-                    }
-                }
+                proc_message(message, &mut triples, &mut used_ns, &mut fd, &mut running);
             }
         }
     });
 
     return (triples, used_ns);
+}
+
+fn proc_message(
+    message: Message,
+    triples: &mut TripleFreq,
+    used_ns: &mut BTreeMap<String, String>,
+    fd: &mut File,
+    running: &mut usize,
+) {
+    match message {
+        Message::NormalizedTriple {
+            subject,
+            predicate,
+            object,
+        } => {
+            triples.add((
+                subject.clone().into(),
+                predicate.clone().into(),
+                object.clone().into(),
+            ));
+            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
+                used_ns.insert(alias, namespace);
+            }
+            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate {
+                used_ns.insert(alias, namespace);
+            }
+            match object {
+                NormalizedResource::NamedNode(NNode { alias, namespace }) => {
+                    used_ns.insert(alias, namespace);
+                }
+                NormalizedResource::TypedLiteral(TypedLit {
+                    namespace,
+                    alias,
+                    iri: _,
+                }) => {
+                    used_ns.insert(alias, namespace);
+                }
+                _ => {}
+            }
+        }
+        Message::NamespaceUnknown { iri } => {
+            let msg = format!("Unknown namespace for resource '{iri}'");
+            warn!("{msg}");
+            writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
+            //log_error_to_file(fd, msg);
+        }
+        Message::Finished => {
+            *running -= 1;
+        }
+    }
 }
 
 fn proc_triples(
@@ -275,7 +284,18 @@ fn proc_triple<E>(
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
 
-    if !ignore_unknown {}
+    if ignore_unknown {
+        if let Err(UnknownNamespaceError) = subject {
+            return Ok(());
+        }
+        if let Err(UnknownNamespaceError) = predicate {
+            return Ok(());
+        }
+        if let Err(UnknownNamespaceError) = object {
+            return Ok(());
+        }
+    }
+
     if let Err(UnknownNamespaceError { iri: _ }) = subject {
         if let Subject::NamedNode(NamedNode { iri }) = t.subject {
             tx.send(Message::NamespaceUnknown {
@@ -296,18 +316,6 @@ fn proc_triple<E>(
                 iri: iri.to_string(),
             })
             .unwrap();
-        }
-    }
-
-    if ignore_unknown {
-        if let Err(UnknownNamespaceError) = subject {
-            return Ok(());
-        }
-        if let Err(UnknownNamespaceError) = predicate {
-            return Ok(());
-        }
-        if let Err(UnknownNamespaceError) = object {
-            return Ok(());
         }
     }
 
