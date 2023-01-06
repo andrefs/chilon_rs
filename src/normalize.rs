@@ -187,8 +187,18 @@ pub fn normalize_triples(
                         {
                             used_ns.insert(alias, namespace);
                         }
-                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = object {
-                            used_ns.insert(alias, namespace);
+                        match object {
+                            NormalizedResource::NamedNode(NNode { alias, namespace }) => {
+                                used_ns.insert(alias, namespace);
+                            }
+                            NormalizedResource::TypedLiteral(TypedLit {
+                                namespace,
+                                alias,
+                                iri: _,
+                            }) => {
+                                used_ns.insert(alias, namespace);
+                            }
+                            _ => {}
                         }
                     }
                     Message::NamespaceUnknown { iri: _ } => {
