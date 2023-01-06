@@ -610,7 +610,8 @@ mod tests {
     #[test]
     fn handle_literal_typed() {
         let iri = "http://example.org/#my-datatype";
-        let alias = "mydt";
+        let ns = "http://example.org/";
+        let alias = "example";
 
         let dt = NamedNode { iri };
         let lit = Literal::Typed {
@@ -619,17 +620,22 @@ mod tests {
         };
 
         let mut ns_trie = NamespaceTrie::new();
-        ns_trie.insert(iri, alias.into());
+        ns_trie.insert(ns, alias.into());
 
         let res = handle_literal(lit, &ns_trie);
 
         assert!(res.is_ok());
 
         match res.unwrap() {
-            NormalizedResource::Literal(lit) => {
-                assert_eq!(lit.data_type, Some("pt-PT".into()));
+            NormalizedResource::TypedLiteral(lit) => {
+                assert_eq!(lit.alias, "example");
+                assert_eq!(lit.namespace, ns);
+                assert_eq!(lit.iri, "http://example.org/#my-datatype");
             }
-            _ => panic!("Result should be a NormalizedResource::Literal"),
+            _ => panic!(
+                "Result should be a NormalizedResource::Literal, but got:\n{:#?}",
+                lit
+            ),
         }
     }
 
@@ -644,7 +650,7 @@ mod tests {
             datatype: dt,
         };
 
-        let mut ns_trie = NamespaceTrie::new();
+        let ns_trie = NamespaceTrie::new();
 
         let res = handle_literal(lit, &ns_trie);
 
