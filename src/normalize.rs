@@ -4,7 +4,7 @@ use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
     model::Triple,
-    model::{Literal, NamedNode, Subject, Term},
+    model::{BlankNode, Literal, NamedNode, Subject, Term},
     parser::TriplesParser,
 };
 use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
@@ -211,9 +211,9 @@ pub fn normalize_triples(
                         }
                     }
                     Message::NamespaceUnknown { iri } => {
-                        let msg = format!("Unknown namespace for resource {iri}");
+                        let msg = format!("Unknown namespace for resource '{iri}'");
                         warn!("{msg}");
-                        writeln!(fd, "Unknown namespace for resource {iri}").unwrap();
+                        writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
                         //log_error_to_file(fd, msg);
                     }
                     Message::Finished => {
@@ -277,10 +277,12 @@ fn proc_triple<E>(
 
     if !ignore_unknown {}
     if let Err(UnknownNamespaceError { iri: _ }) = subject {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.subject.to_string(),
-        })
-        .unwrap();
+        if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+            tx.send(Message::NamespaceUnknown {
+                iri: iri.to_string(),
+            })
+            .unwrap();
+        }
     }
     if let Err(UnknownNamespaceError { iri: _ }) = predicate {
         tx.send(Message::NamespaceUnknown {
@@ -289,10 +291,12 @@ fn proc_triple<E>(
         .unwrap();
     }
     if let Err(UnknownNamespaceError { iri: _ }) = object {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.object.to_string(),
-        })
-        .unwrap();
+        if let Term::NamedNode(NamedNode { iri }) = t.object {
+            tx.send(Message::NamespaceUnknown {
+                iri: iri.to_string(),
+            })
+            .unwrap();
+        }
     }
 
     if ignore_unknown {
@@ -400,7 +404,7 @@ fn handle_literal(
                     return Ok(NormalizedResource::TypedLiteral(TypedLit {
                         namespace: ns,
                         alias,
-                        iri: datatype.iri.to_string(),
+                        iri: datatype.iri.into(),
                     }));
                 }
             }
