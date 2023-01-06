@@ -63,7 +63,7 @@ pub enum Message {
     Finished,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NormalizedResource {
     Unknown,
     BlankNode,
@@ -72,18 +72,18 @@ pub enum NormalizedResource {
     NamedNode(NNode),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Lit {
     data_type: Option<String>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypedLit {
     namespace: String,
     alias: String,
     iri: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NNode {
     alias: String,
     namespace: String,
@@ -396,6 +396,12 @@ fn handle_literal(
         } => Ok(NormalizedResource::Literal(Lit {
             data_type: Some("lang-string".into()),
         })),
+        //Literal::Typed {
+        //    value: _,
+        //    datatype: _,
+        //} => Ok(NormalizedResource::Literal(Lit {
+        //    data_type: Some("other-datatype".into()),
+        //})),
         Literal::Typed { value: _, datatype } => {
             let res = ns_trie.longest_prefix(datatype.iri, true);
             if let Some((node, ns)) = res {
@@ -555,4 +561,100 @@ pub fn save_normalized_triples(
             .unwrap();
     }
     formatter.finish().unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::trie::Node;
+
+    use super::*;
+
+    #[test]
+    fn handle_literal_simple() {
+        let lit = Literal::Simple { value: "my-lit" };
+        let ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::Literal(lit) => {
+                assert_eq!(lit.data_type, None);
+            }
+            _ => panic!("Result should be a NormalizedResource::Literal"),
+        }
+    }
+
+    #[test]
+    fn handle_literal_lts() {
+        let lit = Literal::LanguageTaggedString {
+            value: "my-lit",
+            language: "pt-PT",
+        };
+        let ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::Literal(lit) => {
+                assert_eq!(lit.data_type, Some("lang-string".into()));
+            }
+            _ => panic!("Result should be a NormalizedResource::Literal"),
+        }
+    }
+
+    #[test]
+    fn handle_literal_typed() {
+        let iri = "http://example.org/#my-datatype";
+        let alias = "mydt";
+
+        let dt = NamedNode { iri };
+        let lit = Literal::Typed {
+            value: "my-lit",
+            datatype: dt,
+        };
+
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert(iri, alias.into());
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::Literal(lit) => {
+                assert_eq!(lit.data_type, Some("pt-PT".into()));
+            }
+            _ => panic!("Result should be a NormalizedResource::Literal"),
+        }
+    }
+
+    #[test]
+    fn handle_literal_typed_unknown() {
+        let dt_iri = "http://example.org/#my-datatype";
+        let alias = "mydt";
+
+        let dt = NamedNode { iri: dt_iri };
+        let lit = Literal::Typed {
+            value: "my-lit",
+            datatype: dt,
+        };
+
+        let mut ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_err());
+
+        match res.unwrap_err() {
+            UnknownNamespaceError { iri } => {
+                assert_eq!(iri, dt_iri)
+            }
+            _ => panic!("Result should be an UnknownNamespaceError"),
+        }
+    }
 }
