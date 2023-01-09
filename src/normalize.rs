@@ -1,18 +1,18 @@
-use crate::{ns_trie::NamespaceTrie, parse::parse, util::gen_file_name};
-use log::{debug, error, info, trace};
+use crate::{ns_trie::NamespaceTrie, parse::parse};
+use log::{debug, error, info, trace, warn};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
     model::Triple,
-    model::{Literal, NamedNode, Subject, Term},
+    model::{BlankNode, Literal, NamedNode, Subject, Term},
     parser::TriplesParser,
 };
 use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs::OpenOptions,
+    collections::BTreeMap,
+    fs::{File, OpenOptions},
     io::{BufRead, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc::{channel, Sender},
     time::Instant,
 };
@@ -63,7 +63,7 @@ pub enum Message {
     Finished,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NormalizedResource {
     Unknown,
     BlankNode,
@@ -72,18 +72,18 @@ pub enum NormalizedResource {
     NamedNode(NNode),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Lit {
     data_type: Option<String>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypedLit {
     namespace: String,
     alias: String,
     iri: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NNode {
     alias: String,
     namespace: String,
@@ -123,6 +123,7 @@ pub fn normalize_triples(
     paths: Vec<PathBuf>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
+    outf: &str,
 ) -> (TripleFreq, BTreeMap<String, String>) {
     let mut triples = TripleFreq::new();
     let mut used_ns = BTreeMap::<String, String>::new();
@@ -151,6 +152,14 @@ pub fn normalize_triples(
         let mut last_i = 0;
         let mut start = Instant::now();
 
+        let file_path = Path::new(".").join(outf).join("errors.log");
+
+        let mut fd = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(file_path.clone())
+            .unwrap();
+
         loop {
             i += 1;
             if i % 1_000_000 == 1 {
@@ -169,54 +178,62 @@ pub fn normalize_triples(
                 break;
             }
             if let Ok(message) = rx.recv() {
-                match message {
-                    Message::NormalizedTriple {
-                        subject,
-                        predicate,
-                        object,
-                    } => {
-                        triples.add((
-                            subject.clone().into(),
-                            predicate.clone().into(),
-                            object.clone().into(),
-                        ));
-                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
-                            used_ns.insert(alias, namespace);
-                        }
-                        if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate
-                        {
-                            used_ns.insert(alias, namespace);
-                        }
-                        match object {
-                            NormalizedResource::NamedNode(NNode { alias, namespace }) => {
-                                used_ns.insert(alias, namespace);
-                            }
-                            NormalizedResource::TypedLiteral(TypedLit {
-                                namespace,
-                                alias,
-                                iri: _,
-                            }) => {
-                                used_ns.insert(alias, namespace);
-                            }
-                            _ => {}
-                        }
-                    }
-                    Message::NamespaceUnknown { iri: _ } => {
-                        //if let UnknownNamespaceError { iri } = err {
-                        //    let msg = format!("Unknown namespace for resource {iri}");
-                        //    warn!("{msg}");
-                        //    //log_error_to_file(msg);
-                        //}
-                    }
-                    Message::Finished => {
-                        running -= 1;
-                    }
-                }
+                proc_message(message, &mut triples, &mut used_ns, &mut fd, &mut running);
             }
         }
     });
 
     return (triples, used_ns);
+}
+
+fn proc_message(
+    message: Message,
+    triples: &mut TripleFreq,
+    used_ns: &mut BTreeMap<String, String>,
+    fd: &mut File,
+    running: &mut usize,
+) {
+    match message {
+        Message::NormalizedTriple {
+            subject,
+            predicate,
+            object,
+        } => {
+            triples.add((
+                subject.clone().into(),
+                predicate.clone().into(),
+                object.clone().into(),
+            ));
+            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
+                used_ns.insert(alias, namespace);
+            }
+            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate {
+                used_ns.insert(alias, namespace);
+            }
+            match object {
+                NormalizedResource::NamedNode(NNode { alias, namespace }) => {
+                    used_ns.insert(alias, namespace);
+                }
+                NormalizedResource::TypedLiteral(TypedLit {
+                    namespace,
+                    alias,
+                    iri: _,
+                }) => {
+                    used_ns.insert(alias, namespace);
+                }
+                _ => {}
+            }
+        }
+        Message::NamespaceUnknown { iri } => {
+            let msg = format!("Unknown namespace for resource '{iri}'");
+            warn!("{msg}");
+            writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
+            //log_error_to_file(fd, msg);
+        }
+        Message::Finished => {
+            *running -= 1;
+        }
+    }
 }
 
 fn proc_triples(
@@ -267,26 +284,6 @@ fn proc_triple<E>(
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
 
-    if !ignore_unknown {}
-    if let Err(UnknownNamespaceError { iri: _ }) = subject {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.subject.to_string(),
-        })
-        .unwrap();
-    }
-    if let Err(UnknownNamespaceError { iri: _ }) = predicate {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.predicate.to_string(),
-        })
-        .unwrap();
-    }
-    if let Err(UnknownNamespaceError { iri: _ }) = object {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.object.to_string(),
-        })
-        .unwrap();
-    }
-
     if ignore_unknown {
         if let Err(UnknownNamespaceError) = subject {
             return Ok(());
@@ -296,6 +293,29 @@ fn proc_triple<E>(
         }
         if let Err(UnknownNamespaceError) = object {
             return Ok(());
+        }
+    }
+
+    if let Err(UnknownNamespaceError { iri: _ }) = subject {
+        if let Subject::NamedNode(NamedNode { iri }) = t.subject {
+            tx.send(Message::NamespaceUnknown {
+                iri: iri.to_string(),
+            })
+            .unwrap();
+        }
+    }
+    if let Err(UnknownNamespaceError { iri: _ }) = predicate {
+        tx.send(Message::NamespaceUnknown {
+            iri: t.predicate.to_string(),
+        })
+        .unwrap();
+    }
+    if let Err(UnknownNamespaceError { iri: _ }) = object {
+        if let Term::NamedNode(NamedNode { iri }) = t.object {
+            tx.send(Message::NamespaceUnknown {
+                iri: iri.to_string(),
+            })
+            .unwrap();
         }
     }
 
@@ -316,20 +336,6 @@ fn proc_triple<E>(
     .unwrap();
 
     Ok(()) as Result<(), E>
-}
-
-fn log_error_to_file(err: String) {
-    let base_path = "results/errors".to_string();
-    let ext = "log".to_string();
-    let file_path = gen_file_name(base_path, ext);
-
-    let mut fd = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .append(true)
-        .open(file_path.clone())
-        .unwrap();
-    writeln!(fd, "{}", err).unwrap();
 }
 
 fn handle_subject(
@@ -398,6 +404,12 @@ fn handle_literal(
         } => Ok(NormalizedResource::Literal(Lit {
             data_type: Some("lang-string".into()),
         })),
+        //Literal::Typed {
+        //    value: _,
+        //    datatype: _,
+        //} => Ok(NormalizedResource::Literal(Lit {
+        //    data_type: Some("other-datatype".into()),
+        //})),
         Literal::Typed { value: _, datatype } => {
             let res = ns_trie.longest_prefix(datatype.iri, true);
             if let Some((node, ns)) = res {
@@ -406,7 +418,7 @@ fn handle_literal(
                     return Ok(NormalizedResource::TypedLiteral(TypedLit {
                         namespace: ns,
                         alias,
-                        iri: datatype.iri.to_string(),
+                        iri: datatype.iri.into(),
                     }));
                 }
             }
@@ -417,21 +429,24 @@ fn handle_literal(
     }
 }
 
-pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, String>) {
-    let base_path = "results/output".to_string();
-    let ext = "ttl".to_string();
-    let file_path = gen_file_name(base_path, ext);
-    info!("Saving graph summary to {}", file_path);
+pub fn save_normalized_triples(
+    nts: &TripleFreq,
+    used_ns: BTreeMap<String, String>,
+    min_occurs: Option<i32>,
+    outf: &str,
+) {
+    let file_path = Path::new(".").join(outf).join("output.ttl");
+    info!("Saving graph summary to {}", file_path.to_string_lossy());
 
-    let mut id_count = 1;
+    let mut id_count = 0;
 
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(file_path)
+        .open(file_path.clone())
         .unwrap();
 
-    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1#> .").unwrap();
+    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1> .").unwrap();
     writeln!(fd, "").unwrap();
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
@@ -462,7 +477,23 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
 
     formatter = TurtleFormatter::new(fd);
     for tf in nts.iter_all() {
-        let t_id = format!("t{:0width$}", id_count, width = 4);
+        if min_occurs.is_some() && tf.3 < min_occurs.unwrap() {
+            continue;
+        }
+
+        id_count += 1;
+        let t_id = format!("#t{:0width$}", id_count, width = 4);
+
+        // declare groups link
+        formatter
+            .format(&Triple {
+                subject: NamedNode { iri: t_id.as_str() }.into(),
+                predicate: NamedNode {
+                    iri: format!("{rdf}type").as_str(),
+                },
+                object: NamedNode { iri: "#GroupsLink" }.into(),
+            })
+            .unwrap();
 
         // declare statement id
         formatter
@@ -477,7 +508,6 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 .into(),
             })
             .unwrap();
-        id_count += 1;
 
         // declare statement subject
         formatter
@@ -486,7 +516,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}subject").as_str(),
                 },
-                object: NamedNode { iri: tf.0.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.0).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -497,7 +530,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}predicate").as_str(),
                 },
-                object: NamedNode { iri: tf.1.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.1).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -508,7 +544,10 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 predicate: NamedNode {
                     iri: format!("{rdf}object").as_str(),
                 },
-                object: NamedNode { iri: tf.2.as_str() }.into(),
+                object: NamedNode {
+                    iri: format!("#{}", tf.2).as_str(),
+                }
+                .into(),
             })
             .unwrap();
 
@@ -516,7 +555,9 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
         formatter
             .format(&Triple {
                 subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode { iri: "occurrences" },
+                predicate: NamedNode {
+                    iri: "#occurrences",
+                },
                 object: Literal::Typed {
                     value: tf.3.to_string().as_str(),
                     datatype: NamedNode {
@@ -526,8 +567,108 @@ pub fn save_normalized_triples(nts: &TripleFreq, used_ns: BTreeMap<String, Strin
                 .into(),
             })
             .unwrap();
-
-        id_count += 1;
     }
     formatter.finish().unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::trie::Node;
+
+    use super::*;
+
+    #[test]
+    fn handle_literal_simple() {
+        let lit = Literal::Simple { value: "my-lit" };
+        let ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::Literal(lit) => {
+                assert_eq!(lit.data_type, None);
+            }
+            _ => panic!("Result should be a NormalizedResource::Literal"),
+        }
+    }
+
+    #[test]
+    fn handle_literal_lts() {
+        let lit = Literal::LanguageTaggedString {
+            value: "my-lit",
+            language: "pt-PT",
+        };
+        let ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::Literal(lit) => {
+                assert_eq!(lit.data_type, Some("lang-string".into()));
+            }
+            _ => panic!("Result should be a NormalizedResource::Literal"),
+        }
+    }
+
+    #[test]
+    fn handle_literal_typed() {
+        let iri = "http://example.org/#my-datatype";
+        let ns = "http://example.org/";
+        let alias = "example";
+
+        let dt = NamedNode { iri };
+        let lit = Literal::Typed {
+            value: "my-lit",
+            datatype: dt,
+        };
+
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert(ns, alias.into());
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_ok());
+
+        match res.unwrap() {
+            NormalizedResource::TypedLiteral(lit) => {
+                assert_eq!(lit.alias, "example");
+                assert_eq!(lit.namespace, ns);
+                assert_eq!(lit.iri, "http://example.org/#my-datatype");
+            }
+            _ => panic!(
+                "Result should be a NormalizedResource::Literal, but got:\n{:#?}",
+                lit
+            ),
+        }
+    }
+
+    #[test]
+    fn handle_literal_typed_unknown() {
+        let dt_iri = "http://example.org/#my-datatype";
+        let alias = "mydt";
+
+        let dt = NamedNode { iri: dt_iri };
+        let lit = Literal::Typed {
+            value: "my-lit",
+            datatype: dt,
+        };
+
+        let ns_trie = NamespaceTrie::new();
+
+        let res = handle_literal(lit, &ns_trie);
+
+        assert!(res.is_err());
+
+        match res.unwrap_err() {
+            UnknownNamespaceError { iri } => {
+                assert_eq!(iri, dt_iri)
+            }
+            _ => panic!("Result should be an UnknownNamespaceError"),
+        }
+    }
 }

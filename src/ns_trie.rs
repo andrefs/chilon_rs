@@ -1,19 +1,19 @@
-use std::{collections::HashMap, fs::write};
+use std::{collections::HashMap, fs::write, path::Path};
 
-use crate::{trie::Node, util::gen_file_name};
-use log::{debug, error, info, trace, warn};
+use crate::trie::Node;
+use log::{debug, info, warn};
 use url::Url;
 
 pub type NamespaceTrie = Node<String>;
 
 pub trait SaveTrie {
-    fn save(&self);
+    fn save(&self, outf: &str);
 }
 
 impl SaveTrie for NamespaceTrie {
-    fn save(&self) {
-        let file_path = gen_file_name("results/all-prefixes".to_string(), "json".to_string());
-        info!("Saving namespaces in {}", file_path);
+    fn save(&self, outf: &str) {
+        let file_path = Path::new(".").join(outf).join("all-prefixes.json");
+        info!("Saving namespaces in {}", file_path.to_string_lossy());
         let mut ns_map = HashMap::<String, String>::new();
         for (ns, node) in self.iter_leaves() {
             ns_map.insert(node.value.as_ref().unwrap().clone(), ns);

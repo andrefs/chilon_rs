@@ -1,0 +1,474 @@
+//window.originalData = await d3.json('data.json')
+window.originalData = {{ data | json_encode(pretty = true) | safe }};
+
+const normalizeCounts = (elems) => {
+  let [max, min] = elems.reduce((acc, cur) => {
+    let [max, min] = acc;
+    let count = cur.count;
+
+    return [count > max ? count : max, count < min ? count : min];
+  }, [elems[0]?.count || 0, elems[0]?.count || 0]);
+  console.log('XXXXXXXXx 1', { max, min })
+
+  let delta = max - min;
+
+  for (let elem of elems) {
+    elem.normCount = Math.floor(((elem.count - min) / delta) * 50) + 50;
+  }
+}
+
+normalizeCounts(originalData.nodes);
+normalizeCounts(originalData.links);
+window.data = {
+  nodes: [...originalData.nodes],
+  links: [...originalData.links]
+};
+
+
+window.filterData = () => {
+  const minNodes = d3.select('#minNodeCountInput').node().value;
+  const maxNodes = d3.select('#maxNodeCountInput').node().value;
+  const minEdges = d3.select('#minPredicateCountInput').node().value;
+  const maxEdges = d3.select('#maxPredicateCountInput').node().value;
+
+  window.data.nodes = originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes);
+  window.data.links = originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges);
+};
+
+const setSliders = (data) => {
+  const totalNodes = data.nodes.length;
+  const totalEdges = data.links.length;
+  d3.select('#maxNodeCountInput').node().max = totalNodes;
+  d3.select('#maxNodeCountInput').node().value = totalNodes;
+  d3.select('#maxNodeCount').text(totalNodes);
+
+  d3.select('#minNodeCountInput').node().max = totalNodes - 1;
+
+  d3.select('#maxPredicateCountInput').node().max = totalEdges;
+  d3.select('#maxPredicateCountInput').node().value = totalEdges;
+  d3.select('#maxPredicateCount').text(totalEdges)
+
+  d3.select('#minPredicateCountInput').node().max = totalEdges - 1;
+};
+
+setSliders(data);
+
+
+
+data.links.sort(function(a, b) {
+  const aFields = [a.source, a.target].sort();
+  const bFields = [b.source, b.target].sort();
+  if (aFields[0] > bFields[0]) { return 1; }
+  else if (aFields[0] < bFields[0]) { return -1; }
+  else {
+    if (aFields[1] > bFields[1]) { return 1; }
+    if (aFields[1] < bFields[1]) { return -1; }
+    else { return 0; }
+  }
+});
+//any links with duplicate source and target get an incremented 'linknum'
+for (let i = 0; i < data.links.length; i++) {
+  data.links[i].count /= 500;
+  //if (i != 0 &&
+  //  data.links[i].source === data.links[i-1].source &&
+  //  data.links[i].target === data.links[i-1].target) {
+  //    data.links[i].linknum = data.links[i-1].linknum + 1;
+  //  }
+  //else { data.links[i].linknum = 1; }
+
+
+  if (i === 0) {
+    data.links[0].linknum = 1;
+    continue;
+  }
+
+  const aSrc = data.links[i].source;
+  const aTgt = data.links[i].target;
+  const bSrc = data.links[i - 1].source;
+  const bTgt = data.links[i - 1].target;
+  const label = data.links[i].label;
+
+  if (aSrc === bSrc && aTgt === bTgt) {
+    data.links[i].linknum = Math.abs(data.links[i - 1].linknum) + 1;
+  }
+  else if (aSrc === bTgt && aTgt === bSrc) {
+    //const signal = -Math.sign(data.links[i-1].linknum);
+    //data.links[i].linknum = (Math.abs(data.links[i-1].linknum) + 1)*signal;
+    data.links[i].linknum = -(Math.abs(data.links[i - 1].linknum) + 1);
+  }
+  else { data.links[i].linknum = 1; }
+};
+
+
+data.nodes.map(n => {
+  n.count = Math.ceil(5 + 10 * Math.log2(n.count));
+  return n;
+});
+const resources = new Set(data.nodes.map(n => n.name));
+const predicates = new Set(data.links.flatMap(l => [l.label]))
+//const width = 1000;
+//const height = 600;
+//
+
+
+
+/**********
+ * Colors *
+ **********/
+
+const RGB2Color = (r, g, b) => '#' + byte2Hex(r) + byte2Hex(g) + byte2Hex(b);
+const byte2Hex = n => {
+  const nybHexString = "0123456789ABCDEF";
+  return String(nybHexString.substr((n >> 4) & 0x0F, 1)) +
+    nybHexString.substr(n & 0x0F, 1);
+};
+const makeColorGradient = (frequency1, frequency2, frequency3, phase1, phase2, phase3, center, width, len) => {
+  const colors = []
+  if (len == undefined) { len = 50; }
+  if (center == undefined) { center = 128; }
+  if (width == undefined) { width = 127; }
+
+  for (let i = 0; i < len; ++i) {
+    const red = Math.sin(frequency1 * i + phase1) * width + center;
+    const grn = Math.sin(frequency2 * i + phase2) * width + center;
+    const blu = Math.sin(frequency3 * i + phase3) * width + center;
+    colors.push(RGB2Color(red, grn, blu));
+  }
+  return colors;
+};
+
+const genColors = numColors => {
+  let center = 128;
+  let width = 127;
+  let frequency = 2.4;
+  return makeColorGradient(frequency, frequency, frequency, 0, 2, 4, center, width, numColors);
+};
+
+//const nodeColors = genColors(data.nodes.length);
+const edgeColors = genColors(data.links.length);
+//const colorEntries = [...Array.from(resources).map((r, i) => [r, nodeColors[i]]),
+//                      ...Array.from(predicates).map((p, i) => [p, edgeColors[i]])];
+const colorHash = Object.fromEntries(Array.from(predicates).map((p, i) => ([p, edgeColors[i]])));
+
+
+/**********
+ * Zoom   *
+ **********/
+
+let zoom = d3.zoom()
+  .scaleExtent([0.1, 5])
+  //.translateExtent([[0, 0], [width, height]])
+  .on('zoom', handleZoom);
+
+function initZoom() {
+  d3.select('svg')
+    .call(zoom);
+}
+
+function handleZoom(e) {
+  d3.selectAll('svg g')
+    .attr('transform', e.transform);
+}
+
+
+var svg = d3.select("svg")
+const width = svg.node().getBoundingClientRect().width;
+const height = svg.node().getBoundingClientRect().height;
+
+/**********
+ * Edges  *
+ **********/
+
+
+//// Per-type markers, as they don't inherit styles.
+//svg.append("svg:defs").selectAll("marker")
+//    .data(["suit", "licensing", "resolved"])
+//  .enter().append("svg:marker")
+//    .attr("id", 'triangle')
+//    .attr("viewBox", "0 -5 10 10")
+//    .attr("refX", 15)
+//    .attr("refY", -1.5)
+//    .attr('fill-opacity', 0.5)
+//    .attr("markerWidth", 6)
+//    .attr("markerHeight", 6)
+//    .attr("orient", "auto")
+//  .append("svg:path")
+//    .attr("d", "M0,-5L10,0L0,5");
+
+const edgeGroups = svg.append('g')
+  .attr('class', 'edges')
+  .selectAll("g")
+  .data(data.links)
+  .enter()
+  .append('g').attr('class', 'edge-g')
+
+var edgepaths = edgeGroups
+  .append('path')
+  //.attr('d',linkArc)
+  //.attr('d', d => {
+  //  console.log('XXXXXXXXXXXX d', d);
+  //  return 'M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y
+  //})
+  .attr('class', 'edgepath')
+  .attr('fill-opacity', 0)
+  .attr('id', (d, i) => 'edgepath' + i)
+  .attr("stroke-width", d => Math.ceil(d.normCount / 10))
+  .attr('opacity', 0.3)
+  .attr("data-stroke-width", d => Math.ceil(d.normCount / 10))
+  .attr("data-source", d => d.source)
+  .attr("data-target", d => d.target)
+  .attr("data-label", d => d.label)
+  .style("stroke", (d) => colorHash[d.label])
+  //.style("stroke", '#b8b8b8')
+  .attr("data-stroke", (d) => colorHash[d.label])
+  //.style("pointer-events", "none");
+  .style("pointer-events", "visibleStroke")
+  .attr('marker-end', 'url(#triangle)')
+
+var edgelabels = edgeGroups.append('text')
+  .style("pointer-events", "none")
+  .attr('class', 'edgelabel')
+  .attr('id', (d, i) => 'edgelabel' + i)
+  .attr('text-anchor', 'middle')
+  .attr('dominant-baseline', 'text-after-edge')
+  .attr('font-size', 15)
+  .attr('fill', '#999')
+
+edgelabels.append('textPath')
+  .attr('xlink:href', (d, i) => '#edgepath' + i)
+  .style("pointer-events", "none")
+  .attr('startOffset', '50%')
+  .attr('text-anchor', 'middle')
+  .attr('text-anchor', 'middle')
+//.text(d => d.label)
+
+
+/**********
+ * Simulation  *
+ **********/
+
+const nodeDistance = 300;
+const simulation = d3.forceSimulation(data.nodes)
+  .force("linkForce", d3.forceLink(data.links).distance(300).strength(2))
+  .force("charge", d3.forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
+  .force('collision', d3.forceCollide().radius(d => d.normCount + 4))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .on("tick", ticked);
+
+/**********
+ * Nodes  *
+ **********/
+
+const nodeGroups = svg.append('g')
+  .attr('class', 'nodes')
+  .selectAll("g")
+  .data(data.nodes)
+  .enter()
+  .append('g').attr('class', 'node-g')
+
+var nodes = nodeGroups
+  .append("circle")
+  .attr("r", d => Math.ceil(d.normCount || 0))
+  .style("fill", (d, i) => '#B3D9CB')
+  .attr('data-id', (d, i) => d.id)
+  .attr("data-fill", (d, i) => '#B3D9CB')
+  .style("pointer-events", "visiblePainted")
+  .style('cursor', 'pointer')
+
+var nodelabels = nodeGroups
+  .append("text")
+  .attr("x", d => d.x)
+  .attr("y", d => d.y)
+  .attr('font-size', d => Math.ceil(d.normCount / 2))
+  .attr('class', "nodelabel")
+  .text(d => d.name)
+  .attr('dominant-baseline', 'middle')
+  .style("pointer-events", "none")
+  .style('cursor', 'pointer')
+
+
+/**********
+ * Tooltip *
+ **********/
+
+const tooltip = d3.select('#main')
+  .append("div")
+  .classed("tooltip", true)
+  .style("opacity", 0) // start invisible
+
+/**********
+ * Events *
+ **********/
+
+const circle = svg.selectAll('circle');
+circle
+  .on('mouseover', function(event, d) {
+    const hlNodes = new Set();
+    edgepaths.each(function(d) {
+      const s = d.source;
+      const t = d.target;
+      const circleId = event.target.getAttribute('data-id')
+      if (circleId && t.id == circleId || s.id == circleId) {
+        hlNodes.add(String(s.id));
+        hlNodes.add(String(t.id));
+      }
+      const strokeWidth = this.getAttribute('data-stroke-width')
+      const stroke = this.getAttribute('data-stroke')
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('opacity', s.id == circleId || t.id == circleId ? 1 : 0.3)
+        .style('stroke', s.id == circleId || t.id == circleId ? stroke : '#b8b8b8')
+        .style('stroke-width', s.id == circleId || t.id == circleId ? strokeWidth : 1)
+    });
+
+    nodes.each(function(n) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('fill', n => {
+          return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+        })
+
+
+      tooltip.transition()
+        .duration(200)
+        .style("opacity", 1) // show the tooltip
+      tooltip.html(d.name)
+        .style("left", (event.clientX + 20) + "px")
+        .style("top", (event.clientY - 20) + "px");
+
+    });
+    //edges
+    //  .style('stroke', link_d => link_d.source === d.id || link_d.target === d.id ? '#69b3b2' : '#b8b8b8')
+    //  .style('stroke-width', link_d => link_d.source === d.id || link_d.target === d.id ? 4 : 1)
+  })
+  .on('mouseout', function(d) {
+    circle.each(function(c) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('fill', this.getAttribute('data-fill'))
+    });
+    edgepaths.each(function(e) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('opacity', 0.3)
+        .style('stroke', this.getAttribute('data-stroke'))
+        //.style("stroke", '#b8b8b8')
+        .style('stroke-width', this.getAttribute('data-stroke-width'))
+    })
+    tooltip.transition()
+      .duration(200)
+      .style("opacity", 0)
+  });
+
+edgepaths
+  .on('mouseover', function(event, d) {
+    const hlNodes = new Set();
+    edgepaths.each(function({ label, source, target }) {
+      const strokeWidth = this.getAttribute('data-stroke-width')
+      const stroke = this.getAttribute('data-stroke')
+
+      if (d.label == label) {
+        hlNodes.add(String(source.id));
+        hlNodes.add(String(target.id));
+      }
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('opacity', 1)
+        .style('stroke', label == d.label ? stroke : '#b8b8b8')
+        .style('stroke-width', label == d.label ? strokeWidth : 1)
+    });
+
+    nodes.each(function(n) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('fill', n => {
+          return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+        })
+    });
+
+
+    tooltip.transition()
+      .duration(200)
+      .style("opacity", 1) // show the tooltip
+    tooltip.html(d.label)
+      .style("left", (event.clientX + 20) + "px")
+      .style("top", (event.clientY - 20) + "px");
+  })
+  .on('mouseout', function(event, d) {
+    edgepaths.each(function(e) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('opacity', 0.3)
+        .style('stroke', this.getAttribute('data-stroke'))
+        //.style("stroke", '#b8b8b8')
+        .style('stroke-width', this.getAttribute('data-stroke-width'))
+    })
+
+    circle.each(function(c) {
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('fill', this.getAttribute('data-fill'))
+    });
+
+    tooltip.transition()
+      .duration(200)
+      .style("opacity", 0)
+  });
+
+
+/**********
+ * Tick  *
+ **********/
+
+initZoom();
+
+const calcEdge = (d) => {
+  let signal = 0;
+  if (d.linknum % 2 === 1 && d.linknum > 0) { signal = 1; }
+  if (d.linknum % 2 === 0 && d.linknum < 0) { signal = 1; }
+  const dl = Math.abs(d.linknum)
+  const divisor = Math.floor(dl / 2) * 2;
+  const dr = dl === 1 ? 0 : 1500 / divisor;  //linknum is defined above
+
+  const pathd = `M${d.source.x},${d.source.y}
+                 A${dr},${dr} 0 0 ${signal} ${d.target.x},${d.target.y}`;
+  return pathd;
+};
+
+const calcLoop = (d) => {
+  const dl = Math.abs(d.linknum)
+  const dr = 40 + d.normCount * dl;  //linknum is defined above
+
+  //loop
+  //d="M334.5179247605647,472.7245628100564
+  //     A73,73 -45 1 1 335.5179247605647,473.7245628100564"
+  const pathd = `M${d.source.x},${d.source.y}
+                   A${dr},${dr} -45 1 0 ${d.target.x + 1},${d.target.y + 1}`;
+  return pathd;
+
+}
+
+function ticked() {
+  edgepaths.attr('d', function(d) {
+    const sId = d.source?.id ?? d.source;
+    const tId = d.target?.id ?? d.target;
+    return sId === tId ? calcLoop(d) : calcEdge(d);
+  });
+
+  nodes.attr("cx", d => d.x)
+    .attr("cy", d => d.y)
+
+  nodelabels.attr("x", d => d.x)
+    .attr("y", d => d.y);
+
+  d3.select('#alpha_value').style('flex-basis', (simulation.alpha() * 100) + '%');
+}
+

@@ -10,8 +10,7 @@ mod prefixes;
 mod seg_tree;
 mod trie;
 mod util;
-
-use std::fs;
+mod visualization;
 
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
@@ -19,13 +18,15 @@ use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use chilon_rs::util::gen_file_name;
+use chilon_rs::visualization::{build_data, dump_json, load_summary, render_vis};
 use chrono::Utc;
 use clap::Parser;
-use log::{debug, info, trace};
+use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
 use simple_logger::SimpleLogger;
+use std::fs;
 
 fn main() {
     /**********************
@@ -46,11 +47,12 @@ fn main() {
     /**********************
      * Prepare namespaces *
      **********************/
+
     info!("Loading namespaces from Prefix.cc");
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
     if cli.infer_ns {
-        // // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
+        // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
         let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
@@ -72,7 +74,7 @@ fn main() {
         //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
         //);
 
-        ns_trie.save();
+        ns_trie.save(outf);
     }
 
     /*********************
@@ -80,8 +82,19 @@ fn main() {
      *********************/
 
     info!("Normalizing triples");
-    let (nts, used_ns) = normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown); // TODO improve
+    let (nts, used_ns) =
+        normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
 
     debug!("saving normalized triples");
-    save_normalized_triples(&nts, used_ns);
+    save_normalized_triples(&nts, used_ns, Some(10), outf); // min_occurs = 10
+
+    /*****************
+     * Visualization *
+     *****************/
+
+    //let mut summ = load_summary(path);
+
+    let vis_data = build_data(outf);
+    dump_json(&vis_data, outf);
+    render_vis(&vis_data, outf);
 }

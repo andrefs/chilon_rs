@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>CodePen - D3 in Depth</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body marginwidth="0" marginheight="0">
+  <div class="controls">
+    <div class="force alpha">
+      <p><label>alpha</label> Simulation activity</p>
+      <div class="alpha_bar" onclick="updateAll();">
+        <div id="alpha_value"></div>
+      </div>
+    </div>
+    <div class="force">
+      <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
+      <label>
+        Min node count:
+        <output id="minNodeCount">0</output>
+        <input id="minNodeCountInput" type="range" value="0" min="0" step="1"
+          oninput="d3.select('#minNodeCount').text(value); filterData();">
+      </label>
+      <label>
+        Max node count:
+        <output id="maxNodeCount"></output>
+        <input id="maxNodeCountInput" type="range" min="1" step="1"
+          oninput="d3.select('#maxNodeCount').text(value); filterData();">
+      </label>
+      <label>
+        Min predicate count:
+        <output id="minPredicateCount">0</output>
+        <input id="minPredicateCountInput" type="range" value="0" min="0" step="1"
+          oninput="d3.select('#minPredicateCount').text(value); filterData();">
+      </label>
+      <label>
+        Max predicate count:
+        <output id="maxPredicateCount"></output>
+        <input id="maxPredicateCountInput" type="range" min="1" step="1"
+          oninput="d3.select('#maxPredicateCount').text(value); filterData();">
+      </label>
+    </div>
+  </div>
+  <div id="main">
+    <svg></svg>
+  </div>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.4.4/d3.js'></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.5.0/lodash.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+
+</html>
