@@ -1,5 +1,8 @@
-//window.originalData = await d3.json('data.json')
-window.originalData = {{ data | json_encode(pretty = true) | safe }};
+
+/*****************
+ * DEFINING STUFF *
+ *****************/
+
 
 const normalizeCounts = (elems) => {
   let [max, min] = elems.reduce((acc, cur) => {
@@ -8,7 +11,6 @@ const normalizeCounts = (elems) => {
 
     return [count > max ? count : max, count < min ? count : min];
   }, [elems[0]?.count || 0, elems[0]?.count || 0]);
-  console.log('XXXXXXXXx 1', { max, min })
 
   let delta = max - min;
 
@@ -17,41 +19,193 @@ const normalizeCounts = (elems) => {
   }
 }
 
-normalizeCounts(originalData.nodes);
-normalizeCounts(originalData.links);
-window.data = {
-  nodes: [...originalData.nodes],
-  links: [...originalData.links]
-};
-
+window.debFilterData = debounce(() => filterData());
 
 window.filterData = () => {
-  const minNodes = d3.select('#minNodeCountInput').node().value;
-  const maxNodes = d3.select('#maxNodeCountInput').node().value;
-  const minEdges = d3.select('#minPredicateCountInput').node().value;
-  const maxEdges = d3.select('#maxPredicateCountInput').node().value;
+  const minNodes = d3.select('#minNodeOccursInput').node().value;
+  const maxNodes = d3.select('#maxNodeOccursInput').node().value;
+  const minEdges = d3.select('#minPredicateOccursInput').node().value;
+  const maxEdges = d3.select('#maxPredicateOccursInput').node().value;
+
+  console.log('XXXXXXXXXXX filterData', { minNodes, maxNodes, minEdges, maxEdges });
 
   window.data.nodes = originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes);
   window.data.links = originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges);
+
+  restartSimulation(window.simulation);
 };
 
-const setSliders = (data) => {
-  const totalNodes = data.nodes.length;
-  const totalEdges = data.links.length;
-  d3.select('#maxNodeCountInput').node().max = totalNodes;
-  d3.select('#maxNodeCountInput').node().value = totalNodes;
-  d3.select('#maxNodeCount').text(totalNodes);
+const setSliders = (nodes, links) => {
+  d3.select('#maxNodeOccursInput').node().max = nodes.totalMaxSlider;
+  d3.select('#maxNodeOccursInput').node().value = nodes.maxSlider;
+  d3.select('#maxNodeOccurs').text(nodes.maxSlider);
 
-  d3.select('#minNodeCountInput').node().max = totalNodes - 1;
+  d3.select('#minNodeOccursInput').node().min = nodes.totalMinSlider;
+  d3.select('#minNodeOccursInput').node().value = nodes.minSlider;
+  d3.select('#minNodeOccurs').text(nodes.minSlider);
 
-  d3.select('#maxPredicateCountInput').node().max = totalEdges;
-  d3.select('#maxPredicateCountInput').node().value = totalEdges;
-  d3.select('#maxPredicateCount').text(totalEdges)
+  d3.select('#maxPredicateOccursInput').node().max = links.totalMaxSlider;
+  d3.select('#maxPredicateOccursInput').node().value = links.maxSlider;
+  d3.select('#maxPredicateOccurs').text(links.maxSlider);
 
-  d3.select('#minPredicateCountInput').node().max = totalEdges - 1;
+  d3.select('#minPredicateOccursInput').node().min = links.totalMinSlider;
+  d3.select('#minPredicateOccursInput').node().value = links.minSlider;
+  d3.select('#minPredicateOccurs').text(links.minSlider);
+
+  filterData();
 };
 
-setSliders(data);
+const calcInitValues = (data) => {
+  let NODES = 50;
+  let EDGES = 50;
+
+  window.data = {
+    nodes: data.nodes.slice(0, 50),
+    links: data.links.slice(0, 50)
+  };
+
+  let nodes = {
+    minSlider: data.nodes.slice(-1)[0].count,
+    totalMinSlider: 0,
+    maxSlider: data.nodes[0].count,
+    totalMaxSlider: data.nodes[0].count,
+  };
+
+  let links = {
+    minSlider: data.links.slice(-1)[0].count,
+    totalMinSlider: 0,
+    maxSlider: data.links[0].count,
+    totalMaxSlider: data.links[0].count,
+  };
+
+
+
+  setSliders(nodes, links);
+}
+
+
+//const setSliders = (data) => {
+//  const totalNodes = data.nodes.length;
+//  const totalEdges = data.links.length;
+//  d3.select('#maxNodeCountInput').node().max = totalNodes;
+//  d3.select('#maxNodeCountInput').node().value = totalNodes;
+//  d3.select('#maxNodeCount').text(totalNodes);
+//
+//  d3.select('#minNodeCountInput').node().max = totalNodes - 1;
+//
+//  d3.select('#maxPredicateCountInput').node().max = totalEdges;
+//  d3.select('#maxPredicateCountInput').node().value = totalEdges;
+//  d3.select('#maxPredicateCount').text(totalEdges)
+//
+//  d3.select('#minPredicateCountInput').node().max = totalEdges - 1;
+//};
+
+/**********
+ * Colors *
+ **********/
+
+const RGB2Color = (r, g, b) => '#' + byte2Hex(r) + byte2Hex(g) + byte2Hex(b);
+const byte2Hex = n => {
+  const nybHexString = "0123456789ABCDEF";
+  return String(nybHexString.substr((n >> 4) & 0x0F, 1)) +
+    nybHexString.substr(n & 0x0F, 1);
+};
+const makeColorGradient = (frequency1, frequency2, frequency3, phase1, phase2, phase3, center, width, len) => {
+  const colors = []
+  if (len == undefined) { len = 50; }
+  if (center == undefined) { center = 128; }
+  if (width == undefined) { width = 127; }
+
+  for (let i = 0; i < len; ++i) {
+    const red = Math.sin(frequency1 * i + phase1) * width + center;
+    const grn = Math.sin(frequency2 * i + phase2) * width + center;
+    const blu = Math.sin(frequency3 * i + phase3) * width + center;
+    colors.push(RGB2Color(red, grn, blu));
+  }
+  return colors;
+};
+
+const genColors = numColors => {
+  let center = 128;
+  let width = 127;
+  let frequency = 2.4;
+  return makeColorGradient(frequency, frequency, frequency, 0, 2, 4, center, width, numColors);
+};
+
+
+/**********
+ * Zoom   *
+ **********/
+
+function initZoom() {
+  d3.select('svg')
+    .call(zoom);
+}
+
+function handleZoom(e) {
+  d3.selectAll('svg g')
+    .attr('transform', e.transform);
+}
+
+const calcEdge = (d) => {
+  let signal = 0;
+  if (d.linknum % 2 === 1 && d.linknum > 0) { signal = 1; }
+  if (d.linknum % 2 === 0 && d.linknum < 0) { signal = 1; }
+  const dl = Math.abs(d.linknum)
+  const divisor = Math.floor(dl / 2) * 2;
+  const dr = dl === 1 ? 0 : 1500 / divisor;  //linknum is defined above
+
+  const pathd = `M${d.source.x},${d.source.y}
+                 A${dr},${dr} 0 0 ${signal} ${d.target.x},${d.target.y}`;
+  return pathd;
+};
+
+const calcLoop = (d) => {
+  const dl = Math.abs(d.linknum)
+  const dr = 40 + d.normCount * dl;  //linknum is defined above
+
+  //loop
+  //d="M334.5179247605647,472.7245628100564
+  //     A73,73 -45 1 1 335.5179247605647,473.7245628100564"
+  const pathd = `M${d.source.x},${d.source.y}
+                   A${dr},${dr} -45 1 0 ${d.target.x + 1},${d.target.y + 1}`;
+  return pathd;
+
+}
+
+function ticked() {
+  edgepaths.attr('d', function(d) {
+    const sId = d.source?.id ?? d.source;
+    const tId = d.target?.id ?? d.target;
+    return sId === tId ? calcLoop(d) : calcEdge(d);
+  });
+
+  nodes.attr("cx", d => d.x)
+    .attr("cy", d => d.y)
+
+  nodelabels.attr("x", d => d.x)
+    .attr("y", d => d.y);
+
+  d3.select('#alpha_value').style('flex-basis', (simulation.alpha() * 100) + '%');
+}
+
+
+/*****************
+ * RUNNING STUFF *
+ *****************/
+
+window.originalData = {{ data | json_encode(pretty = true) | safe }};
+
+normalizeCounts(originalData.nodes);
+normalizeCounts(originalData.links);
+
+calcInitValues(originalData);
+window.data.links = [...originalData.links];
+
+
+
+
+//setSliders(data);
 
 
 
@@ -66,6 +220,7 @@ data.links.sort(function(a, b) {
     else { return 0; }
   }
 });
+
 //any links with duplicate source and target get an incremented 'linknum'
 for (let i = 0; i < data.links.length; i++) {
   data.links[i].count /= 500;
@@ -112,37 +267,6 @@ const predicates = new Set(data.links.flatMap(l => [l.label]))
 
 
 
-/**********
- * Colors *
- **********/
-
-const RGB2Color = (r, g, b) => '#' + byte2Hex(r) + byte2Hex(g) + byte2Hex(b);
-const byte2Hex = n => {
-  const nybHexString = "0123456789ABCDEF";
-  return String(nybHexString.substr((n >> 4) & 0x0F, 1)) +
-    nybHexString.substr(n & 0x0F, 1);
-};
-const makeColorGradient = (frequency1, frequency2, frequency3, phase1, phase2, phase3, center, width, len) => {
-  const colors = []
-  if (len == undefined) { len = 50; }
-  if (center == undefined) { center = 128; }
-  if (width == undefined) { width = 127; }
-
-  for (let i = 0; i < len; ++i) {
-    const red = Math.sin(frequency1 * i + phase1) * width + center;
-    const grn = Math.sin(frequency2 * i + phase2) * width + center;
-    const blu = Math.sin(frequency3 * i + phase3) * width + center;
-    colors.push(RGB2Color(red, grn, blu));
-  }
-  return colors;
-};
-
-const genColors = numColors => {
-  let center = 128;
-  let width = 127;
-  let frequency = 2.4;
-  return makeColorGradient(frequency, frequency, frequency, 0, 2, 4, center, width, numColors);
-};
 
 //const nodeColors = genColors(data.nodes.length);
 const edgeColors = genColors(data.links.length);
@@ -160,15 +284,6 @@ let zoom = d3.zoom()
   //.translateExtent([[0, 0], [width, height]])
   .on('zoom', handleZoom);
 
-function initZoom() {
-  d3.select('svg')
-    .call(zoom);
-}
-
-function handleZoom(e) {
-  d3.selectAll('svg g')
-    .attr('transform', e.transform);
-}
 
 
 var svg = d3.select("svg")
@@ -247,13 +362,42 @@ edgelabels.append('textPath')
  * Simulation  *
  **********/
 
+
+function debounce(func, timeout = 100) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      func.apply(this, args);
+
+    }, timeout);
+  }
+}
+
+function restartSimulation(simulation) {
+  if (!simulation) { return; }
+  console.log('XXXXXXXXXXX restartSimulation', { simulation, windowData: window.data, originalData: window.originalData })
+  simulation.nodes(window.data.nodes);
+  simulation.force("linkForce", d3.forceLink(data.links).distance(300).strength(2));
+  simulation.alpha(1).restart();
+  simulation.on('tick', ticked);
+}
+
+function initSimulation(simulation, data) {
+  if (!simulation) { return; }
+  console.log('XXXXXXXXXXX initSimulation', { windowData: window.data, simulation })
+  simulation.nodes(data.nodes);
+  simulation.force("linkForce", d3.forceLink(data.links).distance(300).strength(2));
+  simulation.force("charge", d3.forceManyBody().strength(-800).distanceMin(200).distanceMax(400));
+  simulation.force('collision', d3.forceCollide().radius(d => d.normCount + 4));
+  simulation.force('center', d3.forceCenter(width / 2, height / 2));
+  simulation.on("tick", ticked);
+}
+
+
 const nodeDistance = 300;
-const simulation = d3.forceSimulation(data.nodes)
-  .force("linkForce", d3.forceLink(data.links).distance(300).strength(2))
-  .force("charge", d3.forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
-  .force('collision', d3.forceCollide().radius(d => d.normCount + 4))
-  .force('center', d3.forceCenter(width / 2, height / 2))
-  .on("tick", ticked);
+window.simulation = d3.forceSimulation();
+initSimulation(window.simulation, window.data);
 
 /**********
  * Nodes  *
@@ -430,45 +574,4 @@ edgepaths
 
 initZoom();
 
-const calcEdge = (d) => {
-  let signal = 0;
-  if (d.linknum % 2 === 1 && d.linknum > 0) { signal = 1; }
-  if (d.linknum % 2 === 0 && d.linknum < 0) { signal = 1; }
-  const dl = Math.abs(d.linknum)
-  const divisor = Math.floor(dl / 2) * 2;
-  const dr = dl === 1 ? 0 : 1500 / divisor;  //linknum is defined above
-
-  const pathd = `M${d.source.x},${d.source.y}
-                 A${dr},${dr} 0 0 ${signal} ${d.target.x},${d.target.y}`;
-  return pathd;
-};
-
-const calcLoop = (d) => {
-  const dl = Math.abs(d.linknum)
-  const dr = 40 + d.normCount * dl;  //linknum is defined above
-
-  //loop
-  //d="M334.5179247605647,472.7245628100564
-  //     A73,73 -45 1 1 335.5179247605647,473.7245628100564"
-  const pathd = `M${d.source.x},${d.source.y}
-                   A${dr},${dr} -45 1 0 ${d.target.x + 1},${d.target.y + 1}`;
-  return pathd;
-
-}
-
-function ticked() {
-  edgepaths.attr('d', function(d) {
-    const sId = d.source?.id ?? d.source;
-    const tId = d.target?.id ?? d.target;
-    return sId === tId ? calcLoop(d) : calcEdge(d);
-  });
-
-  nodes.attr("cx", d => d.x)
-    .attr("cy", d => d.y)
-
-  nodelabels.attr("x", d => d.x)
-    .attr("y", d => d.y);
-
-  d3.select('#alpha_value').style('flex-basis', (simulation.alpha() * 100) + '%');
-}
 

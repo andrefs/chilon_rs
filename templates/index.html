@@ -18,28 +18,28 @@
     <div class="force">
       <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
       <label>
-        Min node count:
-        <output id="minNodeCount">0</output>
-        <input id="minNodeCountInput" type="range" value="0" min="0" step="1"
-          oninput="d3.select('#minNodeCount').text(value); filterData();">
+        Min node occurs:
+        <output id="minNodeOccurs">0</output>
+        <input id="minNodeOccursInput" type="range" value="0" min="0" step="1"
+          oninput="d3.select('#minNodeOccurs').text(value); debFilterData();">
       </label>
       <label>
-        Max node count:
-        <output id="maxNodeCount"></output>
-        <input id="maxNodeCountInput" type="range" min="1" step="1"
-          oninput="d3.select('#maxNodeCount').text(value); filterData();">
+        Max node occurs:
+        <output id="maxNodeOccurs"></output>
+        <input id="maxNodeOccursInput" type="range" min="1" step="1"
+          oninput="d3.select('#maxNodeOccurs').text(value); debFilterData(); console.log('XXXXXXXXXX 1');">
       </label>
       <label>
-        Min predicate count:
-        <output id="minPredicateCount">0</output>
-        <input id="minPredicateCountInput" type="range" value="0" min="0" step="1"
-          oninput="d3.select('#minPredicateCount').text(value); filterData();">
+        Min predicate occurs:
+        <output id="minPredicateOccurs">0</output>
+        <input id="minPredicateOccursInput" type="range" value="0" min="0" step="1"
+          oninput="d3.select('#minPredicateOccurs').text(value); debFilterData();">
       </label>
       <label>
-        Max predicate count:
-        <output id="maxPredicateCount"></output>
-        <input id="maxPredicateCountInput" type="range" min="1" step="1"
-          oninput="d3.select('#maxPredicateCount').text(value); filterData();">
+        Max predicate occurs:
+        <output id="maxPredicateOccurs"></output>
+        <input id="maxPredicateOccursInput" type="range" min="1" step="1"
+          oninput="d3.select('#maxPredicateOccurs').text(value); debFilterData();">
       </label>
     </div>
   </div>
