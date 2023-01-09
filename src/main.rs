@@ -11,11 +11,15 @@ mod seg_tree;
 mod trie;
 mod util;
 
+use std::fs;
+
 use crate::iri_trie::{IriTrie, IriTrieExt};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
+use chilon_rs::util::gen_file_name;
+use chrono::Utc;
 use clap::Parser;
 use log::{debug, info, trace};
 use normalize::normalize_triples;
@@ -24,8 +28,20 @@ use prefixes::prefixcc;
 use simple_logger::SimpleLogger;
 
 fn main() {
+    /**********************
+     * Initializing stuff *
+     **********************/
+
     let cli = Cli::parse();
     SimpleLogger::new().init().unwrap();
+
+    let out = gen_file_name(
+        format!("results/{}", Utc::now().format("%Y%m%d")),
+        "".to_string(),
+    );
+    let outf = out.as_str();
+    info!("Creating folder {outf} to store results");
+    fs::create_dir(outf).unwrap();
 
     /**********************
      * Prepare namespaces *
