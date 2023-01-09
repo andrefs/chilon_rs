@@ -77,6 +77,7 @@ pub fn build_data(outf: &str) -> VisData {
             ?id rdf:object ?tgt .
             ?id afsgs:occurrences ?occurs .
         }
+        ORDER BY DESC(?occurs)
         "#;
 
     let qres = store.query(q);
@@ -172,9 +173,13 @@ pub fn build_data(outf: &str) -> VisData {
         }
     }
 
+    edges.sort_by(|a, b| b.count.cmp(&a.count));
+    let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
+    sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
+
     let data = VisData {
         links: edges,
-        nodes: nodes.into_values().collect::<Vec<_>>(),
+        nodes: sorted_nodes,
     };
 
     return data;
