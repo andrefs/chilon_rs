@@ -1,5 +1,8 @@
+use itertools::Itertools;
+use log::warn;
 use regex::Regex;
 use std::{
+    cmp::Ordering,
     collections::BTreeMap,
     fs::{create_dir_all, write, File},
     io::{BufReader, Read},
@@ -32,8 +35,40 @@ pub fn parse<'a>(json: String) -> PrefixMap {
 
 fn map_to_trie<'a>(map: PrefixMap) -> NamespaceTrie {
     let mut t = NamespaceTrie::new();
-    for (k, v) in map.iter() {
-        t.insert(v, k.clone());
+    for (alias, namespace) in map.into_iter().sorted_by(|(_, ns1), (_, ns2)| {
+        let len1 = ns1.len();
+        let len2 = ns2.len();
+
+        if len1 < len2 {
+            Ordering::Less
+        } else if len1 > len2 {
+            Ordering::Greater
+        } else {
+            ns1.cmp(ns2)
+        }
+    }) {
+        let res = t.longest_prefix(namespace.as_str(), true);
+        if let Some((node, ns)) = res {
+            if node.value.is_some() {
+                let existing_alias = node.value.as_ref().unwrap().clone();
+
+                if namespace.eq(&ns) {
+                    warn!(
+                        "Namespace {namespace} (alias {alias}) is already in trie with alias {}",
+                        existing_alias
+                    );
+                } else {
+                    warn!(
+                        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
+                        existing_alias,
+                        ns
+                    );
+                }
+
+                continue;
+            }
+        }
+        t.insert(&namespace, alias.clone());
     }
     return t;
 }
@@ -67,6 +102,11 @@ fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
                 return false;
             }
 
+            // lots of http://dbpedia.org/resource/XYZ stuff in prefix.cc
+            if namespace.starts_with("http://dpbedia.org/resource") && alias.ne(&"dbr") {
+                return false;
+            }
+
             // https://www.w3.org/2006/vcard/ns#latitude#"
             if Regex::new("#.*#").unwrap().is_match(namespace) {
                 return false;
@@ -74,7 +114,7 @@ fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
 
             return true;
         })
-        .map(|(k, v)| ((k.to_owned(), v.to_owned())))
+        .map(|(alias, namespace)| ((alias.to_owned(), namespace.to_owned())))
         .collect();
     fixed
 }
