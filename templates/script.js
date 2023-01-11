@@ -22,7 +22,7 @@ const normalizeCounts = (elems) => {
 window.debFilterData = debounce(() => filterData());
 
 
-const update = () => {
+const update = (data) => {
 
   let nodesParent = d3.select("svg g.nodes");
   let edgesParent = d3.select("svg g.edges");
@@ -31,7 +31,8 @@ const update = () => {
     .selectAll("g")
     .data(data.nodes)
     .enter()
-    .append('g').attr('class', 'node-g')
+    .append('g').attr('class', 'node-g');
+  nodeGroups.exit().remove();
 
   var nodes = nodeGroups
     .append("circle")
@@ -60,6 +61,8 @@ const update = () => {
     .data(data.links)
     .enter()
     .append('g').attr('class', 'edge-g')
+
+  edgeGroups.exit().remove();
 
   var edgepaths = edgeGroups
     .append('path')
@@ -115,7 +118,7 @@ window.filterData = () => {
   window.data.nodes = originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes);
   window.data.links = originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges);
 
-  update(svg);
+  update(window.data);
 };
 
 const setSliders = (nodes, links) => {
@@ -286,18 +289,8 @@ window.originalData = {{ data | json_encode(pretty = true) | safe }};
 
 normalizeCounts(originalData.nodes);
 normalizeCounts(originalData.links);
-
 calcInitValues(originalData);
-window.data.links = [...originalData.links];
-
-
-
-
-//setSliders(data);
-
-
-
-data.links.sort(function(a, b) {
+window.data.links = [...originalData.links].sort(function(a, b) {
   const aFields = [a.source, a.target].sort();
   const bFields = [b.source, b.target].sort();
   if (aFields[0] > bFields[0]) { return 1; }
@@ -343,15 +336,12 @@ for (let i = 0; i < data.links.length; i++) {
 };
 
 
-data.nodes.map(n => {
+window.data.nodes = [...originalData.nodes].map(n => {
   n.count = Math.ceil(5 + 10 * Math.log2(n.count));
   return n;
 });
-const resources = new Set(data.nodes.map(n => n.name));
-const predicates = new Set(data.links.flatMap(l => [l.label]))
-//const width = 1000;
-//const height = 600;
-//
+const resources = new Set(window.data.nodes.map(n => n.name));
+const predicates = new Set(window.data.links.flatMap(l => [l.label]))
 
 
 
@@ -422,7 +412,7 @@ window.simulation = d3.forceSimulation();
 
 svg.append('g').attr('class', 'edges')
 svg.append('g').attr('class', 'nodes');
-update(svg);
+update(window.data);
 
 initSimulation(window.simulation, window.data);
 
@@ -436,132 +426,132 @@ const tooltip = d3.select('#main')
   .classed("tooltip", true)
   .style("opacity", 0) // start invisible
 
-/**********
- * Events *
- **********/
-
-const circle = svg.selectAll('circle');
-circle
-  .on('mouseover', function(event, d) {
-    const hlNodes = new Set();
-    edgepaths.each(function(d) {
-      const s = d.source;
-      const t = d.target;
-      const circleId = event.target.getAttribute('data-id')
-      if (circleId && t.id == circleId || s.id == circleId) {
-        hlNodes.add(String(s.id));
-        hlNodes.add(String(t.id));
-      }
-      const strokeWidth = this.getAttribute('data-stroke-width')
-      const stroke = this.getAttribute('data-stroke')
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('opacity', s.id == circleId || t.id == circleId ? 1 : 0.3)
-        .style('stroke', s.id == circleId || t.id == circleId ? stroke : '#b8b8b8')
-        .style('stroke-width', s.id == circleId || t.id == circleId ? strokeWidth : 1)
-    });
-
-    nodes.each(function(n) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('fill', n => {
-          return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
-        })
-
-
-      tooltip.transition()
-        .duration(200)
-        .style("opacity", 1) // show the tooltip
-      tooltip.html(d.name)
-        .style("left", (event.clientX + 20) + "px")
-        .style("top", (event.clientY - 20) + "px");
-
-    });
-    //edges
-    //  .style('stroke', link_d => link_d.source === d.id || link_d.target === d.id ? '#69b3b2' : '#b8b8b8')
-    //  .style('stroke-width', link_d => link_d.source === d.id || link_d.target === d.id ? 4 : 1)
-  })
-  .on('mouseout', function(d) {
-    circle.each(function(c) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('fill', this.getAttribute('data-fill'))
-    });
-    edgepaths.each(function(e) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('opacity', 0.3)
-        .style('stroke', this.getAttribute('data-stroke'))
-        //.style("stroke", '#b8b8b8')
-        .style('stroke-width', this.getAttribute('data-stroke-width'))
-    })
-    tooltip.transition()
-      .duration(200)
-      .style("opacity", 0)
-  });
-
-edgepaths
-  .on('mouseover', function(event, d) {
-    const hlNodes = new Set();
-    edgepaths.each(function({ label, source, target }) {
-      const strokeWidth = this.getAttribute('data-stroke-width')
-      const stroke = this.getAttribute('data-stroke')
-
-      if (d.label == label) {
-        hlNodes.add(String(source.id));
-        hlNodes.add(String(target.id));
-      }
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('opacity', 1)
-        .style('stroke', label == d.label ? stroke : '#b8b8b8')
-        .style('stroke-width', label == d.label ? strokeWidth : 1)
-    });
-
-    nodes.each(function(n) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('fill', n => {
-          return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
-        })
-    });
-
-
-    tooltip.transition()
-      .duration(200)
-      .style("opacity", 1) // show the tooltip
-    tooltip.html(d.label)
-      .style("left", (event.clientX + 20) + "px")
-      .style("top", (event.clientY - 20) + "px");
-  })
-  .on('mouseout', function(event, d) {
-    edgepaths.each(function(e) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('opacity', 0.3)
-        .style('stroke', this.getAttribute('data-stroke'))
-        //.style("stroke", '#b8b8b8')
-        .style('stroke-width', this.getAttribute('data-stroke-width'))
-    })
-
-    circle.each(function(c) {
-      d3.select(this)
-        .transition()
-        .duration(200)
-        .style('fill', this.getAttribute('data-fill'))
-    });
-
-    tooltip.transition()
-      .duration(200)
-      .style("opacity", 0)
-  });
+//    /**********
+//     * Events *
+//     **********/
+//    
+//    const circle = svg.selectAll('circle');
+//    circle
+//      .on('mouseover', function(event, d) {
+//        const hlNodes = new Set();
+//        edgepaths.each(function(d) {
+//          const s = d.source;
+//          const t = d.target;
+//          const circleId = event.target.getAttribute('data-id')
+//          if (circleId && t.id == circleId || s.id == circleId) {
+//            hlNodes.add(String(s.id));
+//            hlNodes.add(String(t.id));
+//          }
+//          const strokeWidth = this.getAttribute('data-stroke-width')
+//          const stroke = this.getAttribute('data-stroke')
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('opacity', s.id == circleId || t.id == circleId ? 1 : 0.3)
+//            .style('stroke', s.id == circleId || t.id == circleId ? stroke : '#b8b8b8')
+//            .style('stroke-width', s.id == circleId || t.id == circleId ? strokeWidth : 1)
+//        });
+//    
+//        nodes.each(function(n) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('fill', n => {
+//              return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+//            })
+//    
+//    
+//          tooltip.transition()
+//            .duration(200)
+//            .style("opacity", 1) // show the tooltip
+//          tooltip.html(d.name)
+//            .style("left", (event.clientX + 20) + "px")
+//            .style("top", (event.clientY - 20) + "px");
+//    
+//        });
+//        //edges
+//        //  .style('stroke', link_d => link_d.source === d.id || link_d.target === d.id ? '#69b3b2' : '#b8b8b8')
+//        //  .style('stroke-width', link_d => link_d.source === d.id || link_d.target === d.id ? 4 : 1)
+//      })
+//      .on('mouseout', function(d) {
+//        circle.each(function(c) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('fill', this.getAttribute('data-fill'))
+//        });
+//        edgepaths.each(function(e) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('opacity', 0.3)
+//            .style('stroke', this.getAttribute('data-stroke'))
+//            //.style("stroke", '#b8b8b8')
+//            .style('stroke-width', this.getAttribute('data-stroke-width'))
+//        })
+//        tooltip.transition()
+//          .duration(200)
+//          .style("opacity", 0)
+//      });
+//    
+//    edgepaths
+//      .on('mouseover', function(event, d) {
+//        const hlNodes = new Set();
+//        edgepaths.each(function({ label, source, target }) {
+//          const strokeWidth = this.getAttribute('data-stroke-width')
+//          const stroke = this.getAttribute('data-stroke')
+//    
+//          if (d.label == label) {
+//            hlNodes.add(String(source.id));
+//            hlNodes.add(String(target.id));
+//          }
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('opacity', 1)
+//            .style('stroke', label == d.label ? stroke : '#b8b8b8')
+//            .style('stroke-width', label == d.label ? strokeWidth : 1)
+//        });
+//    
+//        nodes.each(function(n) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('fill', n => {
+//              return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+//            })
+//        });
+//    
+//    
+//        tooltip.transition()
+//          .duration(200)
+//          .style("opacity", 1) // show the tooltip
+//        tooltip.html(d.label)
+//          .style("left", (event.clientX + 20) + "px")
+//          .style("top", (event.clientY - 20) + "px");
+//      })
+//      .on('mouseout', function(event, d) {
+//        edgepaths.each(function(e) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('opacity', 0.3)
+//            .style('stroke', this.getAttribute('data-stroke'))
+//            //.style("stroke", '#b8b8b8')
+//            .style('stroke-width', this.getAttribute('data-stroke-width'))
+//        })
+//    
+//        circle.each(function(c) {
+//          d3.select(this)
+//            .transition()
+//            .duration(200)
+//            .style('fill', this.getAttribute('data-fill'))
+//        });
+//    
+//        tooltip.transition()
+//          .duration(200)
+//          .style("opacity", 0)
+//      });
 
 
 /**********
