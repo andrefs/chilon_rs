@@ -117,11 +117,13 @@ window.filterData = () => {
   const maxEdges = d3.select('#maxPredicateOccursInput').node().value;
 
 
-  window.data.nodes = originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes);
-  window.data.links = originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges);
+  let data = {
+    nodes: originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes),
+    links: originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges)
+  };
   console.log('XXXXXXXXXXX filterData', { minNodes, maxNodes, minEdges, maxEdges, windowData: window.data });
 
-  update(window.data);
+  update(data);
 };
 
 const setSliders = (nodes, links) => {
@@ -400,12 +402,12 @@ function restartSimulation(simulation) {
 function initSimulation(simulation, data) {
   if (!simulation) { return; }
   console.log('XXXXXXXXXXX initSimulation', { windowData: window.data, simulation })
-  simulation.nodes(data.nodes);
-  simulation.force("linkForce", d3.forceLink(data.links).distance(300).strength(2));
-  simulation.force("charge", d3.forceManyBody().strength(-800).distanceMin(200).distanceMax(400));
-  simulation.force('collision', d3.forceCollide().radius(d => d.normCount + 4));
-  simulation.force('center', d3.forceCenter(width / 2, height / 2));
-  simulation.on("tick", ticked);
+  simulation.nodes(data.nodes)
+    .force("linkForce", d3.forceLink(data.links).distance(300).strength(2))
+    .force("charge", d3.forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
+    .force('collision', d3.forceCollide().radius(d => d.normCount + 4))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .on("tick", ticked);
 }
 
 
@@ -415,9 +417,10 @@ window.simulation = d3.forceSimulation();
 
 svg.append('g').attr('class', 'edges')
 svg.append('g').attr('class', 'nodes');
-update(window.data);
 
+filterData();
 initSimulation(window.simulation, window.data);
+update(window.data);
 
 
 /**********
