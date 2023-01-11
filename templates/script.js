@@ -29,7 +29,8 @@ const update = (data) => {
 
   const nodeGroups = nodesParent
     .selectAll("g")
-    .data(data.nodes)
+    .data(data.nodes);
+  nodeGroups
     .enter()
     .append('g').attr('class', 'node-g');
   nodeGroups.exit().remove();
@@ -58,7 +59,8 @@ const update = (data) => {
 
   const edgeGroups = edgesParent
     .selectAll("g")
-    .data(data.links)
+    .data(data.links);
+  edgeGroups
     .enter()
     .append('g').attr('class', 'edge-g')
 
@@ -104,6 +106,7 @@ const update = (data) => {
     .attr('text-anchor', 'middle')
   //.text(d => d.label)
 
+  restartSimulation(window.simulation);
 }
 
 
@@ -113,10 +116,10 @@ window.filterData = () => {
   const minEdges = d3.select('#minPredicateOccursInput').node().value;
   const maxEdges = d3.select('#maxPredicateOccursInput').node().value;
 
-  console.log('XXXXXXXXXXX filterData', { minNodes, maxNodes, minEdges, maxEdges });
 
   window.data.nodes = originalData.nodes.filter(n => n.count >= minNodes && n.count <= maxNodes);
   window.data.links = originalData.links.filter(n => n.count >= minEdges && n.count <= maxEdges);
+  console.log('XXXXXXXXXXX filterData', { minNodes, maxNodes, minEdges, maxEdges, windowData: window.data });
 
   update(window.data);
 };
