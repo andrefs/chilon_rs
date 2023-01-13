@@ -1,97 +1,64 @@
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
+body{ 
+  width: 100%; 
+  margin: 0; padding: 0; 
+  display: flex; 
+  font-family: sans-serif; font-size: 75%; }
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+.active {
+  stroke: #000;
+  stroke-width: 2px;
 }
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+text {
+  text-anchor: middle;
 }
-a:hover {
-  color: #535bf2;
+div.tooltip {
+	background-color: lightblue;
 }
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+div.tooltip {
+  position: absolute;
   text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #3178c6aa);
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-button {
+  padding: 5px;
+  background: honeydew;
+  font: 16px sans-serif;
+  font-weight: bold;
+  border: 1px solid black;
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  pointer-events: none; /* keep the mouseover when over the tooltip */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.links line {
+  stroke: #aaa;
 }
+.nodes circle {
+  pointer-events: all;
+  stroke: none;
+  stroke-width: 40px;
+}
+
+svg {
+  width:100vw;
+  height: 100vh;
+}
+
+.controls {
+  float: left;
+  position: absolute;
+  padding: 0 5px;
+}
+.controls .force {
+  background-color:#eee;
+  border-radius: 3px;
+  padding: 5px;
+  margin: 5px 0;
+  width: 200px;
+}
+.controls .force p label { margin-right: .5em; font-size: 120%; font-weight: bold;}
+.controls .force p { margin-top: 0;}
+.controls .force label { display: inline-block; }
+
+/* alpha viewer */
+.controls .alpha p { margin-bottom: .25em; }
+.controls .alpha .alpha_bar { height: .5em; border: 1px #777 solid; border-radius: 2px; padding: 1px; display: flex; }
+.controls .alpha .alpha_bar #alpha_value { background-color: #555; border-radius: 1px; flex-basis: 100% }
+.controls .alpha .alpha_bar:hover { border-width: 2px; margin:-1px; }
+.controls .alpha .alpha_bar:active #alpha_value { background-color: #222 }
