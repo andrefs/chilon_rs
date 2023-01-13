@@ -6,3 +6,4 @@ output*.ttl
 all-prefixes*.json
 results/
 _*
+tmp/*

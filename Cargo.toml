@@ -11,7 +11,7 @@ edition = "2021"
 rio_turtle = { path = "/home/andrefs/Projects/3rd_party/oxigraph/rio/turtle/", version = "0.7.1"}
 rio_api = { path = "/home/andrefs/Projects/3rd_party/oxigraph/rio/api/", version = "0.7.1"}
 bzip2 = "0.4.3"
-clap = {version = "4.0.18", features = ["derive"]}
+clap = {version = "4.1", features = ["derive"]}
 num_cpus = "1.13.1"
 rayon = "1.6.0"
 ureq = "2.5.0"
