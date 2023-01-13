@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "id": 2,
+      "name": "group2",
+      "count": 100
+    },
+    {
+      "id": 0,
+      "name": "group0",
+      "count": 127
+    },
+    {
+      "id": 3,
+      "name": "group3",
+      "count": 300
+    },
+    {
+      "id": 1,
+      "name": "group1",
+      "count": 10
+    }
+  ],
+  "links": [
+    {
+      "source": 1,
+      "target": 2,
+      "count": 366287,
+      "label": "fog"
+    },
+    {
+      "source": 3,
+      "target": 2,
+      "count": 285668,
+      "label": "tread"
+    },
+    {
+      "source": 0,
+      "target": 2,
+      "count": 207272,
+      "label": "disobey"
+    },
+    {
+      "source": 0,
+      "target": 3,
+      "count": 207272,
+      "label": "tree"
+    },
+    {
+      "source": 2,
+      "target": 1,
+      "count": 117791,
+      "label": "drink"
+    },
+    {
+      "source": 2,
+      "target": 3,
+      "count": 117791,
+      "label": "driving"
+    },
+    {
+      "source": 0,
+      "target": 3,
+      "count": 98923,
+      "label": "roomy"
+    },
+    {
+      "source": 0,
+      "target": 0,
+      "count": 92518,
+      "label": "comfort"
+    }
+  ]
+}

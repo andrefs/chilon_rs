@@ -3,6 +3,14 @@
  * DEFINING STUFF *
  *****************/
 
+const fixData = (originalData) => {
+  let data = originalData;
+
+  normalizeCounts(data.nodes);
+  normalizeCounts(data.links);
+
+
+};
 
 const normalizeCounts = (elems) => {
   let [max, min] = elems.reduce((acc, cur) => {
@@ -150,11 +158,15 @@ const calcInitValues = (data) => {
   let NODES = 50;
   let EDGES = 50;
 
-  window.data = {
+  let res = {
     nodes: data.nodes.slice(0, 50),
     links: data.links.slice(0, 50)
   };
 
+  return res;
+}
+
+const setInitSliders = (data) => {
   let nodes = {
     minSlider: data.nodes.slice(-1)[0].count,
     totalMinSlider: 0,
@@ -169,11 +181,8 @@ const calcInitValues = (data) => {
     totalMaxSlider: data.links[0].count,
   };
 
-
-
   setSliders(nodes, links);
 }
-
 
 //const setSliders = (data) => {
 //  const totalNodes = data.nodes.length;
@@ -285,93 +294,70 @@ function ticked() {
   d3.select('#alpha_value').style('flex-basis', (simulation.alpha() * 100) + '%');
 }
 
+const sortLinks = (data) => {
+  data.links = data.links.sort(function(a, b) {
+    const aFields = [a.source, a.target].sort();
+    const bFields = [b.source, b.target].sort();
+    if (aFields[0] > bFields[0]) { return 1; }
+    else if (aFields[0] < bFields[0]) { return -1; }
+    else {
+      if (aFields[1] > bFields[1]) { return 1; }
+      if (aFields[1] < bFields[1]) { return -1; }
+      else { return 0; }
+    }
+  });
+}
 
-/*****************
- * RUNNING STUFF *
- *****************/
 
-window.originalData = {{ data | json_encode(pretty = true) | safe }};
 
-normalizeCounts(originalData.nodes);
-normalizeCounts(originalData.links);
-calcInitValues(originalData);
-window.data.links = [...originalData.links].sort(function(a, b) {
-  const aFields = [a.source, a.target].sort();
-  const bFields = [b.source, b.target].sort();
-  if (aFields[0] > bFields[0]) { return 1; }
-  else if (aFields[0] < bFields[0]) { return -1; }
-  else {
-    if (aFields[1] > bFields[1]) { return 1; }
-    if (aFields[1] < bFields[1]) { return -1; }
-    else { return 0; }
+const setLinkNum = (data) => {
+
+  //any links with duplicate source and target get an incremented 'linknum'
+  for (let i = 0; i < data.links.length; i++) {
+    data.links[i].count /= 500;
+
+    if (i === 0) {
+      data.links[0].linknum = 1;
+      continue;
+    }
+
+    const aSrc = data.links[i].source;
+    const aTgt = data.links[i].target;
+    const bSrc = data.links[i - 1].source;
+    const bTgt = data.links[i - 1].target;
+    const label = data.links[i].label;
+
+    if (aSrc === bSrc && aTgt === bTgt) {
+      data.links[i].linknum = Math.abs(data.links[i - 1].linknum) + 1;
+    }
+    else if (aSrc === bTgt && aTgt === bSrc) {
+      data.links[i].linknum = -(Math.abs(data.links[i - 1].linknum) + 1);
+    }
+    else { data.links[i].linknum = 1; }
+  };
+
+}
+
+
+const fixNodesCount = (data) => {
+  for (let n in data.nodes) {
+    n.count = Math.ceil(5 + 10 * Math.log2(n.count));
+    return n;
   }
-});
-
-//any links with duplicate source and target get an incremented 'linknum'
-for (let i = 0; i < data.links.length; i++) {
-  data.links[i].count /= 500;
-  //if (i != 0 &&
-  //  data.links[i].source === data.links[i-1].source &&
-  //  data.links[i].target === data.links[i-1].target) {
-  //    data.links[i].linknum = data.links[i-1].linknum + 1;
-  //  }
-  //else { data.links[i].linknum = 1; }
-
-
-  if (i === 0) {
-    data.links[0].linknum = 1;
-    continue;
-  }
-
-  const aSrc = data.links[i].source;
-  const aTgt = data.links[i].target;
-  const bSrc = data.links[i - 1].source;
-  const bTgt = data.links[i - 1].target;
-  const label = data.links[i].label;
-
-  if (aSrc === bSrc && aTgt === bTgt) {
-    data.links[i].linknum = Math.abs(data.links[i - 1].linknum) + 1;
-  }
-  else if (aSrc === bTgt && aTgt === bSrc) {
-    //const signal = -Math.sign(data.links[i-1].linknum);
-    //data.links[i].linknum = (Math.abs(data.links[i-1].linknum) + 1)*signal;
-    data.links[i].linknum = -(Math.abs(data.links[i - 1].linknum) + 1);
-  }
-  else { data.links[i].linknum = 1; }
-};
-
-
-window.data.nodes = [...originalData.nodes].map(n => {
-  n.count = Math.ceil(5 + 10 * Math.log2(n.count));
-  return n;
-});
-const resources = new Set(window.data.nodes.map(n => n.name));
-const predicates = new Set(window.data.links.flatMap(l => [l.label]))
+}
 
 
 
+const genColorHash = (data) => {
+  const predicates = new Set(data.links.flatMap(l => [l.label]))
 
-//const nodeColors = genColors(data.nodes.length);
-const edgeColors = genColors(data.links.length);
-//const colorEntries = [...Array.from(resources).map((r, i) => [r, nodeColors[i]]),
-//                      ...Array.from(predicates).map((p, i) => [p, edgeColors[i]])];
-const colorHash = Object.fromEntries(Array.from(predicates).map((p, i) => ([p, edgeColors[i]])));
+  //const nodeColors = genColors(data.nodes.length);
+  const edgeColors = genColors(data.links.length);
+  //const colorEntries = [...Array.from(resources).map((r, i) => [r, nodeColors[i]]),
+  //                      ...Array.from(predicates).map((p, i) => [p, edgeColors[i]])];
+  return Object.fromEntries(Array.from(predicates).map((p, i) => ([p, edgeColors[i]])));
+}
 
-
-/**********
- * Zoom   *
- **********/
-
-let zoom = d3.zoom()
-  .scaleExtent([0.1, 5])
-  //.translateExtent([[0, 0], [width, height]])
-  .on('zoom', handleZoom);
-
-
-
-var svg = d3.select("svg")
-const width = svg.node().getBoundingClientRect().width;
-const height = svg.node().getBoundingClientRect().height;
 
 
 /**********
@@ -411,7 +397,41 @@ function initSimulation(simulation, data) {
 }
 
 
-const nodeDistance = 300;
+const main = (originalData, d3) => {
+  normalizeCounts(originalData.nodes);
+  normalizeCounts(originalData.links);
+
+  const fixedData = calcInitValues(originalData);
+  setInitSliders(fixedData);
+
+
+
+
+};
+
+
+/*****************
+ * RUNNING STUFF *
+ *****************/
+
+
+const originalData = {{ data | json_encode(pretty = true) | safe }};
+
+
+normalizeCounts(originalData.nodes);
+normalizeCounts(originalData.links);
+window.fixedData = calcInitValues(originalData);
+sortLinks(window.fixedData);
+setLinkNum(window.fixedData);
+fixNodesCount(window.fixedData);
+const colorHash = genColorHash(window.fixedData);
+let zoom = d3.zoom().scaleExtent([0.1, 5]).on('zoom', handleZoom);
+var svg = d3.select("svg")
+const width = svg.node().getBoundingClientRect().width;
+const height = svg.node().getBoundingClientRect().height;
+
+
+
 window.simulation = d3.forceSimulation();
 
 
@@ -419,13 +439,8 @@ svg.append('g').attr('class', 'edges')
 svg.append('g').attr('class', 'nodes');
 
 filterData();
-initSimulation(window.simulation, window.data);
-update(window.data);
-
-
-/**********
- * Tooltip *
- **********/
+initSimulation(window.simulation, window.fixedData);
+update(window.fixedData);
 
 const tooltip = d3.select('#main')
   .append("div")
@@ -563,6 +578,9 @@ const tooltip = d3.select('#main')
 /**********
  * Tick  *
  **********/
+
+
+
 
 initZoom();
 
