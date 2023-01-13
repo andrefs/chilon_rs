@@ -5,13 +5,13 @@ use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader},
+    fs::{rename, File, OpenOptions},
+    io::{self, BufRead, BufReader},
+    process::Command,
 };
 use std::{io::Write, path::Path};
-use url::Url;
-
 use tera::{Context, Tera};
+use url::Url;
 
 pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let file =
@@ -202,37 +202,51 @@ pub fn dump_json(data: &VisData, outf: &str) {
 }
 
 pub fn render_vis(data: &VisData, outf: &str) {
+    let RENDER_DIR = Path::new(".").join("chilon-viz");
     let tera = Tera::new("templates/**/*").unwrap();
     let mut ctx = Context::new();
     ctx.insert("data", &data);
 
-    let js_path = Path::new(".").join(outf).join("script.js");
-    let html_path = Path::new(".").join(outf).join("index.html");
-    let css_path = Path::new(".").join(outf).join("style.css");
+    let data_path = RENDER_DIR.join("src").join("data.ts");
 
-    info!("Rendering visualization to {}", html_path.to_string_lossy());
+    info!("Copying data to {}", data_path.to_string_lossy());
 
-    let js_fd = OpenOptions::new()
+    let data_fd = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(js_path.clone())
+        .open(data_path.clone())
         .unwrap();
 
-    let html_fd = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(html_path.clone())
-        .unwrap();
+    tera.render_to("data.ts", &ctx, data_fd).unwrap();
 
-    let css_fd = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(css_path.clone())
-        .unwrap();
+    info!("Building Vite");
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("yarn build")
+        .current_dir(RENDER_DIR.clone())
+        .output()
+        .expect("Failed to execute vite build");
 
-    tera.render_to("script.js", &ctx, js_fd).unwrap();
-    tera.render_to("index.html", &Context::new(), html_fd)
-        .unwrap();
-    tera.render_to("style.css", &Context::new(), css_fd)
-        .unwrap();
+    io::stdout().write_all(&output.stdout).unwrap();
+    io::stderr().write_all(&output.stderr).unwrap();
+
+    let src = RENDER_DIR.join("dist");
+    let dst = Path::new(outf).join("dist");
+    info!(
+        "Copying {} to {}",
+        src.to_string_lossy(),
+        dst.to_string_lossy()
+    );
+    rename(src, dst).unwrap();
+
+    info!("Opening dev env");
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg("yarn dev")
+        .current_dir(RENDER_DIR.clone())
+        .output()
+        .expect("Failed to execute vite build");
+
+    io::stdout().write_all(&output.stdout).unwrap();
+    io::stderr().write_all(&output.stderr).unwrap();
 }

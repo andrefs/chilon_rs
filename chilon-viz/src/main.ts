@@ -1,7 +1,7 @@
 import './style.css'
 import typescriptLogo from './typescript.svg'
 import { setupCounter } from './counter'
-import data from './data.json';
+import data from './data';
 
 console.log('XXXXXX', { data });
 
