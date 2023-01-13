@@ -1,26 +1,13 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
-import { setupCounter } from './counter'
-import data from './data';
+import { rawData } from './data';
+import { select } from 'd3-selection';
 
-console.log('XXXXXX', { data });
+let svg = select("#app svg");
+svg.append('g').attr('class', 'edges')
+svg.append('g').attr('class', 'nodes');
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+
+
+
+console.log('XXXXXX', { rawData, svg });

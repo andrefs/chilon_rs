@@ -26,7 +26,7 @@ pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VisData {
     nodes: Vec<VisNode>,
-    links: Vec<VisEdge>,
+    edges: Vec<VisEdge>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -178,7 +178,7 @@ pub fn build_data(outf: &str) -> VisData {
     sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
 
     let data = VisData {
-        links: edges,
+        edges,
         nodes: sorted_nodes,
     };
 
@@ -207,7 +207,7 @@ pub fn render_vis(data: &VisData, outf: &str) {
     let mut ctx = Context::new();
     ctx.insert("data", &data);
 
-    let data_path = RENDER_DIR.join("src").join("data.ts");
+    let data_path = RENDER_DIR.join("src").join("data").join("raw-data.ts");
 
     info!("Copying data to {}", data_path.to_string_lossy());
 
@@ -217,7 +217,7 @@ pub fn render_vis(data: &VisData, outf: &str) {
         .open(data_path.clone())
         .unwrap();
 
-    tera.render_to("data.ts", &ctx, data_fd).unwrap();
+    tera.render_to("raw-data.ts", &ctx, data_fd).unwrap();
 
     info!("Building Vite");
     let output = Command::new("sh")

@@ -27,7 +27,7 @@ fn main() {
     SimpleLogger::new().init().unwrap();
 
     let out = gen_file_name(
-        format!("tmp-{}", Utc::now().format("%Y%m%d")),
+        format!("tmp/{}", Utc::now().format("%Y%m%d")),
         "".to_string(),
     );
     let outf = out.as_str();
