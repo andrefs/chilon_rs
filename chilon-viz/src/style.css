@@ -62,3 +62,4 @@ svg {
 .controls .alpha .alpha_bar #alpha_value { background-color: #555; border-radius: 1px; flex-basis: 100% }
 .controls .alpha .alpha_bar:hover { border-width: 2px; margin:-1px; }
 .controls .alpha .alpha_bar:active #alpha_value { background-color: #222 }
+

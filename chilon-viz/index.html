@@ -18,30 +18,21 @@
     </div>
     <div class="force">
       <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
-      <label>
-        Min node occurs:
-        <output id="minNodeOccurs">0</output>
-        <input id="minNodeOccursInput" type="range" value="0" min="0" step="1"
-          oninput="d3.select('#minNodeOccurs').text(value); debFilterData();">
-      </label>
-      <label>
-        Max node occurs:
-        <output id="maxNodeOccurs"></output>
-        <input id="maxNodeOccursInput" type="range" min="1" step="1"
-          oninput="d3.select('#maxNodeOccurs').text(value); debFilterData(); console.log('XXXXXXXXXX 1');">
-      </label>
-      <label>
-        Min predicate occurs:
-        <output id="minPredicateOccurs">0</output>
-        <input id="minPredicateOccursInput" type="range" value="0" min="0" step="1"
-          oninput="d3.select('#minPredicateOccurs').text(value); debFilterData();">
-      </label>
-      <label>
-        Max predicate occurs:
-        <output id="maxPredicateOccurs"></output>
-        <input id="maxPredicateOccursInput" type="range" min="1" step="1"
-          oninput="d3.select('#maxPredicateOccurs').text(value); debFilterData();">
-      </label>
+      <label>Min node occurs:</label>
+      <input id="minNodeOccursInput" type="range" value="0" step="1">
+      <output id="minNodeOccurs">0</output>
+
+      <label>Max node occurs:</label>
+      <output id="maxNodeOccurs"></output>
+      <input id="maxNodeOccursInput" type="range" min="1" max="100" step="1">
+
+      <label>Min predicate occurs:</label>
+      <output id="minEdgeOccurs">0</output>
+      <input id="minEdgeOccursInput" type="range" value="0" step="1">
+
+      <label>Max predicate occurs:</label>
+      <output id="maxEdgeOccurs"></output>
+      <input id="maxEdgeOccursInput" type="range" min="1" max="100" step="1">
     </div>
   </div>
 
