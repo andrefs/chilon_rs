@@ -1,5 +1,10 @@
 use log::{debug, info};
-use oxigraph::{io::GraphFormat, model::GraphName, sparql::QueryResults, store::Store};
+use oxigraph::{
+    io::GraphFormat,
+    model::{GraphName, NamedNode},
+    sparql::{EvaluationError, QueryResults, QuerySolution},
+    store::Store,
+};
 
 use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
@@ -45,6 +50,108 @@ pub struct VisEdge {
 }
 
 pub fn build_data(outf: &str) -> VisData {
+    let qres = query_graph(outf);
+
+    let mut nodes = BTreeMap::<i32, VisNode>::new();
+    let mut edges = Vec::<VisEdge>::new();
+    let mut nodes2ids = BTreeMap::<String, i32>::new();
+
+    if let Ok(QueryResults::Solutions(mut sols)) = qres {
+        let mut id_count = 0;
+
+        for s in sols {
+            if let Ok(sol) = s {
+                proc_solution(sol, &mut nodes, &mut edges, &mut nodes2ids, &mut id_count);
+            }
+        }
+    }
+
+    edges.sort_by(|a, b| b.count.cmp(&a.count));
+    let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
+    sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
+
+    let data = VisData {
+        edges,
+        nodes: sorted_nodes,
+    };
+
+    return data;
+}
+
+fn proc_solution(
+    sol: QuerySolution,
+    nodes: &mut BTreeMap<i32, VisNode>,
+    edges: &mut Vec<VisEdge>,
+    nodes2ids: &mut BTreeMap<String, i32>,
+    id_count: &mut i32,
+) {
+    let mut src = None;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("src").unwrap() {
+        src = get_fragment(n.clone());
+    }
+
+    let mut tgt = None;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("tgt").unwrap() {
+        tgt = get_fragment(n.clone());
+    }
+
+    let mut label = None;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("label").unwrap() {
+        label = get_fragment(n.clone());
+    }
+
+    let mut occurs = None;
+    if let oxigraph::model::Term::Literal(l) = sol.get("occurs").unwrap() {
+        occurs = Some(l.value());
+    }
+
+    if src.clone().is_some()
+        && tgt.clone().is_some()
+        && label.clone().is_some()
+        && occurs.clone().is_some()
+    {
+        let src_id = if nodes2ids.contains_key(&src.clone().unwrap()) {
+            *nodes2ids.get(&src.clone().unwrap()).unwrap()
+        } else {
+            nodes2ids.insert(src.clone().unwrap(), *id_count);
+            *id_count += 1;
+            *id_count
+        };
+        let tgt_id = if nodes2ids.contains_key(&tgt.clone().unwrap()) {
+            *nodes2ids.get(&tgt.clone().unwrap()).unwrap()
+        } else {
+            nodes2ids.insert(tgt.clone().unwrap(), *id_count);
+            *id_count += 1;
+            *id_count
+        };
+
+        nodes
+            .entry(src_id)
+            .or_insert_with(|| VisNode {
+                id: src_id,
+                name: src.clone().unwrap(),
+                count: 0,
+            })
+            .count += occurs.unwrap().parse::<usize>().unwrap();
+        nodes
+            .entry(tgt_id)
+            .or_insert_with(|| VisNode {
+                id: tgt_id,
+                name: tgt.clone().unwrap(),
+                count: 0,
+            })
+            .count += occurs.unwrap().parse::<usize>().unwrap();
+
+        edges.push(VisEdge {
+            source: src_id,
+            target: tgt_id,
+            count: occurs.unwrap().parse().unwrap(),
+            label: label.clone().unwrap(),
+        });
+    }
+}
+
+fn query_graph(outf: &str) -> Result<QueryResults, EvaluationError> {
     let file_path = Path::new(".").join(outf).join("output.ttl");
     let file = File::open(file_path.clone())
         .unwrap_or_else(|e| panic!("Could not open file {}: {e}", file_path.to_string_lossy()));
@@ -81,108 +188,17 @@ pub fn build_data(outf: &str) -> VisData {
         "#;
 
     let qres = store.query(q);
+    return qres;
+}
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres {
-        let mut id_count = 0;
-
-        for s in sols {
-            if let Ok(sol) = s {
-                let mut src = None;
-                if let oxigraph::model::Term::NamedNode(n) = sol.get("src").unwrap() {
-                    src = Some(
-                        Url::parse(&n.clone().into_string())
-                            .unwrap()
-                            .fragment()
-                            .unwrap()
-                            .to_string(),
-                    );
-                }
-
-                let mut tgt = None;
-                if let oxigraph::model::Term::NamedNode(n) = sol.get("tgt").unwrap() {
-                    tgt = Some(
-                        Url::parse(&n.clone().into_string())
-                            .unwrap()
-                            .fragment()
-                            .unwrap()
-                            .to_string(),
-                    );
-                }
-
-                let mut label = None;
-                if let oxigraph::model::Term::NamedNode(n) = sol.get("label").unwrap() {
-                    label = Some(
-                        Url::parse(&n.clone().into_string())
-                            .unwrap()
-                            .fragment()
-                            .unwrap()
-                            .to_string(),
-                    );
-                }
-
-                let mut occurs = None;
-                if let oxigraph::model::Term::Literal(l) = sol.get("occurs").unwrap() {
-                    occurs = Some(l.value());
-                }
-
-                if src.clone().is_some()
-                    && tgt.clone().is_some()
-                    && label.clone().is_some()
-                    && occurs.clone().is_some()
-                {
-                    let src_id = if nodes2ids.contains_key(&src.clone().unwrap()) {
-                        *nodes2ids.get(&src.clone().unwrap()).unwrap()
-                    } else {
-                        nodes2ids.insert(src.clone().unwrap(), id_count);
-                        id_count += 1;
-                        id_count
-                    };
-                    let tgt_id = if nodes2ids.contains_key(&tgt.clone().unwrap()) {
-                        *nodes2ids.get(&tgt.clone().unwrap()).unwrap()
-                    } else {
-                        nodes2ids.insert(tgt.clone().unwrap(), id_count);
-                        id_count += 1;
-                        id_count
-                    };
-
-                    nodes
-                        .entry(src_id)
-                        .or_insert_with(|| VisNode {
-                            id: src_id,
-                            name: src.clone().unwrap(),
-                            count: 0,
-                        })
-                        .count += occurs.unwrap().parse::<usize>().unwrap();
-                    nodes
-                        .entry(tgt_id)
-                        .or_insert_with(|| VisNode {
-                            id: tgt_id,
-                            name: tgt.clone().unwrap(),
-                            count: 0,
-                        })
-                        .count += occurs.unwrap().parse::<usize>().unwrap();
-
-                    edges.push(VisEdge {
-                        source: src_id,
-                        target: tgt_id,
-                        count: occurs.unwrap().parse().unwrap(),
-                        label: label.clone().unwrap(),
-                    });
-                }
-            }
-        }
-    }
-
-    edges.sort_by(|a, b| b.count.cmp(&a.count));
-    let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
-    sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
-
-    let data = VisData {
-        edges,
-        nodes: sorted_nodes,
-    };
-
-    return data;
+fn get_fragment(n: NamedNode) -> Option<String> {
+    Some(
+        Url::parse(&n.into_string())
+            .unwrap()
+            .fragment()
+            .unwrap()
+            .to_string(),
+    )
 }
 
 pub fn dump_json(data: &VisData, outf: &str) {
