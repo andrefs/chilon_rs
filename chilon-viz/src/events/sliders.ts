@@ -79,9 +79,9 @@ export const initSliderListeners = () => {
   handleMinSlider(minEdgeOccursIn, minEdgeOccursOut, maxEdgeOccursIn, maxEdgeOccursOut);
   handleMaxSlider(maxEdgeOccursIn, maxEdgeOccursOut, minEdgeOccursIn, minEdgeOccursOut);
 
-  minNodeOccursIn!.addEventListener('change', () => handleMinSlider(minNodeOccursIn, minNodeOccursOut, maxNodeOccursIn, maxNodeOccursOut));
-  maxNodeOccursIn!.addEventListener('change', () => handleMaxSlider(maxNodeOccursIn, maxNodeOccursOut, minNodeOccursIn, minNodeOccursOut));
-  minEdgeOccursIn!.addEventListener('change', () => handleMinSlider(minEdgeOccursIn, minEdgeOccursOut, maxEdgeOccursIn, maxEdgeOccursOut));
-  maxEdgeOccursIn!.addEventListener('change', () => handleMaxSlider(maxEdgeOccursIn, maxEdgeOccursOut, minEdgeOccursIn, minEdgeOccursOut));
+  minNodeOccursIn!.addEventListener('input', () => handleMinSlider(minNodeOccursIn, minNodeOccursOut, maxNodeOccursIn, maxNodeOccursOut));
+  maxNodeOccursIn!.addEventListener('input', () => handleMaxSlider(maxNodeOccursIn, maxNodeOccursOut, minNodeOccursIn, minNodeOccursOut));
+  minEdgeOccursIn!.addEventListener('input', () => handleMinSlider(minEdgeOccursIn, minEdgeOccursOut, maxEdgeOccursIn, maxEdgeOccursOut));
+  maxEdgeOccursIn!.addEventListener('input', () => handleMaxSlider(maxEdgeOccursIn, maxEdgeOccursOut, minEdgeOccursIn, minEdgeOccursOut));
 };
 
