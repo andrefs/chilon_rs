@@ -10,6 +10,7 @@ export type FEdge = {
   target: number;
   label: String;
   count: number;
+  link_num: number;
 };
 
 export type RawData = { edges: FEdge[], nodes: FNode[] };

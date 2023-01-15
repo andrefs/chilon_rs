@@ -9,7 +9,7 @@ use oxigraph::{
 use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs::{rename, File, OpenOptions},
     io::{self, BufRead, BufReader},
     process::Command,
@@ -47,14 +47,17 @@ pub struct VisEdge {
     target: i32,
     count: i32,
     label: String,
+    link_num: i32,
 }
 
 pub fn build_data(outf: &str) -> VisData {
     let qres = query_graph(outf);
 
     let mut nodes = BTreeMap::<i32, VisNode>::new();
-    let mut edges = Vec::<VisEdge>::new();
+    //let mut edges = Vec::<VisEdge>::new();
     let mut nodes2ids = BTreeMap::<String, i32>::new();
+
+    let mut edges = HashMap::<(i32, i32), Vec<VisEdge>>::new();
 
     if let Ok(QueryResults::Solutions(mut sols)) = qres {
         let mut id_count = 0;
@@ -66,12 +69,21 @@ pub fn build_data(outf: &str) -> VisData {
         }
     }
 
-    edges.sort_by(|a, b| b.count.cmp(&a.count));
+    println!("edges {:#?}", edges);
+
+    let mut sorted_edges = edges
+        .into_iter()
+        .map(|(_, v)| v)
+        .flatten()
+        .collect::<Vec<VisEdge>>();
+
+    sorted_edges.sort_by(|a, b| b.count.cmp(&a.count));
+
     let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
     sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
 
     let data = VisData {
-        edges,
+        edges: sorted_edges,
         nodes: sorted_nodes,
     };
 
@@ -81,7 +93,7 @@ pub fn build_data(outf: &str) -> VisData {
 fn proc_solution(
     sol: QuerySolution,
     nodes: &mut BTreeMap<i32, VisNode>,
-    edges: &mut Vec<VisEdge>,
+    edges: &mut HashMap<(i32, i32), Vec<VisEdge>>,
     nodes2ids: &mut BTreeMap<String, i32>,
     id_count: &mut i32,
 ) {
@@ -117,6 +129,7 @@ fn proc_solution(
             *id_count += 1;
             *id_count
         };
+
         let tgt_id = if nodes2ids.contains_key(&tgt.clone().unwrap()) {
             *nodes2ids.get(&tgt.clone().unwrap()).unwrap()
         } else {
@@ -142,12 +155,27 @@ fn proc_solution(
             })
             .count += occurs.unwrap().parse::<usize>().unwrap();
 
-        edges.push(VisEdge {
+        let key = sort_pair(src_id, tgt_id);
+        let colliding = edges.entry(key).or_insert_with(|| Vec::new());
+        colliding.push(VisEdge {
             source: src_id,
             target: tgt_id,
             count: occurs.unwrap().parse().unwrap(),
             label: label.clone().unwrap(),
+            link_num: colliding.len() as i32,
         });
+
+        for edge in colliding {
+            edge.link_num += 1;
+        }
+    }
+}
+
+fn sort_pair(a: i32, b: i32) -> (i32, i32) {
+    if a > b {
+        (b, a)
+    } else {
+        (a, b)
     }
 }
 
