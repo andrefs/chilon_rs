@@ -1,4 +1,4 @@
-import { RawData } from "../data/raw-data";
+import { SimData } from "../data/raw-data";
 
 const handleMinSlider = (
   minSliderEl: HTMLInputElement | null,
@@ -40,6 +40,7 @@ export const getSliderElems = () => {
     maxNodeOccursIn: document.querySelector<HTMLInputElement>('#maxNodeOccursInput')!,
     minEdgeOccursIn: document.querySelector<HTMLInputElement>('#minEdgeOccursInput')!,
     maxEdgeOccursIn: document.querySelector<HTMLInputElement>('#maxEdgeOccursInput')!,
+
     minNodeOccursOut: document.querySelector<HTMLOutputElement>('#minNodeOccurs')!,
     minEdgeOccursOut: document.querySelector<HTMLOutputElement>('#minEdgeOccurs')!,
     maxNodeOccursOut: document.querySelector<HTMLOutputElement>('#maxNodeOccurs')!,
@@ -66,23 +67,35 @@ export const getSliderValues = () => {
 }
 
 
-export const initSliderValues = (data: RawData) => {
+export const updateSliderValues = (data: SimData) => {
   let elems = getSliderElems();
 
-  const maxNodes = data.nodes.slice(-1)[0].count.toString();
   const minNodeOccursInValue = data.nodes.slice(-1)[0].count.toString();
+
+  elems.minNodeOccursIn.value = minNodeOccursInValue;
+  elems.minNodeOccursOut.textContent = minNodeOccursInValue;
+
+  let minEdgeOccursInValue = data.edges.slice(-1)[0].count.toString();
+
+  elems.minEdgeOccursIn.value = minEdgeOccursInValue;
+  elems.minEdgeOccursOut.textContent = minEdgeOccursInValue;
+}
+
+export const initSliderValues = (initData: SimData) => {
+  let elems = getSliderElems();
+
+  const maxNodes = initData.nodes[0].count.toString();
 
   elems.minNodeOccursIn.setAttribute('max', maxNodes);
   elems.maxNodeOccursIn.setAttribute('max', maxNodes);
-  elems.maxNodeOccursIn.value = minNodeOccursInValue;
+  elems.maxNodeOccursIn.value = maxNodes;
   elems.maxNodeOccursOut.textContent = maxNodes;
 
-  const maxEdges = data.edges[0].count.toString();
-  let minEdgeOccursInValue = data.edges.slice(-1)[0].count.toString();
+  const maxEdges = initData.edges[0].count.toString();
 
   elems.minEdgeOccursIn.setAttribute('max', maxEdges);
   elems.maxEdgeOccursIn.setAttribute('max', maxEdges);
-  elems.maxEdgeOccursIn.value = minEdgeOccursInValue;
+  elems.maxEdgeOccursIn.value = maxEdges;
   elems.maxEdgeOccursOut.textContent = maxEdges;
 }
 

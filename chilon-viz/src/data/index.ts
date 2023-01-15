@@ -1,9 +1,11 @@
 import { SliderValues } from '../events/sliders';
-import { rawData, RawData } from './raw-data';
+import { initData, SimData } from './raw-data';
 
 
-const truncateData = (data: RawData, maxNodes = 50, maxEdges = 50) => {
+const truncateData = (data: SimData, maxNodes = 50, maxEdges = 50) => {
+
   let res = {
+    ...data,
     nodes: data.nodes.slice(0, maxNodes),
     edges: data.edges.slice(0, maxEdges)
   };
@@ -11,11 +13,11 @@ const truncateData = (data: RawData, maxNodes = 50, maxEdges = 50) => {
   return res;
 }
 
-const filterData = (data: RawData, values: SliderValues) => {
+const filterData = (data: SimData, values: SliderValues) => {
   return {
     nodes: data.nodes.filter(n => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs),
     edges: data.edges.filter(e => e.count >= values.minEdgeOccurs && e.count <= values.maxEdgeOccurs),
   }
 };
 
-export { rawData, truncateData as truncateRawData, filterData };
+export { initData, truncateData, filterData };

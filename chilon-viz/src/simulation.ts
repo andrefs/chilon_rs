@@ -1,9 +1,9 @@
 import { Simulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
-import { RawData, RawEdge, RawNode } from './data/raw-data';
+import { RawEdge, RawNode, SimData } from './data/raw-data';
 import { selectAll, select } from 'd3-selection';
 
 
-export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: RawData, width: number, height: number) => {
+export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData, width: number, height: number) => {
   if (!sim) { return; }
 
   sim.nodes(data.nodes)
@@ -15,7 +15,7 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: RawData,
 }
 
 
-export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: RawData) => {
+export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData) => {
   if (!sim) { return; }
   sim.nodes(data.nodes)
     .force("linkForce", forceLink(data.edges).distance(300).strength(2))

@@ -7,7 +7,7 @@ export interface RawNode extends SimulationNodeDatum {
   count: number;
 };
 
-export type FEdge = RawEdge & { colorHash: string };
+export type SimEdge = RawEdge & { colorHash: string };
 
 export interface RawEdge extends SimulationLinkDatum<RawNode> {
   source: number;
@@ -17,9 +17,13 @@ export interface RawEdge extends SimulationLinkDatum<RawNode> {
   link_num: number;
 };
 
+interface RawData {
+  edges: RawEdge[];
+  nodes: RawNode[];
+}
 
-export class RawData {
-  edges: FEdge[];
+export class SimData {
+  edges: SimEdge[];
   nodes: RawNode[];
 
   minNodeCount: number;
@@ -27,7 +31,7 @@ export class RawData {
   minEdgeCount: number;
   maxEdgeCount: number;
 
-  constructor({ nodes, edges }: { nodes: RawNode[], edges: RawEdge[] }) {
+  constructor({ nodes, edges }: RawData) {
 
     const colorHash = genColorHash(edges);
 
@@ -42,4 +46,4 @@ export class RawData {
   }
 }
 
-export const rawData = new RawData({{ data | json_encode(pretty = true) | safe }});
+export const initData = new SimData({{ data | json_encode(pretty = true) | safe }});
