@@ -63,7 +63,7 @@ const calcEdge = (d: any) => {
 
 const calcLoop = (d: any) => {
   const dl = Math.abs(d.link_num)
-  const dr = 40 + d.normCount * dl;  //link_num is defined above
+  const dr = 100 + d.normCount * dl;  //link_num is defined above
 
   //loop
   //d="M334.5179247605647,472.7245628100564
@@ -78,39 +78,6 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
 
   let nodesParent = select("svg g.nodes");
   let edgesParent = select("svg g.edges");
-
-  nodesParent
-    .selectAll("g")
-    .data(data.nodes)
-    .join(
-      enter => {
-        const nodeGroups = enter.append('g').attr('class', 'node-g');
-
-        nodeGroups
-          .append("circle")
-          .attr("r", d => Math.ceil(d.normCount || 0))
-          .style("fill", () => '#B3D9CB')
-          .attr('data-id', (d) => d.id)
-          .attr("data-fill", () => '#B3D9CB')
-          .style("pointer-events", "visiblePainted")
-          .style('cursor', 'pointer')
-
-        nodeGroups
-          .append("text")
-          .attr("x", (d: any) => d.x)
-          .attr("y", (d: any) => d.y)
-          .attr('font-size', d => Math.ceil(d.normCount / 2))
-          .attr('class', "nodelabel")
-          .text((d: any) => d.name)
-          .attr('dominant-baseline', 'middle')
-          .style("pointer-events", "none")
-          .style('cursor', 'pointer')
-
-        return nodeGroups;
-      },
-      update => update,
-      exit => exit.remove()
-    );
 
   edgesParent
     .selectAll("g")
@@ -164,6 +131,40 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
       update => update,
       exit => exit.remove()
     );
+
+  nodesParent
+    .selectAll("g")
+    .data(data.nodes)
+    .join(
+      enter => {
+        const nodeGroups = enter.append('g').attr('class', 'node-g');
+
+        nodeGroups
+          .append("circle")
+          .attr("r", d => Math.ceil(d.normCount || 0))
+          .style("fill", () => '#B3D9CB')
+          .attr('data-id', (d) => d.id)
+          .attr("data-fill", () => '#B3D9CB')
+          .style("pointer-events", "visiblePainted")
+          .style('cursor', 'pointer')
+
+        nodeGroups
+          .append("text")
+          .attr("x", (d: any) => d.x)
+          .attr("y", (d: any) => d.y)
+          .attr('font-size', d => Math.ceil(d.normCount / 2))
+          .attr('class', "nodelabel")
+          .text((d: any) => d.name)
+          .attr('dominant-baseline', 'middle')
+          .style("pointer-events", "none")
+          .style('cursor', 'pointer')
+
+        return nodeGroups;
+      },
+      update => update,
+      exit => exit.remove()
+    );
+
 
   restartSimulation(sim, data);
 }
