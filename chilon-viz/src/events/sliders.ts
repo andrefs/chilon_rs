@@ -62,7 +62,7 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
     min: minNodeOccurs,
     max: maxNodeOccurs,
     value: [data.nodes.slice(-1)[0].count, data.nodes[0].count],
-    onInput: debounce(([minNO, maxNO]) => {
+    onInput: debounce(([minNO, maxNO]: [number, number]) => {
       minNodeOccurs = minNO;
       maxNodeOccurs = maxNO;
       elems.minNodeOccursOut.value = minNO.toString();
@@ -85,7 +85,7 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
     min: minEdgeOccurs,
     max: maxEdgeOccurs,
     value: [data.edges.slice(-1)[0].count, data.edges[0].count],
-    onInput: debounce(([minEO, maxEO]) => {
+    onInput: debounce(([minEO, maxEO]: [number, number]) => {
       elems.minEdgeOccursOut.value = minEO.toString();
       elems.maxEdgeOccursOut.value = maxEO.toString();
 
