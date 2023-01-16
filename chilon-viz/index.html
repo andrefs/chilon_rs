@@ -18,28 +18,43 @@
     </div>
     <div class="force">
       <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
-      <label>Min node occurs:</label>
-      <input id="minNodeOccursInput" type="range" value="0" step="1">
-      <output id="minNodeOccurs">0</output>
 
-      <label>Max node occurs:</label>
-      <output id="maxNodeOccurs"></output>
-      <input id="maxNodeOccursInput" type="range" min="1" step="1">
+      <div>
+        <p class="sub-cat">Node occurs:</p>
+        <div class="node-occurs-out">
+          <div>
+            <span>min:</span>
+            <output id="minNodeOccurs"></output>
+          </div>
+          <div>
+            <span>max:</span>
+            <output id="maxNodeOccurs"></output>
+          </div>
+        </div>
+        <div class="range" id="nodeOccursInput"></div>
+      </div>
 
-      <label>Min predicate occurs:</label>
-      <output id="minEdgeOccurs">0</output>
-      <input id="minEdgeOccursInput" type="range" value="0" step="1">
+      <div>
 
-      <label>Max predicate occurs:</label>
-      <output id="maxEdgeOccurs"></output>
-      <input id="maxEdgeOccursInput" type="range" min="1" step="1">
+        <p class="sub-cat">Predicate occurs:</p>
+        <div class="edge-occurs-out">
+          <div>
+            <span>min:</span>
+            <output id="minEdgeOccurs"></output>
+          </div>
+          <div>
+            <span>max:</span>
+            <output id="maxEdgeOccurs"></output>
+          </div>
+        </div>
+        <div class="range" id="edgeOccursInput"></div>
+      </div>
     </div>
-  </div>
 
-  <div id="app">
-    <svg></svg>
-  </div>
-  <script type="module" src="/src/main.ts"></script>
+    <div id="app">
+      <svg></svg>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 
 </html>

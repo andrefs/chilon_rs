@@ -63,3 +63,23 @@ svg {
 .controls .alpha .alpha_bar:hover { border-width: 2px; margin:-1px; }
 .controls .alpha .alpha_bar:active #alpha_value { background-color: #222 }
 
+
+.range {
+  margin: 5px 0 20px;
+}
+
+.node-occurs-out, .edge-occurs-out {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+p.sub-cat {
+  margin-bottom: 2px;
+}
+
+#nodeOccursInput .range-slider__thumb, #edgeOccursInput .range-slider__thumb {
+  width: 15px;
+  height: 15px;
+}

@@ -20,6 +20,7 @@
     "d3-force": "3.0.0",
     "d3-scale": "4.0.2",
     "d3-selection": "3.0.0",
-    "d3-zoom": "3.0.0"
+    "d3-zoom": "3.0.0",
+    "range-slider-input": "2.4.3"
   }
 }

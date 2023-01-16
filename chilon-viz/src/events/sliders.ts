@@ -1,49 +1,15 @@
 import { SimData } from "../data/raw-data";
-
-const handleMinSlider = (
-  minSliderEl: HTMLInputElement | null,
-  minSliderOutput: HTMLOutputElement | null,
-  maxSliderEl: HTMLInputElement | null,
-  maxSliderOutput: HTMLOutputElement | null,
-) => {
-  if (minSliderEl?.value) {
-    let n = Math.abs(Number(minSliderEl.value))
-    minSliderOutput!.textContent = n.toString();
-
-    if (maxSliderEl?.value && Number(maxSliderEl.value) < Number(minSliderEl.value)) {
-      maxSliderEl.value = minSliderEl.value;
-      maxSliderOutput!.textContent = maxSliderEl.value;
-    }
-  }
-};
-
-const handleMaxSlider = (
-  maxSliderEl: HTMLInputElement | null,
-  maxSliderOutput: HTMLOutputElement | null,
-  minSliderEl: HTMLInputElement | null,
-  minSliderOutput: HTMLOutputElement | null,
-) => {
-  if (maxSliderEl?.value) {
-    let n = Math.abs(Number(maxSliderEl.value))
-    maxSliderOutput!.textContent = n.toString();
-
-    if (minSliderEl?.value && Number(minSliderEl.value) > Number(maxSliderEl?.value)) {
-      minSliderEl.value = maxSliderEl?.value;
-      minSliderOutput!.textContent = minSliderEl.value;
-    }
-  }
-};
+import rangeSlider from 'range-slider-input';
+import 'range-slider-input/dist/style.css';
 
 export const getSliderElems = () => {
   return {
-    minNodeOccursIn: document.querySelector<HTMLInputElement>('#minNodeOccursInput')!,
-    maxNodeOccursIn: document.querySelector<HTMLInputElement>('#maxNodeOccursInput')!,
-    minEdgeOccursIn: document.querySelector<HTMLInputElement>('#minEdgeOccursInput')!,
-    maxEdgeOccursIn: document.querySelector<HTMLInputElement>('#maxEdgeOccursInput')!,
+    nodeOccursIn: document.querySelector<HTMLInputElement>('#nodeOccursInput')!,
+    edgeOccursIn: document.querySelector<HTMLInputElement>('#edgeOccursInput')!,
 
     minNodeOccursOut: document.querySelector<HTMLOutputElement>('#minNodeOccurs')!,
-    minEdgeOccursOut: document.querySelector<HTMLOutputElement>('#minEdgeOccurs')!,
     maxNodeOccursOut: document.querySelector<HTMLOutputElement>('#maxNodeOccurs')!,
+    minEdgeOccursOut: document.querySelector<HTMLOutputElement>('#minEdgeOccurs')!,
     maxEdgeOccursOut: document.querySelector<HTMLOutputElement>('#maxEdgeOccurs')!,
   }
 }
@@ -59,59 +25,36 @@ export const getSliderValues = () => {
   const elems = getSliderElems();
 
   return {
-    minNodeOccurs: Number(elems.minNodeOccursIn.value),
-    maxNodeOccurs: Number(elems.maxNodeOccursIn.value),
-    minEdgeOccurs: Number(elems.minEdgeOccursIn.value),
-    maxEdgeOccurs: Number(elems.maxEdgeOccursIn.value),
+    nodeOccurs: Number(elems.nodeOccursIn.value),
+    edgeOccurs: Number(elems.edgeOccursIn.value),
   };
 }
 
 
-export const updateSliderValues = (data: SimData) => {
-  let elems = getSliderElems();
-
-  const minNodeOccursInValue = data.nodes.slice(-1)[0].count.toString();
-
-  elems.minNodeOccursIn.value = minNodeOccursInValue;
-  elems.minNodeOccursOut.textContent = minNodeOccursInValue;
-
-  let minEdgeOccursInValue = data.edges.slice(-1)[0].count.toString();
-
-  elems.minEdgeOccursIn.value = minEdgeOccursInValue;
-  elems.minEdgeOccursOut.textContent = minEdgeOccursInValue;
-}
 
 export const initSliderValues = (initData: SimData) => {
   let elems = getSliderElems();
 
-  const maxNodes = initData.nodes[0].count.toString();
 
-  elems.minNodeOccursIn.setAttribute('max', maxNodes);
-  elems.maxNodeOccursIn.setAttribute('max', maxNodes);
-  elems.maxNodeOccursIn.value = maxNodes;
-  elems.maxNodeOccursOut.textContent = maxNodes;
-
-  const maxEdges = initData.edges[0].count.toString();
-
-  elems.minEdgeOccursIn.setAttribute('max', maxEdges);
-  elems.maxEdgeOccursIn.setAttribute('max', maxEdges);
-  elems.maxEdgeOccursIn.value = maxEdges;
-  elems.maxEdgeOccursOut.textContent = maxEdges;
+  rangeSlider(elems.nodeOccursIn, {
+    min: 0,
+    max: initData.nodes[0].count,
+    value: [initData.nodes.slice(-1)[0].count, initData.nodes[0].count],
+    onInput: (value) => {
+      elems.minNodeOccursOut.value = value[0].toString();
+      elems.maxNodeOccursOut.value = value[1].toString();
+    }
+  });
+  rangeSlider(elems.edgeOccursIn, {
+    min: 0,
+    max: initData.edges[0].count,
+    value: [initData.edges.slice(-1)[0].count, initData.edges[0].count],
+    onInput: (value) => {
+      elems.minEdgeOccursOut.value = value[0].toString();
+      elems.maxEdgeOccursOut.value = value[1].toString();
+    }
+  });
 }
 
 
-
-export const initSliderListeners = () => {
-  const elems = getSliderElems();
-
-  handleMinSlider(elems.minNodeOccursIn, elems.minNodeOccursOut, elems.maxNodeOccursIn, elems.maxNodeOccursOut);
-  handleMaxSlider(elems.maxNodeOccursIn, elems.maxNodeOccursOut, elems.minNodeOccursIn, elems.minNodeOccursOut);
-  handleMinSlider(elems.minEdgeOccursIn, elems.minEdgeOccursOut, elems.maxEdgeOccursIn, elems.maxEdgeOccursOut);
-  handleMaxSlider(elems.maxEdgeOccursIn, elems.maxEdgeOccursOut, elems.minEdgeOccursIn, elems.minEdgeOccursOut);
-
-  elems.minNodeOccursIn!.addEventListener('input', () => handleMinSlider(elems.minNodeOccursIn, elems.minNodeOccursOut, elems.maxNodeOccursIn, elems.maxNodeOccursOut));
-  elems.maxNodeOccursIn!.addEventListener('input', () => handleMaxSlider(elems.maxNodeOccursIn, elems.maxNodeOccursOut, elems.minNodeOccursIn, elems.minNodeOccursOut));
-  elems.minEdgeOccursIn!.addEventListener('input', () => handleMinSlider(elems.minEdgeOccursIn, elems.minEdgeOccursOut, elems.maxEdgeOccursIn, elems.maxEdgeOccursOut));
-  elems.maxEdgeOccursIn!.addEventListener('input', () => handleMaxSlider(elems.maxEdgeOccursIn, elems.maxEdgeOccursOut, elems.minEdgeOccursIn, elems.minEdgeOccursOut));
-};
 

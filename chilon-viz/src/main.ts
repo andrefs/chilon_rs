@@ -1,7 +1,7 @@
 import './style.css'
 import { initData, truncateData } from './data';
 //import { select } from 'd3-selection';
-import { initSliderListeners, initSliderValues, updateSliderValues } from './events/sliders';
+import { initSliderValues } from './events/sliders';
 //import { forceSimulation } from 'd3-force';
 //import { RawNode } from './data/raw-data';
 //import * as d3Zoom from 'd3-zoom';
@@ -10,9 +10,8 @@ import { initSliderListeners, initSliderValues, updateSliderValues } from './eve
 
 
 const start = () => {
-  initSliderValues(initData);
   const data = truncateData(initData, 5, 5);
-  updateSliderValues(data);
+  initSliderValues(data);
 
   //const svg = select<SVGSVGElement, any>("#app svg");
   //svg.append('g').attr('class', 'edges')
@@ -27,7 +26,6 @@ const start = () => {
 
 
 
-  initSliderListeners();
 
   //console.log('XXXXXX', { sim, initData, svg });
   console.log('XXXXXX', { initData, data });
