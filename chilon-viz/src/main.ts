@@ -1,10 +1,11 @@
 import './style.css'
 import { initData, truncateData } from './data';
-import { select } from 'd3-selection';
+import { BaseType, select, selectAll, Selection } from 'd3-selection';
 import { initSliders } from './events/sliders';
 import { forceSimulation, Simulation } from 'd3-force';
 import { RawEdge, RawNode, SimData } from './data/raw-data';
 import { initSimulation, restartSimulation } from './simulation';
+import * as d3Zoom from 'd3-zoom';
 
 
 const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
@@ -90,6 +91,14 @@ const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
   restartSimulation(sim, data);
 }
 
+const handleZoom = (g: Selection<BaseType, unknown, HTMLElement, any>) => (e: any) => {
+  g.attr('transform', e.transform);
+}
+const initZoom = (zoom: any) => {
+  select('svg')
+    .call(zoom);
+}
+
 
 const start = () => {
   const data = truncateData(initData, 50, 50);
@@ -99,17 +108,21 @@ const start = () => {
   svg.append('g').attr('class', 'edges')
   svg.append('g').attr('class', 'nodes');
 
+  const allG = selectAll('#app svg g');
   const sim = forceSimulation<RawNode>();
-  //let zoom = d3Zoom.zoom().scaleExtent([0.1, 5]).on('zoom', handleZoom);
+  let zoom = d3Zoom.zoom().scaleExtent([0.1, 5]).on('zoom', handleZoom(allG));
+
   const width = svg.node()?.getBoundingClientRect().width!;
   const height = svg.node()?.getBoundingClientRect().height!;
 
   initSimulation(sim, data, width, height);
 
+
   update(data, sim);
 
 
 
+  initZoom(zoom);
 
 
   console.log('XXXXXX', { sim, initData, data, svg });
