@@ -1,6 +1,6 @@
 import { Simulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
-import { RawEdge, RawNode, SimData, SimNode } from './data/raw-data';
-import { selectAll, select, Selection, BaseType } from 'd3-selection';
+import { RawEdge, RawNode, SimData } from './data/raw-data';
+import { selectAll, select } from 'd3-selection';
 
 
 export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData, width: number, height: number) => {
@@ -9,7 +9,7 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
   sim.nodes(data.nodes)
     .force("linkForce", forceLink(data.edges).distance(300).strength(2))
     .force("charge", forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
-    .force('collision', forceCollide().radius((d) => (d as RawNode).normCount + 4))
+    .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
     .force('center', forceCenter(width / 2, height / 2))
     .on("tick", ticked(sim));
 }
@@ -70,4 +70,98 @@ const calcLoop = (d: any) => {
                    A${dr},${dr} -45 1 0 ${d.target.x + 1},${d.target.y + 1}`;
   return pathd;
 
+}
+
+export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
+
+  let nodesParent = select("svg g.nodes");
+  let edgesParent = select("svg g.edges");
+
+  nodesParent
+    .selectAll("g")
+    .data(data.nodes)
+    .join(
+      enter => {
+        const nodeGroups = enter.append('g').attr('class', 'node-g');
+
+        nodeGroups
+          .append("circle")
+          .attr("r", d => Math.ceil(d.normCount || 0))
+          .style("fill", () => '#B3D9CB')
+          .attr('data-id', (d) => d.id)
+          .attr("data-fill", () => '#B3D9CB')
+          .style("pointer-events", "visiblePainted")
+          .style('cursor', 'pointer')
+
+        nodeGroups
+          .append("text")
+          .attr("x", (d: any) => d.x)
+          .attr("y", (d: any) => d.y)
+          .attr('font-size', d => Math.ceil(d.normCount / 2))
+          .attr('class', "nodelabel")
+          .text((d: any) => d.name)
+          .attr('dominant-baseline', 'middle')
+          .style("pointer-events", "none")
+          .style('cursor', 'pointer')
+
+        return nodeGroups;
+      },
+      update => update,
+      exit => exit.remove()
+    );
+
+  edgesParent
+    .selectAll("g")
+    .data(data.edges)
+    .join(
+      enter => {
+        const edgeGroups = enter.append('g').attr('class', 'edge-g');
+
+        edgeGroups
+          .append('path')
+          //.attr('d',linkArc)
+          //.attr('d', d => {
+          //  console.log('XXXXXXXXXXXX d', d);
+          //  return 'M '+d.source.x+' '+d.source.y+' L '+ d.target.x +' '+d.target.y
+          //})
+          .attr('class', 'edgepath')
+          .attr('fill-opacity', 0)
+          .attr('id', (_, i) => 'edgepath' + i)
+          .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 10))
+          .attr('opacity', 0.3)
+          .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 10))
+          .attr("data-source", (d: any) => d.source)
+          .attr("data-target", (d: any) => d.target)
+          .attr("data-label", (d: any) => d.label)
+          .style("stroke", (d: any) => d.colorHash)
+          //.style("stroke", '#b8b8b8')
+          .attr("data-stroke", (d: any) => d.colorHash)
+          //.style("pointer-events", "none");
+          .style("pointer-events", "visibleStroke")
+          .attr('marker-end', 'url(#triangle)')
+
+        const edgelabels = edgeGroups.append('text')
+          .style("pointer-events", "none")
+          .attr('class', 'edgelabel')
+          .attr('id', (_, i) => 'edgelabel' + i)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'text-after-edge')
+          .attr('font-size', 15)
+          .attr('fill', '#999')
+
+        edgelabels.append('textPath')
+          .attr('xlink:href', (_, i) => '#edgepath' + i)
+          .style("pointer-events", "none")
+          .attr('startOffset', '50%')
+          .attr('text-anchor', 'middle')
+          .attr('text-anchor', 'middle')
+        //.text(d => d.label)
+
+        return edgeGroups;
+      },
+      update => update,
+      exit => exit.remove()
+    );
+
+  restartSimulation(sim, data);
 }

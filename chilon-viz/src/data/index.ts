@@ -14,9 +14,20 @@ const truncateData = (data: SimData, maxNodes = 50, maxEdges = 50) => {
 }
 
 const filterData = (data: SimData, values: SliderValues) => {
+  const newNodes = data.nodes.filter(n => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs);
+  const nodeIds = new Set(newNodes.map(n => n.id))
+
+  const newEdges = data.edges.filter(e =>
+    e.count >= values.minEdgeOccurs &&
+    e.count <= values.maxEdgeOccurs &&
+    nodeIds.has(e.source) &&
+    nodeIds.has(e.target)
+  );
+
   return {
-    nodes: data.nodes.filter(n => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs),
-    edges: data.edges.filter(e => e.count >= values.minEdgeOccurs && e.count <= values.maxEdgeOccurs),
+    ...data,
+    nodes: newNodes,
+    edges: newEdges
   }
 };
 
