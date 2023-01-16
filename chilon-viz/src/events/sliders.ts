@@ -32,11 +32,11 @@ export const getSliderValues = () => {
 
 
 
-export const initSliderValues = (initData: SimData) => {
+export const initSliders = (initData: SimData) => {
   let elems = getSliderElems();
 
 
-  rangeSlider(elems.nodeOccursIn, {
+  let nodeSlider = rangeSlider(elems.nodeOccursIn, {
     min: 0,
     max: initData.nodes[0].count,
     value: [initData.nodes.slice(-1)[0].count, initData.nodes[0].count],
@@ -45,7 +45,8 @@ export const initSliderValues = (initData: SimData) => {
       elems.maxNodeOccursOut.value = value[1].toString();
     }
   });
-  rangeSlider(elems.edgeOccursIn, {
+
+  let edgeSlider = rangeSlider(elems.edgeOccursIn, {
     min: 0,
     max: initData.edges[0].count,
     value: [initData.edges.slice(-1)[0].count, initData.edges[0].count],
@@ -54,6 +55,8 @@ export const initSliderValues = (initData: SimData) => {
       elems.maxEdgeOccursOut.value = value[1].toString();
     }
   });
+
+  return { nodeSlider, edgeSlider };
 }
 
 

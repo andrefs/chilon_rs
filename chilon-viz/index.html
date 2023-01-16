@@ -9,51 +9,51 @@
 </head>
 
 <body marginwidth="0" marginheight="0">
-  <div class="controls">
-    <div class="force alpha">
-      <p><label>alpha</label> Simulation activity</p>
-      <div class="alpha_bar" onclick="updateAll();">
-        <div id="alpha_value"></div>
-      </div>
-    </div>
-    <div class="force">
-      <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
-
-      <div>
-        <p class="sub-cat">Node occurs:</p>
-        <div class="node-occurs-out">
-          <div>
-            <span>min:</span>
-            <output id="minNodeOccurs"></output>
-          </div>
-          <div>
-            <span>max:</span>
-            <output id="maxNodeOccurs"></output>
-          </div>
+  <div id="app">
+    <div class="controls">
+      <div class="force alpha">
+        <p><label>alpha</label> Simulation activity</p>
+        <div class="alpha_bar" onclick="updateAll();">
+          <div id="alpha_value"></div>
         </div>
-        <div class="range" id="nodeOccursInput"></div>
       </div>
+      <div class="force">
+        <p><label>Filter</label> Reduce the number of nodes and/or edges</p>
 
-      <div>
-
-        <p class="sub-cat">Predicate occurs:</p>
-        <div class="edge-occurs-out">
-          <div>
-            <span>min:</span>
-            <output id="minEdgeOccurs"></output>
+        <div>
+          <p class="sub-cat">Node occurs:</p>
+          <div class="node-occurs-out">
+            <div>
+              <span>min:</span>
+              <output id="minNodeOccurs"></output>
+            </div>
+            <div>
+              <span>max:</span>
+              <output id="maxNodeOccurs"></output>
+            </div>
           </div>
-          <div>
-            <span>max:</span>
-            <output id="maxEdgeOccurs"></output>
-          </div>
+          <div class="range" id="nodeOccursInput"></div>
         </div>
-        <div class="range" id="edgeOccursInput"></div>
+
+        <div>
+
+          <p class="sub-cat">Predicate occurs:</p>
+          <div class="edge-occurs-out">
+            <div>
+              <span>min:</span>
+              <output id="minEdgeOccurs"></output>
+            </div>
+            <div>
+              <span>max:</span>
+              <output id="maxEdgeOccurs"></output>
+            </div>
+          </div>
+          <div class="range" id="edgeOccursInput"></div>
+        </div>
       </div>
     </div>
 
-    <div id="app">
-      <svg></svg>
-    </div>
+    <svg></svg>
     <script type="module" src="/src/main.ts"></script>
 </body>
 
