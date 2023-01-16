@@ -1,6 +1,7 @@
 import { Simulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
 import { RawEdge, RawNode, SimData } from './data/raw-data';
 import { selectAll, select } from 'd3-selection';
+import { drag } from './events/drag';
 
 
 export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData, width: number, height: number) => {
@@ -37,6 +38,7 @@ const ticked = (sim: Simulation<RawNode, RawEdge>) => () => {
   let nodes = nodeGroups.selectAll("circle");
   nodes.attr("cx", (d: any) => d.x)
     .attr("cy", (d: any) => d.y)
+    .call(drag(sim) as any)
 
   let nodelabels = nodeGroups.selectAll("text");
   nodelabels.attr("x", (d: any) => d.x)

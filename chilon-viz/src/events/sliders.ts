@@ -34,6 +34,18 @@ export const getSliderValues = () => {
 }
 
 
+const debounce = (func: Function, timeout = 100) => {
+  let timer: number;
+  return (...args: any[]) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      func.apply(this, args);
+
+    }, timeout);
+  }
+}
+
+
 
 export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>) => {
   let elems = getSliderElems();
@@ -50,9 +62,11 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
     min: minNodeOccurs,
     max: maxNodeOccurs,
     value: [data.nodes.slice(-1)[0].count, data.nodes[0].count],
-    onInput: ([minNodeOccurs, maxNodeOccurs]) => {
-      elems.minNodeOccursOut.value = minNodeOccurs.toString();
-      elems.maxNodeOccursOut.value = maxNodeOccurs.toString();
+    onInput: debounce(([minNO, maxNO]) => {
+      minNodeOccurs = minNO;
+      maxNodeOccurs = maxNO;
+      elems.minNodeOccursOut.value = minNO.toString();
+      elems.maxNodeOccursOut.value = maxNO.toString();
 
       const newData = filterData(initData, {
         minNodeOccurs,
@@ -64,16 +78,19 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
 
       update(newData, sim);
 
-    }
+    }, 100)
   });
 
   let edgeSlider = rangeSlider(elems.edgeOccursIn, {
     min: minEdgeOccurs,
     max: maxEdgeOccurs,
     value: [data.edges.slice(-1)[0].count, data.edges[0].count],
-    onInput: ([minEdgeOccurs, maxEdgeOccurs]) => {
-      elems.minEdgeOccursOut.value = minEdgeOccurs.toString();
-      elems.maxEdgeOccursOut.value = maxEdgeOccurs.toString();
+    onInput: debounce(([minEO, maxEO]) => {
+      elems.minEdgeOccursOut.value = minEO.toString();
+      elems.maxEdgeOccursOut.value = maxEO.toString();
+
+      minEdgeOccurs = minEO;
+      maxEdgeOccurs = maxEO;
 
       const newData = filterData(initData, {
         minNodeOccurs,
@@ -84,7 +101,7 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
       console.log('XXXXXXXXx edgeSlider.onInput', { minNodeOccurs, maxNodeOccurs, initData, newData })
 
       update(newData, sim);
-    }
+    }, 100)
   });
 
   return { nodeSlider, edgeSlider };
