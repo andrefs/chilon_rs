@@ -8,7 +8,7 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
   if (!sim) { return; }
 
   sim.nodes(data.nodes)
-    .force("linkForce", forceLink(data.edges).distance(300).strength(2))
+    .force("linkForce", forceLink(data.edges).distance((d) => 10 * d.normCount).strength(2))
     .force("charge", forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
     .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
     .force('center', forceCenter(width / 2, height / 2))
@@ -19,7 +19,8 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
 export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData) => {
   if (!sim) { return; }
   sim.nodes(data.nodes)
-    .force("linkForce", forceLink(data.edges).distance(300).strength(2))
+    .force("linkForce", forceLink(data.edges).distance((d) => 10 * d.normCount).strength(2))
+    .force("charge", forceManyBody().strength(-16000).distanceMin(200).distanceMax(1000))
     .alpha(1).restart()
     .on('tick', ticked(sim));
 }
@@ -96,9 +97,9 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
           .attr('class', 'edgepath')
           .attr('fill-opacity', 0)
           .attr('id', (_, i) => 'edgepath' + i)
-          .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 10))
+          .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 3))
           .attr('opacity', 0.3)
-          .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 10))
+          .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 3))
           .attr("data-source", (d: any) => d.source)
           .attr("data-target", (d: any) => d.target)
           .attr("data-label", (d: any) => d.label)
