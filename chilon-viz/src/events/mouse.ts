@@ -5,6 +5,7 @@ export const addMouseEventListeners = (svg: Selection<SVGSVGElement, any, HTMLEl
   const circle = svg.selectAll('g.nodes g.node-g circle');
   let edgepaths = svg.selectAll("g.edges g.edge-g path");
   addNodeEventListeners(circle, edgepaths, tooltip);
+  addEdgeEventListeners(circle, edgepaths, tooltip);
 }
 
 const addNodeEventListeners = (
@@ -78,7 +79,11 @@ const addNodeEventListeners = (
 }
 
 
-const addEdgeEventListeners = (edgepaths, nodes, tooltip) => {
+const addEdgeEventListeners = (
+  circle: Selection<BaseType, unknown, SVGSVGElement, any>,
+  edgepaths: Selection<BaseType, unknown, SVGSVGElement, any>,
+  tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
+) => {
 
   edgepaths
     .on('mouseover', function(event, d) {
@@ -91,7 +96,7 @@ const addEdgeEventListeners = (edgepaths, nodes, tooltip) => {
           hlNodes.add(String(source.id));
           hlNodes.add(String(target.id));
         }
-        d3.select(this)
+        select(this)
           .transition()
           .duration(200)
           .style('opacity', 1)
@@ -99,8 +104,8 @@ const addEdgeEventListeners = (edgepaths, nodes, tooltip) => {
           .style('stroke-width', label == d.label ? strokeWidth : 1)
       });
 
-      nodes.each(function(n) {
-        d3.select(this)
+      circle.each(function(n) {
+        select(this)
           .transition()
           .duration(200)
           .style('fill', n => {

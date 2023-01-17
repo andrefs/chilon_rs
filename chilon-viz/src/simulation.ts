@@ -9,9 +9,10 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
 
   sim.nodes(data.nodes)
     .force("linkForce", forceLink(data.edges).distance((d) => 10 * d.normCount).strength(2))
-    .force("charge", forceManyBody().strength(-800).distanceMin(200).distanceMax(400))
-    .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
+    .force("charge", forceManyBody().strength(-1600))
+    .force('collision', forceCollide().radius((d: any) => d.normCount + 10))
     .force('center', forceCenter(width / 2, height / 2))
+    .velocityDecay(0.9)
     .on("tick", ticked(sim));
 }
 
@@ -20,7 +21,8 @@ export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimDa
   if (!sim) { return; }
   sim.nodes(data.nodes)
     .force("linkForce", forceLink(data.edges).distance((d) => 10 * d.normCount).strength(2))
-    .force("charge", forceManyBody().strength(-16000).distanceMin(200).distanceMax(1000))
+    .force("charge", forceManyBody().strength(-1600))
+    .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
     .alpha(1).restart()
     .on('tick', ticked(sim));
 }
@@ -39,7 +41,7 @@ const ticked = (sim: Simulation<RawNode, RawEdge>) => () => {
   let nodes = nodeGroups.selectAll("circle");
   nodes.attr("cx", (d: any) => d.x)
     .attr("cy", (d: any) => d.y)
-    .call(drag(sim) as any)
+    .call(drag(sim) as any);
 
   let nodelabels = nodeGroups.selectAll("text");
   nodelabels.attr("x", (d: any) => d.x)
