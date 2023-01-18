@@ -36,7 +36,7 @@ const start = () => {
 
   addMouseEventListeners(svg, tooltip);
 
-  console.log('XXXXXX', { sim, initData, data, svg });
+  console.log('XXXXXX end', { sim, initData, data, svg });
 }
 
 start();

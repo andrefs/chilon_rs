@@ -74,7 +74,6 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
         minEdgeOccurs,
         maxEdgeOccurs
       });
-      console.log('XXXXXXXXx nodeSlider.onInput', { minNodeOccurs, maxNodeOccurs, initData, newData })
 
       update(newData, sim);
 
@@ -98,7 +97,6 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
         minEdgeOccurs,
         maxEdgeOccurs
       });
-      console.log('XXXXXXXXx edgeSlider.onInput', { minNodeOccurs, maxNodeOccurs, initData, newData })
 
       update(newData, sim);
     }, 100)

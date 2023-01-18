@@ -3,23 +3,26 @@ import { scaleLinear } from 'd3-scale';
 import { genColorHash } from '../colors';
 
 export interface RawNode extends SimulationNodeDatum {
-  id: number;
-  name: String;
+  name: string;
   count: number;
 };
 
 export type SimNode = RawNode & { normCount: number };
 
-
 export interface RawEdge extends SimulationLinkDatum<RawNode> {
-  source: number;
-  target: number;
-  label: String;
+  source: string;
+  target: string;
+  label: string;
   count: number;
   link_num: number;
 };
 
-export type SimEdge = RawEdge & { normCount: number, colorHash: string };
+interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
+  source: SimNode,
+  target: SimNode,
+  normCount: number,
+  colorHash: string
+};
 
 interface RawData {
   edges: RawEdge[];
@@ -36,7 +39,6 @@ export class SimData {
   maxEdgeCount: number;
 
   constructor({ nodes, edges }: RawData) {
-
     const colorHash = genColorHash(edges);
 
     this.minNodeCount = nodes.slice(-1)[0].count;
@@ -47,17 +49,24 @@ export class SimData {
     const scaleNode = scaleLinear().domain([this.minNodeCount, this.maxNodeCount]).range([10, 100]);
     const scaleEdge = scaleLinear().domain([this.minEdgeCount, this.maxEdgeCount]).range([10, 100]);
 
+
     this.nodes = nodes.map((n) => ({
       ...n,
       normCount: scaleNode(n.count)
     }));
 
+    let namesToNodes: { [name: string]: SimNode } = {};
+    for (const node of this.nodes) {
+      namesToNodes[node.name] = node;
+    }
+
     this.edges = edges.map((e) => ({
       ...e,
+      source: namesToNodes[e.source],
+      target: namesToNodes[e.target],
       colorHash: colorHash[e.label.toString()],
       normCount: scaleEdge(e.count)
     }));
-
   }
 }
 
@@ -67,155 +76,147 @@ export const initData = new SimData({
       "count": 366287,
       "label": "rdf",
       "link_num": 1,
-      "source": 0,
-      "target": 1
+      "source": "wordnet-rdf",
+      "target": "ontolex"
     },
     {
       "count": 285668,
       "label": "wordnet",
       "link_num": 1,
-      "source": 2,
-      "target": 2
+      "source": "wordn2",
+      "target": "wordn2"
+    },
+    {
+      "count": 207272,
+      "label": "ontolex",
+      "link_num": 2,
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
     },
     {
       "count": 207272,
       "label": "ontolex",
       "link_num": 1,
-      "source": 0,
-      "target": 2
-    },
-    {
-      "count": 207272,
-      "label": "ontolex",
-      "link_num": 2,
-      "source": 0,
-      "target": 0
+      "source": "wordnet-rdf",
+      "target": "wordn2"
     },
     {
       "count": 207272,
       "label": "ontolex",
       "link_num": 3,
-      "source": 3,
-      "target": 4
+      "source": "BLANK",
+      "target": "LANG-STRING"
     },
     {
       "count": 207272,
       "label": "ontolex",
       "link_num": 2,
-      "source": 0,
-      "target": 3
+      "source": "wordnet-rdf",
+      "target": "BLANK"
     },
     {
       "count": 159015,
       "label": "wordnet",
       "link_num": 1,
-      "source": 0,
-      "target": 5
+      "source": "wordnet-rdf",
+      "target": "wordnet"
+    },
+    {
+      "count": 117791,
+      "label": "rdf",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "ontolex"
     },
     {
       "count": 117791,
       "label": "owl",
       "link_num": 1,
-      "source": 2,
-      "target": 6
-    },
-    {
-      "count": 117791,
-      "label": "rdf",
-      "link_num": 1,
-      "source": 2,
-      "target": 1
+      "source": "wordn2",
+      "target": "ili"
     },
     {
       "count": 117791,
       "label": "wordnet",
       "link_num": 1,
-      "source": 2,
-      "target": 3
+      "source": "wordn2",
+      "target": "wordnet"
     },
     {
       "count": 117791,
       "label": "rdf",
       "link_num": 3,
-      "source": 3,
-      "target": 4
-    },
-    {
-      "count": 117791,
-      "label": "wordnet",
-      "link_num": 1,
-      "source": 2,
-      "target": 5
+      "source": "BLANK",
+      "target": "LANG-STRING"
     },
     {
       "count": 117791,
       "label": "terms",
       "link_num": 1,
-      "source": 2,
-      "target": 7
+      "source": "wordn2",
+      "target": "STRING"
+    },
+    {
+      "count": 117791,
+      "label": "wordnet",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "BLANK"
     },
     {
       "count": 98923,
       "label": "rdfs",
       "link_num": 3,
-      "source": 3,
-      "target": 4
+      "source": "BLANK",
+      "target": "LANG-STRING"
     },
     {
       "count": 98923,
       "label": "www",
       "link_num": 2,
-      "source": 0,
-      "target": 3
+      "source": "wordnet-rdf",
+      "target": "BLANK"
     },
     {
       "count": 92518,
       "label": "wordnet",
       "link_num": 2,
-      "source": 0,
-      "target": 0
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
     }
   ],
   "nodes": [
     {
       "count": 1638349,
-      "id": 0,
       "name": "wordnet-rdf"
     },
     {
       "count": 1367563,
-      "id": 2,
       "name": "wordn2"
     },
     {
       "count": 847972,
-      "id": 3,
       "name": "BLANK"
     },
     {
       "count": 484078,
-      "id": 1,
       "name": "ontolex"
     },
     {
       "count": 423986,
-      "id": 4,
       "name": "LANG-STRING"
     },
     {
       "count": 276806,
-      "id": 5,
       "name": "wordnet"
     },
     {
       "count": 117791,
-      "id": 6,
-      "name": "ili"
+      "name": "STRING"
     },
     {
       "count": 117791,
-      "id": 7,
-      "name": "STRING"
+      "name": "ili"
     }
   ]
 });

@@ -36,15 +36,14 @@ pub struct VisData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VisNode {
-    id: i32,
     name: String,
     count: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct VisEdge {
-    source: i32,
-    target: i32,
+    source: String,
+    target: String,
     count: i32,
     label: String,
     link_num: i32,
@@ -53,16 +52,15 @@ pub struct VisEdge {
 pub fn build_data(outf: &str) -> VisData {
     let qres = query_graph(outf);
 
-    let mut nodes = BTreeMap::<i32, VisNode>::new();
-    let mut nodes2ids = BTreeMap::<String, i32>::new();
-    let mut edges = HashMap::<(i32, i32), Vec<VisEdge>>::new();
+    let mut nodes = BTreeMap::<String, VisNode>::new();
+    let mut edges = HashMap::<(String, String), Vec<VisEdge>>::new();
 
     if let Ok(QueryResults::Solutions(mut sols)) = qres {
         let mut id_count = 0;
 
         for s in sols {
             if let Ok(sol) = s {
-                proc_solution(sol, &mut nodes, &mut edges, &mut nodes2ids, &mut id_count);
+                proc_solution(sol, &mut nodes, &mut edges);
             }
         }
     }
@@ -90,10 +88,8 @@ pub fn build_data(outf: &str) -> VisData {
 
 fn proc_solution(
     sol: QuerySolution,
-    nodes: &mut BTreeMap<i32, VisNode>,
-    edges: &mut HashMap<(i32, i32), Vec<VisEdge>>,
-    nodes2ids: &mut BTreeMap<String, i32>,
-    id_count: &mut i32,
+    nodes: &mut BTreeMap<String, VisNode>,
+    edges: &mut HashMap<(String, String), Vec<VisEdge>>,
 ) {
     let mut src = None;
     if let oxigraph::model::Term::NamedNode(n) = sol.get("src").unwrap() {
@@ -115,48 +111,31 @@ fn proc_solution(
         occurs = Some(l.value());
     }
 
-    if src.clone().is_some()
-        && tgt.clone().is_some()
-        && label.clone().is_some()
-        && occurs.clone().is_some()
+    if let (Some(src_name), Some(tgt_name), Some(edge_label), Some(occurs_val)) =
+        (src, tgt, label, occurs)
     {
-        println!("XXXXXXXX {:?}", src);
-        let src_id = *nodes2ids.entry(src.clone().unwrap()).or_insert_with(|| {
-            let cur_id = id_count.clone();
-            *id_count += 1;
-            cur_id
-        });
-
-        let tgt_id = *nodes2ids.entry(tgt.clone().unwrap()).or_insert_with(|| {
-            let cur_id = id_count.clone();
-            *id_count += 1;
-            cur_id
-        });
-
         nodes
-            .entry(src_id)
+            .entry(src_name.clone())
             .or_insert_with(|| VisNode {
-                id: src_id,
-                name: src.clone().unwrap(),
+                name: src_name.clone(),
                 count: 0,
             })
-            .count += occurs.unwrap().parse::<usize>().unwrap();
+            .count += occurs_val.parse::<usize>().unwrap();
         nodes
-            .entry(tgt_id)
+            .entry(tgt_name.clone())
             .or_insert_with(|| VisNode {
-                id: tgt_id,
-                name: tgt.clone().unwrap(),
+                name: tgt_name.clone(),
                 count: 0,
             })
-            .count += occurs.unwrap().parse::<usize>().unwrap();
+            .count += occurs_val.parse::<usize>().unwrap();
 
-        let key = sort_pair(src_id, tgt_id);
+        let key = sort_pair(src_name.clone(), tgt_name.clone());
         let colliding = edges.entry(key).or_insert_with(|| Vec::new());
         colliding.push(VisEdge {
-            source: src_id,
-            target: tgt_id,
-            count: occurs.unwrap().parse().unwrap(),
-            label: label.clone().unwrap(),
+            source: src_name,
+            target: tgt_name,
+            count: occurs_val.parse().unwrap(),
+            label: edge_label,
             link_num: colliding.len() as i32,
         });
 
@@ -166,11 +145,10 @@ fn proc_solution(
     }
 }
 
-fn sort_pair(a: i32, b: i32) -> (i32, i32) {
-    if a > b {
-        (b, a)
-    } else {
-        (a, b)
+fn sort_pair(a: String, b: String) -> (String, String) {
+    match a.cmp(&b) {
+        std::cmp::Ordering::Greater => (b, a),
+        _ => (a, b),
     }
 }
 

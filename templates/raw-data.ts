@@ -3,23 +3,26 @@ import { scaleLinear } from 'd3-scale';
 import { genColorHash } from '../colors';
 
 export interface RawNode extends SimulationNodeDatum {
-  id: number;
-  name: String;
+  name: string;
   count: number;
 };
 
 export type SimNode = RawNode & { normCount: number };
 
-
 export interface RawEdge extends SimulationLinkDatum<RawNode> {
-  source: number;
-  target: number;
-  label: String;
+  source: string;
+  target: string;
+  label: string;
   count: number;
   link_num: number;
 };
 
-export type SimEdge = RawEdge & { normCount: number, colorHash: string };
+interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
+  source: SimNode,
+  target: SimNode,
+  normCount: number,
+  colorHash: string
+};
 
 interface RawData {
   edges: RawEdge[];
@@ -36,7 +39,6 @@ export class SimData {
   maxEdgeCount: number;
 
   constructor({ nodes, edges }: RawData) {
-
     const colorHash = genColorHash(edges);
 
     this.minNodeCount = nodes.slice(-1)[0].count;
@@ -47,17 +49,24 @@ export class SimData {
     const scaleNode = scaleLinear().domain([this.minNodeCount, this.maxNodeCount]).range([10, 100]);
     const scaleEdge = scaleLinear().domain([this.minEdgeCount, this.maxEdgeCount]).range([10, 100]);
 
+
     this.nodes = nodes.map((n) => ({
       ...n,
       normCount: scaleNode(n.count)
     }));
 
+    let namesToNodes: { [name: string]: SimNode } = {};
+    for (const node of this.nodes) {
+      namesToNodes[node.name] = node;
+    }
+
     this.edges = edges.map((e) => ({
       ...e,
+      source: namesToNodes[e.source],
+      target: namesToNodes[e.target],
       colorHash: colorHash[e.label.toString()],
       normCount: scaleEdge(e.count)
     }));
-
   }
 }
 

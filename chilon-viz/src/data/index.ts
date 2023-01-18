@@ -3,26 +3,38 @@ import { initData, SimData } from './raw-data';
 
 
 const truncateData = (data: SimData, maxNodes = 50, maxEdges = 50) => {
+  let newNodes = data.nodes.slice(0, maxNodes);
+
+  let namesToNodes: { [name: string]: boolean } = {};
+  for (const node of newNodes) {
+    namesToNodes[node.name] = true;
+  }
+
 
   let res = {
     ...data,
-    nodes: data.nodes.slice(0, maxNodes),
-    edges: data.edges.slice(0, maxEdges)
+    nodes: newNodes,
+    edges: data.edges
+      .slice(0, maxEdges)
+      .filter(e => e.source.name in namesToNodes && e.target.name in namesToNodes)
   };
 
   return res;
 }
 
 const filterData = (data: SimData, values: SliderValues) => {
-  const newNodes = data.nodes.filter(n => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs);
-  const nodeIds = new Set(newNodes.map(n => n.id))
-  console.log('XXXXXXX', { nodeIds })
+  let newNodes = data.nodes.filter((n) => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs);
+
+  let namesToNodes: { [name: string]: boolean } = {};
+  for (const node of newNodes) {
+    namesToNodes[node.name] = true;
+  }
 
   const newEdges = data.edges.filter(e =>
     e.count >= values.minEdgeOccurs &&
     e.count <= values.maxEdgeOccurs &&
-    nodeIds.has((e as any).source.id) &&
-    nodeIds.has((e as any).target.id)
+    (e as any).source.name in namesToNodes &&
+    (e as any).target.name in namesToNodes
   );
 
   return {
