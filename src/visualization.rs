@@ -54,9 +54,7 @@ pub fn build_data(outf: &str) -> VisData {
     let qres = query_graph(outf);
 
     let mut nodes = BTreeMap::<i32, VisNode>::new();
-    //let mut edges = Vec::<VisEdge>::new();
     let mut nodes2ids = BTreeMap::<String, i32>::new();
-
     let mut edges = HashMap::<(i32, i32), Vec<VisEdge>>::new();
 
     if let Ok(QueryResults::Solutions(mut sols)) = qres {
@@ -122,21 +120,18 @@ fn proc_solution(
         && label.clone().is_some()
         && occurs.clone().is_some()
     {
-        let src_id = if nodes2ids.contains_key(&src.clone().unwrap()) {
-            *nodes2ids.get(&src.clone().unwrap()).unwrap()
-        } else {
-            nodes2ids.insert(src.clone().unwrap(), *id_count);
+        println!("XXXXXXXX {:?}", src);
+        let src_id = *nodes2ids.entry(src.clone().unwrap()).or_insert_with(|| {
+            let cur_id = id_count.clone();
             *id_count += 1;
-            *id_count
-        };
+            cur_id
+        });
 
-        let tgt_id = if nodes2ids.contains_key(&tgt.clone().unwrap()) {
-            *nodes2ids.get(&tgt.clone().unwrap()).unwrap()
-        } else {
-            nodes2ids.insert(tgt.clone().unwrap(), *id_count);
+        let tgt_id = *nodes2ids.entry(tgt.clone().unwrap()).or_insert_with(|| {
+            let cur_id = id_count.clone();
             *id_count += 1;
-            *id_count
-        };
+            cur_id
+        });
 
         nodes
             .entry(src_id)
@@ -257,6 +252,7 @@ pub fn render_vis(data: &VisData, outf: &str) {
 
     let data_fd = OpenOptions::new()
         .write(true)
+        .truncate(true)
         .create(true)
         .open(data_path.clone())
         .unwrap();
