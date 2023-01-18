@@ -80,13 +80,6 @@ export const initData = new SimData({
     {
       "count": 207272,
       "label": "ontolex",
-      "link_num": 2,
-      "source": 0,
-      "target": 0
-    },
-    {
-      "count": 207272,
-      "label": "ontolex",
       "link_num": 1,
       "source": 0,
       "target": 2
@@ -96,7 +89,7 @@ export const initData = new SimData({
       "label": "ontolex",
       "link_num": 2,
       "source": 0,
-      "target": 3
+      "target": 0
     },
     {
       "count": 207272,
@@ -104,6 +97,13 @@ export const initData = new SimData({
       "link_num": 3,
       "source": 3,
       "target": 4
+    },
+    {
+      "count": 207272,
+      "label": "ontolex",
+      "link_num": 2,
+      "source": 0,
+      "target": 3
     },
     {
       "count": 159015,
@@ -121,20 +121,6 @@ export const initData = new SimData({
     },
     {
       "count": 117791,
-      "label": "terms",
-      "link_num": 1,
-      "source": 2,
-      "target": 7
-    },
-    {
-      "count": 117791,
-      "label": "wordnet",
-      "link_num": 1,
-      "source": 2,
-      "target": 3
-    },
-    {
-      "count": 117791,
       "label": "rdf",
       "link_num": 1,
       "source": 2,
@@ -145,11 +131,32 @@ export const initData = new SimData({
       "label": "wordnet",
       "link_num": 1,
       "source": 2,
-      "target": 5
+      "target": 3
     },
     {
       "count": 117791,
       "label": "rdf",
+      "link_num": 3,
+      "source": 3,
+      "target": 4
+    },
+    {
+      "count": 117791,
+      "label": "wordnet",
+      "link_num": 1,
+      "source": 2,
+      "target": 5
+    },
+    {
+      "count": 117791,
+      "label": "terms",
+      "link_num": 1,
+      "source": 2,
+      "target": 7
+    },
+    {
+      "count": 98923,
+      "label": "rdfs",
       "link_num": 3,
       "source": 3,
       "target": 4
@@ -160,13 +167,6 @@ export const initData = new SimData({
       "link_num": 2,
       "source": 0,
       "target": 3
-    },
-    {
-      "count": 98923,
-      "label": "rdfs",
-      "link_num": 3,
-      "source": 3,
-      "target": 4
     },
     {
       "count": 92518,

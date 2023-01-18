@@ -30,11 +30,11 @@ const start = () => {
   initSliders(initData, sim);
 
   update(data, sim);
-  //initZoom(zoom);
+  initZoom(zoom);
 
-  //const tooltip = createTooltip();
+  const tooltip = createTooltip();
 
-  //addMouseEventListeners(svg, tooltip);
+  addMouseEventListeners(svg, tooltip);
 
   console.log('XXXXXX', { sim, initData, data, svg });
 }
