@@ -99,7 +99,7 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
           .attr('class', 'edgepath')
           .attr('fill-opacity', 0)
           .attr('id', (_, i) => 'edgepath' + i)
-          .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 3))
+          .attr("stroke-width", (d: any) => { console.log('XXXXXXXXXXXX', { d }); return Math.ceil(d.normCount / 3); })
           .attr('opacity', 0.3)
           .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 3))
           .attr("data-source", (d: any) => d.source)
