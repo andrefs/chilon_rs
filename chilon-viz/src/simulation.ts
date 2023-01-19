@@ -8,8 +8,8 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
   if (!sim) { return; }
 
   sim.nodes(data.nodes)
-    .force("linkForce", forceLink(data.edges).id((n: any) => n.name).distance((d) => 10 * d.normCount).strength(2))
-    .force("charge", forceManyBody().strength(-1600))
+    .force("linkForce", forceLink(data.edges).id((n: any) => n.name).distance(100).strength(2))
+    .force("charge", forceManyBody().strength(-200000).distanceMax(1000))
     .force('collision', forceCollide().radius((d: any) => d.normCount + 10))
     .force('center', forceCenter(width / 2, height / 2))
     .velocityDecay(0.9)
@@ -20,8 +20,8 @@ export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData,
 export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData) => {
   if (!sim) { return; }
   sim.nodes(data.nodes)
-    .force("linkForce", forceLink(data.edges).id((n: any) => n.name).distance((d) => 10 * d.normCount).strength(2))
-    .force("charge", forceManyBody().strength(-1600))
+    .force("linkForce", forceLink(data.edges).id((n: any) => n.name).distance(100).strength(2))
+    .force("charge", forceManyBody().strength(-200000).distanceMax(1000))
     .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
     .alpha(1).restart()
     .on('tick', ticked(sim));
