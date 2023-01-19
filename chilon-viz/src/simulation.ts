@@ -55,6 +55,7 @@ const calcEdge = (d: any) => {
   let signal = 0;
   if (d.link_num % 2 === 1 && d.link_num > 0) { signal = 1; }
   if (d.link_num % 2 === 0 && d.link_num < 0) { signal = 1; }
+
   const dl = Math.abs(d.link_num)
   const divisor = Math.floor(dl / 2) * 2;
   const dr = dl === 1 ? 0 : 1500 / divisor;  //link_num is defined above
