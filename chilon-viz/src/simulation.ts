@@ -61,6 +61,7 @@ const calcEdge = (d: any) => {
 
   const pathd = `M${d.source.x},${d.source.y}
                  A${dr},${dr} 0 0 ${signal} ${d.target.x},${d.target.y}`;
+
   return pathd;
 };
 

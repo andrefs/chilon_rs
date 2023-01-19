@@ -46,7 +46,7 @@ pub struct VisEdge {
     target: String,
     count: i32,
     label: String,
-    link_num: i32,
+    link_num: i32, // number signal indicates direction for edge path calcs
 }
 
 pub fn build_data(outf: &str) -> VisData {
@@ -130,18 +130,16 @@ fn proc_solution(
             .count += occurs_val.parse::<usize>().unwrap();
 
         let key = sort_pair(src_name.clone(), tgt_name.clone());
-        let colliding = edges.entry(key).or_insert_with(|| Vec::new());
+        let colliding = edges.entry(key.clone()).or_insert_with(|| Vec::new());
+        let signal = if src_name == key.0 { 1 } else { -1 };
+
         colliding.push(VisEdge {
-            source: src_name,
-            target: tgt_name,
+            source: src_name.clone(),
+            target: tgt_name.clone(),
             count: occurs_val.parse().unwrap(),
             label: edge_label,
-            link_num: colliding.len() as i32,
+            link_num: signal * (colliding.len() + 1) as i32,
         });
-
-        for edge in colliding {
-            edge.link_num += 1;
-        }
     }
 }
 
