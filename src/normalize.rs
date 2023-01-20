@@ -9,7 +9,7 @@ use rio_api::{
 };
 use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{File, OpenOptions},
     io::{BufRead, Write},
     path::{Path, PathBuf},
@@ -74,7 +74,7 @@ pub enum NormalizedResource {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lit {
-    data_type: Option<String>,
+    lang: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedLit {
@@ -94,15 +94,9 @@ impl From<NormalizedResource> for String {
         match nr {
             NormalizedResource::Unknown => "UNKNOWN".to_string(),
             NormalizedResource::BlankNode => "BLANK".to_string(),
-            NormalizedResource::Literal(Lit { data_type }) => match data_type {
+            NormalizedResource::Literal(Lit { lang }) => match lang {
                 None => "STRING".into(),
-                Some(dt) => {
-                    if dt == "lang-string" {
-                        "LANG-STRING".to_string()
-                    } else {
-                        dt.to_string()
-                    }
-                }
+                Some(l) => format!("STRING@{l}"),
             },
             NormalizedResource::TypedLiteral(TypedLit {
                 namespace,
@@ -119,14 +113,27 @@ impl From<NormalizedResource> for String {
     }
 }
 
+#[derive(Ord, Eq, PartialEq, PartialOrd)]
+pub struct GroupNS {
+    alias: String,
+    namespace: String,
+}
+
+#[derive(Ord, Eq, PartialEq, PartialOrd)]
+pub enum Group {
+    Namespace(GroupNS),
+    Unknown,
+    Blank,
+}
+
 pub fn normalize_triples(
     paths: Vec<PathBuf>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
-) -> (TripleFreq, BTreeMap<String, String>) {
+) -> (TripleFreq, BTreeSet<Group>) {
     let mut triples = TripleFreq::new();
-    let mut used_ns = BTreeMap::<String, String>::new();
+    let mut used_groups = BTreeSet::<Group>::new();
 
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -178,18 +185,24 @@ pub fn normalize_triples(
                 break;
             }
             if let Ok(message) = rx.recv() {
-                proc_message(message, &mut triples, &mut used_ns, &mut fd, &mut running);
+                proc_message(
+                    message,
+                    &mut triples,
+                    &mut used_groups,
+                    &mut fd,
+                    &mut running,
+                );
             }
         }
     });
 
-    return (triples, used_ns);
+    return (triples, used_groups);
 }
 
 fn proc_message(
     message: Message,
     triples: &mut TripleFreq,
-    used_ns: &mut BTreeMap<String, String>,
+    used_groups: &mut BTreeSet<Group>,
     fd: &mut File,
     running: &mut usize,
 ) {
@@ -204,24 +217,38 @@ fn proc_message(
                 predicate.clone().into(),
                 object.clone().into(),
             ));
-            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = subject {
-                used_ns.insert(alias, namespace);
-            }
-            if let NormalizedResource::NamedNode(NNode { alias, namespace }) = predicate {
-                used_ns.insert(alias, namespace);
-            }
-            match object {
-                NormalizedResource::NamedNode(NNode { alias, namespace }) => {
-                    used_ns.insert(alias, namespace);
+
+            for resource in vec![subject, predicate, object] {
+                match resource {
+                    NormalizedResource::Unknown => {
+                        used_groups.insert(Group::Unknown);
+                    }
+                    NormalizedResource::BlankNode => {
+                        used_groups.insert(Group::Blank);
+                    }
+                    NormalizedResource::Literal(Lit { lang }) => {
+                        used_groups.insert(match lang {
+                            None => Group::Namespace(GroupNS {
+                                alias: "xsd".into(),
+                                namespace: "http://www.w3.org/TR/xmlschema11-2/".into(),
+                            }),
+                            Some(_) => Group::Namespace(GroupNS {
+                                alias: "rdf".into(),
+                                namespace: "http://www.w3.org/1999/02/22-rdf-syntax-ns#".into(),
+                            }),
+                        });
+                    }
+                    NormalizedResource::TypedLiteral(TypedLit {
+                        namespace,
+                        alias,
+                        iri: _,
+                    }) => {
+                        used_groups.insert(Group::Namespace(GroupNS { alias, namespace }));
+                    }
+                    NormalizedResource::NamedNode(NNode { alias, namespace }) => {
+                        used_groups.insert(Group::Namespace(GroupNS { alias, namespace }));
+                    }
                 }
-                NormalizedResource::TypedLiteral(TypedLit {
-                    namespace,
-                    alias,
-                    iri: _,
-                }) => {
-                    used_ns.insert(alias, namespace);
-                }
-                _ => {}
             }
         }
         Message::NamespaceUnknown { iri } => {
@@ -397,12 +424,12 @@ fn handle_literal(
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match lit {
-        Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { data_type: None })),
+        Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { lang: None })),
         Literal::LanguageTaggedString {
             value: _,
             language: _,
         } => Ok(NormalizedResource::Literal(Lit {
-            data_type: Some("lang-string".into()),
+            lang: Some("pt-PT".into()),
         })),
         //Literal::Typed {
         //    value: _,
@@ -431,7 +458,7 @@ fn handle_literal(
 
 pub fn save_normalized_triples(
     nts: &TripleFreq,
-    used_ns: BTreeMap<String, String>,
+    used_groups: BTreeSet<Group>,
     min_occurs: Option<i32>,
     outf: &str,
 ) {
@@ -455,25 +482,9 @@ pub fn save_normalized_triples(
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     let mut formatter = TurtleFormatter::new(fd);
-
     // print namespace alias
-    for (alias, namespace) in used_ns {
-        formatter
-            .format(&Triple {
-                subject: NamedNode {
-                    iri: alias.as_str(),
-                }
-                .into(),
-                predicate: NamedNode {
-                    iri: "namespacePrefix",
-                }
-                .into(),
-                object: NamedNode {
-                    iri: namespace.as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
+    for group in used_groups {
+        format_group(group, &mut formatter);
     }
     fd = formatter.finish().unwrap();
     writeln!(fd, "").unwrap();
@@ -574,6 +585,30 @@ pub fn save_normalized_triples(
     formatter.finish().unwrap();
 }
 
+pub fn format_group(group: Group, formatter: &mut TurtleFormatter<File>) {
+    let blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
+    let unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
+    match group {
+        Group::Namespace(GroupNS { alias, namespace }) => formatter
+            .format(&Triple {
+                subject: NamedNode {
+                    iri: format!("#{}", alias).as_str(),
+                }
+                .into(),
+                predicate: NamedNode {
+                    iri: "namespacePrefix",
+                }
+                .into(),
+                object: NamedNode {
+                    iri: namespace.as_str(),
+                }
+                .into(),
+            })
+            .unwrap(),
+        _ => {}
+    };
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -592,7 +627,7 @@ mod tests {
 
         match res.unwrap() {
             NormalizedResource::Literal(lit) => {
-                assert_eq!(lit.data_type, None);
+                assert_eq!(lit.lang, None);
             }
             _ => panic!("Result should be a NormalizedResource::Literal"),
         }
@@ -612,7 +647,7 @@ mod tests {
 
         match res.unwrap() {
             NormalizedResource::Literal(lit) => {
-                assert_eq!(lit.data_type, Some("lang-string".into()));
+                assert_eq!(lit.lang, Some("pt-PT".into()));
             }
             _ => panic!("Result should be a NormalizedResource::Literal"),
         }

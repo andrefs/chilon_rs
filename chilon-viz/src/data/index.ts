@@ -37,6 +37,8 @@ const filterData = (data: SimData, values: SliderValues) => {
     (e as any).target.name in namesToNodes
   );
 
+  console.log('XXXXXXXX 5', { data, newNodes, newEdges })
+
   return {
     ...data,
     nodes: newNodes,

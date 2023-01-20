@@ -82,11 +82,11 @@ fn main() {
      *********************/
 
     info!("Normalizing triples");
-    let (nts, used_ns) =
+    let (nts, used_groups) =
         normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
 
     debug!("saving normalized triples");
-    save_normalized_triples(&nts, used_ns, Some(10), outf); // min_occurs = 10
+    save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
     /*****************
      * Visualization *

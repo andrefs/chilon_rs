@@ -98,13 +98,6 @@ export const initData = new SimData({
       "count": 207272,
       "label": "ontolex",
       "link_num": 1,
-      "source": "BLANK",
-      "target": "LANG-STRING"
-    },
-    {
-      "count": 207272,
-      "label": "ontolex",
-      "link_num": 1,
       "source": "wordnet-rdf",
       "target": "wordnet-rdf"
     },
@@ -123,39 +116,18 @@ export const initData = new SimData({
       "target": "BLANK"
     },
     {
+      "count": 207272,
+      "label": "ontolex",
+      "link_num": 1,
+      "source": "BLANK",
+      "target": "STRING@pt-PT"
+    },
+    {
       "count": 159015,
       "label": "wordnet",
       "link_num": -1,
       "source": "wordnet-rdf",
       "target": "wordnet"
-    },
-    {
-      "count": 117791,
-      "label": "rdf",
-      "link_num": 2,
-      "source": "BLANK",
-      "target": "LANG-STRING"
-    },
-    {
-      "count": 117791,
-      "label": "rdf",
-      "link_num": -1,
-      "source": "wordn2",
-      "target": "ontolex"
-    },
-    {
-      "count": 117791,
-      "label": "wordnet",
-      "link_num": -1,
-      "source": "wordn2",
-      "target": "BLANK"
-    },
-    {
-      "count": 117791,
-      "label": "owl",
-      "link_num": -1,
-      "source": "wordn2",
-      "target": "ili"
     },
     {
       "count": 117791,
@@ -166,17 +138,38 @@ export const initData = new SimData({
     },
     {
       "count": 117791,
+      "label": "rdf",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "ontolex"
+    },
+    {
+      "count": 117791,
+      "label": "owl",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "ili"
+    },
+    {
+      "count": 117791,
       "label": "wordnet",
       "link_num": 1,
       "source": "wordn2",
       "target": "wordnet"
     },
     {
-      "count": 98923,
-      "label": "rdfs",
-      "link_num": 3,
+      "count": 117791,
+      "label": "wordnet",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "BLANK"
+    },
+    {
+      "count": 117791,
+      "label": "rdf",
+      "link_num": 2,
       "source": "BLANK",
-      "target": "LANG-STRING"
+      "target": "STRING@pt-PT"
     },
     {
       "count": 98923,
@@ -184,6 +177,13 @@ export const initData = new SimData({
       "link_num": -2,
       "source": "wordnet-rdf",
       "target": "BLANK"
+    },
+    {
+      "count": 98923,
+      "label": "rdfs",
+      "link_num": 3,
+      "source": "BLANK",
+      "target": "STRING@pt-PT"
     },
     {
       "count": 92518,
@@ -212,7 +212,7 @@ export const initData = new SimData({
     },
     {
       "count": 423986,
-      "name": "LANG-STRING"
+      "name": "STRING@pt-PT"
     },
     {
       "count": 276806,
