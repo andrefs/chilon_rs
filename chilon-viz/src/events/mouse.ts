@@ -19,19 +19,19 @@ const addNodeEventListeners = (
       edgepaths.each(function(d: any) {
         const s = d.source;
         const t = d.target;
-        const circleId = event.target.getAttribute('data-id')
-        if (circleId && t.id == circleId || s.id == circleId) {
-          hlNodes.add(String(s.id));
-          hlNodes.add(String(t.id));
+        const circleName = event.target.getAttribute('data-id')
+        if (circleName && t.name === circleName || s.name === circleName) {
+          hlNodes.add(String(s.name));
+          hlNodes.add(String(t.name));
         }
         const strokeWidth = (this as Element).getAttribute('data-stroke-width')
         const stroke = (this as Element).getAttribute('data-stroke')
         select(this as Element)
           .transition()
           .duration(200)
-          .style('opacity', s.id == circleId || t.id == circleId ? 1 : 0.3)
-          .style('stroke', s.id == circleId || t.id == circleId ? stroke : '#b8b8b8')
-          .style('stroke-width', s.id == circleId || t.id == circleId ? strokeWidth : 1)
+          .style('opacity', s.name == circleName || t.name == circleName ? 1 : 0.3)
+          .style('stroke', s.name == circleName || t.name == circleName ? stroke : '#b8b8b8')
+          .style('stroke-width', s.name == circleName || t.name == circleName ? strokeWidth : 1)
       });
 
       circle.each(function(n) {
@@ -39,7 +39,7 @@ const addNodeEventListeners = (
           .transition()
           .duration(200)
           .style('fill', (n: any) => {
-            return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+            return hlNodes.has(n.name) ? this.getAttribute('data-fill') : '#b8b8b8'
           })
 
 
