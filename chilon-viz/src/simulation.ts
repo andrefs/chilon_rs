@@ -148,7 +148,7 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
           .append("circle")
           .attr("r", d => Math.ceil(d.normCount || 0))
           .style("fill", () => '#B3D9CB')
-          .attr('data-id', (d) => d.id)
+          .attr('data-id', (n) => n.name)
           .attr("data-fill", () => '#B3D9CB')
           .style("pointer-events", "visiblePainted")
           .style('cursor', 'pointer')
