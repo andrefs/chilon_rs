@@ -1,4 +1,5 @@
 import { BaseType, select, Selection } from "d3-selection";
+import humanFormat from 'human-format';
 
 export const addMouseEventListeners = (svg: Selection<SVGSVGElement, any, HTMLElement, any>, tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>) => {
   const nodes = svg.selectAll('g.nodes g.node-g circle');
@@ -15,6 +16,7 @@ const addNodeEventListeners = (
 ) => {
   circle
     .on('mouseover', function(event, d) {
+      console.log('XXXXXXXXXX', { d })
       const hlNodes = new Set();
       edgepaths.each(function(d: any) {
         const s = d.source;
@@ -46,7 +48,12 @@ const addNodeEventListeners = (
         tooltip.transition()
           .duration(200)
           .style("opacity", 1) // show the tooltip
-        tooltip.html(d.name)
+        tooltip.html(`<div>
+                     <p class="node-name">${d.name}</p>
+                     <p class="node-count">${humanFormat(d.count)}</p>
+                     <p class="node-perc">${Number(d.occursPerc * 100).toFixed(2)}%</p>
+                     <!--p class="node-desc">Namespace IRI or description (for BLANK and UNKNOWN)</p-->
+                     </div>`)
           .style("left", (event.clientX + 20) + "px")
           .style("top", (event.clientY - 20) + "px");
 

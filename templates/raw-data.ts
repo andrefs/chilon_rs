@@ -7,7 +7,10 @@ export interface RawNode extends SimulationNodeDatum {
   count: number;
 };
 
-export type SimNode = RawNode & { normCount: number };
+export type SimNode = RawNode & {
+  normCount: number,
+  occursPerc: number
+};
 
 export interface RawEdge extends SimulationLinkDatum<RawNode> {
   source: string;
@@ -38,6 +41,8 @@ export class SimData {
   minEdgeCount: number;
   maxEdgeCount: number;
 
+  totalNodeCount: number;
+
   constructor({ nodes, edges }: RawData) {
     const colorHash = genColorHash(edges);
 
@@ -50,10 +55,13 @@ export class SimData {
     const scaleEdge = scaleLinear().domain([this.minEdgeCount, this.maxEdgeCount]).range([10, 100]);
 
 
+    this.totalNodeCount = nodes.reduce((acc, cur) => acc + cur.count, 0);
     this.nodes = nodes.map((n) => ({
       ...n,
-      normCount: scaleNode(n.count)
+      normCount: scaleNode(n.count),
+      occursPerc: n.count / this.totalNodeCount
     }));
+
 
     let namesToNodes: { [name: string]: SimNode } = {};
     for (const node of this.nodes) {

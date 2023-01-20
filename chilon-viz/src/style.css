@@ -84,3 +84,15 @@ p.sub-cat {
   width: 15px;
   height: 15px;
 }
+
+.node-name, .node-count, .node-perc {
+ margin:0;
+}
+
+.node-name {
+ font-size: 14px;
+ }
+
+.node-count, .node-perc {
+ font-size: 10px;
+}

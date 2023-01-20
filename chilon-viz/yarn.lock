@@ -161,6 +161,11 @@
     "@types/d3-interpolate" "*"
     "@types/d3-selection" "*"
 
+"@types/human-format@1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@types/human-format/-/human-format-1.0.0.tgz#b77d8ef5d9638d066c132ec58628d4a9a6163cef"
+  integrity sha512-EpU2OnpDx0b7F93KuhUnsFyLL60h+PWjXsc6QWNU0gHsSqy6Up+7YRqzMHWVcCYjNbaXqYr2g5vpNwOXyUap+A==
+
 "d3-array@2 - 3", "d3-array@2.10.0 - 3":
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/d3-array/-/d3-array-3.2.1.tgz#39331ea706f5709417d31bbb6ec152e0328b39b3"
@@ -318,6 +323,11 @@ has@^1.0.3:
   integrity sha512-f2dvO0VU6Oej7RkWJGrehjbzMAjFp5/VKPp5tTpWIV4JHHZK1/BxbFRtf/siA2SWTe09caDmVtYYzWEIbBS4zw==
   dependencies:
     function-bind "^1.1.1"
+
+human-format@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/human-format/-/human-format-1.0.0.tgz#bb5ecc618062581f0442769529c553367507e8fe"
+  integrity sha512-ZfSxF/LHVDb5Un52AguYkZArbiuMbJQwpOpZ0MBuj3pYDmLt7pkCEws9L8xKbgnaKrfMgGd6qc+PHBbKO97AaA==
 
 "internmap@1 - 2":
   version "2.0.3"

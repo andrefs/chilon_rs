@@ -446,7 +446,10 @@ pub fn save_normalized_triples(
         .open(file_path.clone())
         .unwrap();
 
-    writeln!(fd, "@base <http://andrefs.com/graph-summ/v1> .").unwrap();
+    let base = "http://andrefs.com/graph-summ/v1";
+    writeln!(fd, "@base <{}> .", { base }).unwrap();
+    writeln!(fd, "@prefix ngont: <{}/ontology> .", base).unwrap(); // ontology (data-types?, unknown, blank, classes and predicates, etc)
+    writeln!(fd, "@prefix ngns: <{}/instance> .", base).unwrap(); // namespaces (kgs, data types?)
     writeln!(fd, "").unwrap();
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
