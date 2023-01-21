@@ -428,12 +428,11 @@ fn handle_literal(
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match lit {
         Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { lang: None })),
-        Literal::LanguageTaggedString {
-            value: _,
-            language: _,
-        } => Ok(NormalizedResource::Literal(Lit {
-            lang: Some("pt-PT".into()),
-        })),
+        Literal::LanguageTaggedString { value: _, language } => {
+            Ok(NormalizedResource::Literal(Lit {
+                lang: Some(language.to_string()),
+            }))
+        }
         //Literal::Typed {
         //    value: _,
         //    datatype: _,
