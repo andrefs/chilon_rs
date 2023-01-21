@@ -2,7 +2,7 @@ pub mod prefixcc;
 
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::NamespaceTrie;
-use crate::parse::parse;
+use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::InsertFnVisitors;
 use log::{debug, error, info, trace, warn};
@@ -130,7 +130,7 @@ let mut last_i = 0;
     return iri_trie;
 }
 
-fn proc_triples(graph: &mut TurtleParser<impl BufRead>, path: &PathBuf, tx: &SyncSender<Message>) {
+fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {

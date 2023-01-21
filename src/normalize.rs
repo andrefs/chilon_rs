@@ -1,4 +1,7 @@
-use crate::{ns_trie::NamespaceTrie, parse::parse};
+use crate::{
+    ns_trie::NamespaceTrie,
+    parse::{parse, ParserWrapper},
+};
 use log::{debug, error, info, trace, warn};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
@@ -264,7 +267,7 @@ fn proc_message(
 }
 
 fn proc_triples(
-    graph: &mut TurtleParser<impl BufRead>,
+    graph: &mut ParserWrapper,
     path: &PathBuf,
     tx: &Sender<Message>,
     ns_trie: &NamespaceTrie,
