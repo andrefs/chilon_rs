@@ -27,6 +27,8 @@ use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
 use simple_logger::SimpleLogger;
 use std::fs;
+use std::process::Command;
+use std::str;
 
 fn main() {
     /**********************
@@ -35,6 +37,17 @@ fn main() {
 
     let cli = Cli::parse();
     SimpleLogger::new().init().unwrap();
+
+    info!("Building Vite");
+    let output = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .unwrap();
+    println!(
+        "Running from commit {}",
+        str::from_utf8(&output.stdout).unwrap()
+    );
 
     let out = gen_file_name(
         format!("results/{}", Utc::now().format("%Y%m%d")),
