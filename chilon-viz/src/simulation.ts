@@ -86,7 +86,7 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
 
   edgesParent
     .selectAll("g")
-    .data(data.edges)
+    .data(data.edges, (e: any) => `edgepath-${e.label}-${e.source.name}-${e.target.name}`)
     .join(
       enter => {
         const edgeGroups = enter.append('g').attr('class', 'edge-g');
@@ -100,7 +100,7 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
           //})
           .attr('class', 'edgepath')
           .attr('fill-opacity', 0)
-          .attr('id', (d, _) => 'edgepath-' + d.label)
+          .attr('id', (e, _) => `edgepath-${e.label}-${e.source.name}-${e.target.name}`)
           .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 3))
           .attr('opacity', 0.3)
           .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 3))
@@ -117,7 +117,6 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
         const edgelabels = edgeGroups.append('text')
           .style("pointer-events", "none")
           .attr('class', 'edgelabel')
-          .attr('id', (_, i) => 'edgelabel' + i)
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'text-after-edge')
           .attr('font-size', 15)
@@ -139,7 +138,7 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
 
   nodesParent
     .selectAll("g")
-    .data(data.nodes)
+    .data(data.nodes, (n: any) => n.name)
     .join(
       enter => {
         const nodeGroups = enter.append('g').attr('class', 'node-g');
