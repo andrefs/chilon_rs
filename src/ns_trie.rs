@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs::write, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::write,
+    path::Path,
+};
 
 use crate::trie::Node;
 use log::{debug, info, warn};
@@ -25,17 +29,24 @@ impl SaveTrie for NamespaceTrie {
 
 pub trait InferredNamespaces {
     fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String>;
+
+    fn to_map(&self) -> BTreeMap<String, String>;
 }
 
 impl InferredNamespaces for NamespaceTrie {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String> {
-        let mut added = Node::<String>::new();
-        let mut aliases = Node::<String>::new();
+    fn to_map(&self) -> BTreeMap<String, String> {
+        let mut trie = BTreeMap::<String, String>::new();
         for (ns, node) in self.iter() {
             if let Some(alias) = node.value.clone() {
-                aliases.insert(&alias, ns);
+                trie.insert(alias, ns);
             }
         }
+        return trie;
+    }
+    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String> {
+        let mut aliases = self.to_map();
+
+        let mut added = Node::<String>::new();
 
         for (ns, size) in inferred.iter() {
             match Url::parse(ns.as_str()) {
@@ -60,7 +71,7 @@ impl InferredNamespaces for NamespaceTrie {
                             alias, ns
                         );
                         self.insert(ns, alias.clone());
-                        aliases.insert(&alias.clone(), ns.clone());
+                        aliases.insert(alias.clone(), ns.clone());
                         added.insert(&alias, ns.clone());
                     } else {
                         warn!("gen_alias() returned None for {}", ns);
@@ -83,7 +94,7 @@ impl InferredNamespaces for NamespaceTrie {
     }
 }
 
-fn gen_alias(url_obj: Url, aliases: &Node<String>) -> Option<String> {
+pub fn gen_alias(url_obj: Url, aliases: &BTreeMap<String, String>) -> Option<String> {
     let mut domains = url_obj
         .host_str()
         .unwrap_or_else(|| panic!("Url {} has no host str", url_obj.to_string()))
@@ -103,13 +114,13 @@ fn gen_alias(url_obj: Url, aliases: &Node<String>) -> Option<String> {
     let alias_abbrv = alias.chars().take(5).collect::<String>();
 
     // check if already exists
-    let conflict = aliases.find(&alias, true);
+    let conflict = aliases.get(&alias);
     if let None = conflict {
         return Some(alias);
     }
 
     // check if tlds are different
-    let confl_url = conflict.unwrap().value.clone().unwrap();
+    let confl_url = conflict.unwrap();
     let confl_url_obj = Url::parse(&confl_url).unwrap();
     if confl_url_obj.to_string() == url_obj.to_string() {
         return None;

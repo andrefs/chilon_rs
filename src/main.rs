@@ -38,7 +38,6 @@ fn main() {
     let cli = Cli::parse();
     SimpleLogger::new().init().unwrap();
 
-    info!("Building Vite");
     let output = Command::new("git")
         .arg("rev-parse")
         .arg("HEAD")
@@ -67,7 +66,7 @@ fn main() {
     if cli.infer_ns {
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
-        let mut iri_trie: IriTrie = build_iri_trie(cli.files.clone(), &mut ns_trie);
+        let (mut iri_trie, mut decl_ns) = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
         info!("Inferring namespaces from IRIs left");
         let seg_tree = SegTree::from(&iri_trie);

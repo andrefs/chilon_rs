@@ -1,7 +1,7 @@
 pub mod prefixcc;
 
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
-use crate::ns_trie::NamespaceTrie;
+use crate::ns_trie::{gen_alias, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::InsertFnVisitors;
@@ -14,6 +14,7 @@ use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 use std::{path::PathBuf, sync::mpsc::sync_channel};
 use unicode_segmentation::UnicodeSegmentation;
+use url::Url;
 
 use crate::ns_trie::InferredNamespaces;
 use rio_api::parser::TriplesParser;
@@ -24,7 +25,10 @@ pub enum Message {
     Finished,
 }
 
-pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
+pub fn build_iri_trie(
+    paths: Vec<PathBuf>,
+    ns_trie: &mut NamespaceTrie,
+) -> (IriTrie, BTreeMap<String, String>) {
     debug!("Building IRI trie");
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -119,15 +123,28 @@ let mut last_i = 0;
     }
     });
 
-    // local file prefix decls are only sent in the end
-    // remove the prefix and add to other prefix trie
-
+    // message with local file prefix decls is only sent in the end
+    // remove the prefix from iri trie and add to namespace trie
     iri_trie.remove_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
+
+    let ns_map = ns_trie.to_map();
     for (namespace, alias) in local_ns.iter() {
-        ns_trie.insert(&namespace.clone(), alias.clone());
+        let mut new_alias = alias.to_string();
+        if new_alias.is_empty() {
+            let url_obj = Url::parse(namespace.as_str());
+            if url_obj.is_ok() {
+                let alias_cand = gen_alias(url_obj.unwrap(), &ns_map);
+                if alias_cand.is_some() {
+                    new_alias = alias_cand.clone().unwrap();
+                }
+            }
+        }
+        if !new_alias.is_empty() {
+            ns_trie.insert(&namespace.clone(), new_alias.clone());
+        }
     }
 
-    return iri_trie;
+    return (iri_trie, local_ns);
 }
 
 fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) {
