@@ -256,9 +256,7 @@ fn proc_message(
         }
         Message::NamespaceUnknown { iri } => {
             let msg = format!("Unknown namespace for resource '{iri}'");
-            //warn!("{msg}");
             writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-            //log_error_to_file(fd, msg);
         }
         Message::Finished => {
             *running -= 1;
