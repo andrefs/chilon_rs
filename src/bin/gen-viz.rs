@@ -1,7 +1,6 @@
 use chilon_rs::{util::gen_file_name, visualization::render_vis};
 use chrono::Utc;
 use log::info;
-use simple_logger::SimpleLogger;
 
 use clap::Parser;
 use std::{
@@ -9,6 +8,8 @@ use std::{
     io::BufReader,
     path::PathBuf,
 };
+
+use simplelog::*;
 
 #[derive(Parser)]
 #[command(
@@ -24,7 +25,18 @@ pub struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    SimpleLogger::new().init().unwrap();
+
+    let log_config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .set_target_level(LevelFilter::Error)
+        .build();
+    TermLogger::init(
+        LevelFilter::Trace,
+        log_config.clone(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .unwrap();
 
     let out = gen_file_name(
         format!("tmp/{}", Utc::now().format("%Y%m%d")),

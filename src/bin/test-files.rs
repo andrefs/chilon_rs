@@ -1,10 +1,10 @@
 use chilon_rs::parse::parse;
 use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
-use simple_logger::SimpleLogger;
 
 use clap::Parser;
 use log::{debug, error, info};
+use simplelog::*;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -21,7 +21,18 @@ pub struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    SimpleLogger::new().init().unwrap();
+
+    let log_config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .set_target_level(LevelFilter::Error)
+        .build();
+    TermLogger::init(
+        LevelFilter::Trace,
+        log_config.clone(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .unwrap();
 
     for path in cli.files {
         info!("Checking file {}", path.to_string_lossy());

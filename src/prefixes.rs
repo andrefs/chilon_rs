@@ -25,10 +25,7 @@ pub enum Message {
     Finished,
 }
 
-pub fn build_iri_trie(
-    paths: Vec<PathBuf>,
-    ns_trie: &mut NamespaceTrie,
-) -> (IriTrie, BTreeMap<String, String>) {
+pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
     debug!("Building IRI trie");
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -144,7 +141,7 @@ let mut last_i = 0;
         }
     }
 
-    return (iri_trie, local_ns);
+    return iri_trie;
 }
 
 fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) {

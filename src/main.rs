@@ -12,49 +12,61 @@ mod trie;
 mod util;
 mod visualization;
 
-use crate::iri_trie::{IriTrie, IriTrieExt};
+use crate::iri_trie::IriTrieExt;
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use chilon_rs::util::gen_file_name;
-use chilon_rs::visualization::{build_data, dump_json, load_summary, render_vis};
+use chilon_rs::visualization::{build_data, dump_json, render_vis};
 use chrono::Utc;
 use clap::Parser;
 use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::prefixcc;
-use simple_logger::SimpleLogger;
-use std::fs;
+use std::fs::{self, File};
+use std::path::Path;
 use std::process::Command;
 use std::str;
+
+use simplelog::*;
+use std::time::Instant;
 
 fn main() {
     /**********************
      * Initializing stuff *
      **********************/
 
-    let cli = Cli::parse();
-    SimpleLogger::new().init().unwrap();
+    // start timers
+    let start = Instant::now();
+    let mut task_start = start;
 
-    let output = Command::new("git")
-        .arg("rev-parse")
-        .arg("HEAD")
-        .output()
-        .unwrap();
-    println!(
-        "Running from commit {}",
-        str::from_utf8(&output.stdout).unwrap()
-    );
-
+    // create output folder
     let out = gen_file_name(
         format!("results/{}", Utc::now().format("%Y%m%d")),
         "".to_string(),
     );
     let outf = out.as_str();
-    info!("Creating folder {outf} to store results");
+    println!("Creating folder {outf} to store results");
     fs::create_dir(outf).unwrap();
+
+    // start logging
+    init_log(outf);
+    info!("Created folder {outf} to store results");
+
+    // log git commit
+    let output = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .unwrap();
+    info!(
+        "Running from commit {}",
+        str::from_utf8(&output.stdout).unwrap().trim()
+    );
+
+    let cli = Cli::parse();
 
     /**********************
      * Prepare namespaces *
@@ -64,9 +76,11 @@ fn main() {
     let mut ns_trie: NamespaceTrie = prefixcc::load();
 
     if cli.infer_ns {
+        task_start = Instant::now();
+
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
-        let (mut iri_trie, mut decl_ns) = build_iri_trie(cli.files.clone(), &mut ns_trie);
+        let mut iri_trie = build_iri_trie(cli.files.clone(), &mut ns_trie);
 
         info!("Inferring namespaces from IRIs left");
         let seg_tree = SegTree::from(&iri_trie);
@@ -86,7 +100,10 @@ fn main() {
         //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
         //);
 
+        debug!("Saving namespaces");
         ns_trie.save(outf);
+
+        restart_task_timer(&mut task_start, "Finished namespace inferrence");
     }
 
     /*********************
@@ -100,6 +117,8 @@ fn main() {
     debug!("saving normalized triples");
     save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
+    restart_task_timer(&mut task_start, "Finished summarizing graph");
+
     /*****************
      * Visualization *
      *****************/
@@ -109,4 +128,34 @@ fn main() {
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
     render_vis(&vis_data, outf);
+
+    restart_task_timer(&mut task_start, "Finished generating visualization");
+}
+
+fn restart_task_timer(timer: &mut Instant, msg: &str) {
+    info!("{msg} ({:?})", timer.elapsed());
+    *timer = Instant::now();
+}
+
+fn init_log(outf: &str) {
+    let file_path = Path::new(".").join(outf).join("chilon.log");
+    let log_config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .set_target_level(LevelFilter::Error)
+        .build();
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Trace,
+            log_config.clone(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Trace,
+            log_config,
+            File::create(file_path).unwrap(),
+        ),
+    ])
+    .unwrap();
 }
