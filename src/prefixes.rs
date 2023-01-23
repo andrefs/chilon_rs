@@ -173,7 +173,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
         graph
             .parse_step(&mut |t| proc_triple(t, &tx))
             .unwrap_or_else(|err| {
-                error!("Error processing file {}: {}", path.to_string_lossy(), err)
+                panic!("Error processing file {}: {}", path.to_string_lossy(), err)
             });
     }
 
