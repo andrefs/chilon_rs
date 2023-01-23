@@ -24,7 +24,7 @@ use clap::Parser;
 use log::{debug, info};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
-use prefixes::prefixcc;
+use prefixes::community;
 use std::fs::{self, File};
 use std::path::Path;
 use std::process::Command;
@@ -72,8 +72,8 @@ fn main() {
      * Prepare namespaces *
      **********************/
 
-    info!("Loading namespaces from Prefix.cc");
-    let mut ns_trie: NamespaceTrie = prefixcc::load();
+    info!("Loading community namespaces");
+    let mut ns_trie: NamespaceTrie = community::load();
 
     if cli.infer_ns {
         task_start = Instant::now();

@@ -1,9 +1,10 @@
+use csv;
 use itertools::Itertools;
 use log::warn;
 use regex::Regex;
+use serde::Deserialize;
 use std::{
     cmp::Ordering,
-    collections::BTreeMap,
     fs::{create_dir_all, write, File},
     io::{BufReader, Read},
     path::Path,
@@ -12,30 +13,41 @@ use ureq;
 
 use crate::ns_trie::NamespaceTrie;
 
-const PCC_URL: &str = "https://prefix.cc/popular/all.file.json";
-const PCC_DIR: &str = "cache";
-const PCC_PATH: &str = "cache/prefix.cc.json";
+const PV_URL: &str =
+    "https://raw.githubusercontent.com/linkml/prefixmaps/main/src/prefixmaps/data/merged.csv";
+const PV_DIR: &str = "cache";
+const PV_PATH: &str = "cache/prefixmap.json";
 
-pub type PrefixMap = BTreeMap<String, String>;
+pub type PrefixVec = Vec<(String, String)>;
+
+#[derive(Deserialize)]
+struct Record {
+    context: String,
+    prefix: String,
+    namespace: String,
+    status: String,
+}
 
 pub fn download() {
-    let res = ureq::get(&PCC_URL).call().unwrap();
-    let json = res.into_string().unwrap();
-    let map = parse(json);
-    let fixed = fix_pcc(map);
+    let res = ureq::get(&PV_URL).call().unwrap();
+    let reader = res.into_reader();
+    let v = parse(reader);
+    let fixed = fix_pv(v);
 
-    create_dir_all(PCC_DIR).unwrap();
-    write(PCC_PATH, serde_json::to_string_pretty(&fixed).unwrap()).unwrap();
+    create_dir_all(PV_DIR).unwrap();
+    write(PV_PATH, serde_json::to_string_pretty(&fixed).unwrap()).unwrap();
 }
 
-pub fn parse<'a>(json: String) -> PrefixMap {
-    let m: PrefixMap = serde_json::from_str(json.as_str()).unwrap();
-    m
+fn parse<'a>(reader: impl Read) -> Vec<Record> {
+    csv::Reader::from_reader(reader)
+        .into_deserialize()
+        .filter_map(|res| res.unwrap())
+        .collect()
 }
 
-fn map_to_trie<'a>(map: PrefixMap) -> NamespaceTrie {
+fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
     let mut t = NamespaceTrie::new();
-    for (alias, namespace) in map.into_iter().sorted_by(|(_, ns1), (_, ns2)| {
+    for (alias, namespace) in v.into_iter().sorted_by(|(_, ns1), (_, ns2)| {
         let len1 = ns1.len();
         let len2 = ns2.len();
 
@@ -74,47 +86,41 @@ fn map_to_trie<'a>(map: PrefixMap) -> NamespaceTrie {
 }
 
 pub fn load() -> NamespaceTrie {
-    if !Path::new(PCC_PATH).exists() {
+    if !Path::new(PV_PATH).exists() {
         download();
     }
-    let file = File::open(PCC_PATH).unwrap();
+    let file = File::open(PV_PATH).unwrap();
     let mut buf_reader = BufReader::new(file);
     let mut s = String::new();
     buf_reader.read_to_string(&mut s).unwrap();
 
-    let map: PrefixMap = serde_json::from_str(s.as_str()).unwrap();
-    return map_to_trie(map);
+    let map: PrefixVec = serde_json::from_str(s.as_str()).unwrap();
+    return vec_to_trie(map);
 }
 
-fn fix_pcc(ns_map: PrefixMap) -> PrefixMap {
-    let fixed: PrefixMap = ns_map
+fn fix_pv(pv: Vec<Record>) -> PrefixVec {
+    let fixed: PrefixVec = pv
         .iter()
-        .filter(|(alias, namespace)| {
+        .filter(|r| r.status == "canonical")
+        .filter(|r| {
             // TODO improve
-            if alias.contains("walmart") && namespace.contains("amazon.es") {
+            if r.prefix.contains("walmart") && r.namespace.contains("amazon") {
                 return false;
             }
-            if alias.contains("movie") && namespace.contains("data.linkedmdb.org/resource/movie") {
-                return false;
-            }
-
-            if alias.contains("linkedmdb") && namespace.contains("data.linkedmdb.org") {
-                return false;
-            }
-
-            // lots of http://dbpedia.org/resource/XYZ stuff in prefix.cc
-            if namespace.starts_with("http://dpbedia.org/resource") && alias.ne(&"dbr") {
+            if r.prefix.contains("movie")
+                && r.namespace.contains("data.linkedmdb.org/resource/movie")
+            {
                 return false;
             }
 
-            // https://www.w3.org/2006/vcard/ns#latitude#"
-            if Regex::new("#.*#").unwrap().is_match(namespace) {
+            // https://www.w3.org/2006/vcard/ns#latitude#" -> invalid URL
+            if Regex::new("#.*#").unwrap().is_match(r.namespace.as_str()) {
                 return false;
             }
 
             return true;
         })
-        .map(|(alias, namespace)| ((alias.to_owned(), namespace.to_owned())))
+        .map(|r| ((r.prefix.to_owned(), r.namespace.to_owned())))
         .collect();
     fixed
 }
