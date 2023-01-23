@@ -50,7 +50,7 @@ fn main() {
                     Ok(())
                 })
                 .unwrap_or_else(|err: TurtleError| {
-                    error!("Error testing file {}: {}", path.to_string_lossy(), err);
+                    panic!("Error testing file {}: {}", path.to_string_lossy(), err);
                 });
         }
 
