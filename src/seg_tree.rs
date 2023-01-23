@@ -6,7 +6,7 @@ use std::{
 };
 use url::Url;
 
-use crate::iri_trie::IriTrie;
+use crate::{iri_trie::IriTrie, ns_trie::NamespaceSource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegTree {
@@ -64,7 +64,7 @@ impl SegTree {
         }
     }
 
-    pub fn infer_namespaces(&self) -> (Vec<(String, usize)>, Vec<String>) {
+    pub fn infer_namespaces(&self) -> (Vec<(String, usize, NamespaceSource)>, Vec<String>) {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
         let mut gbg_collected: Vec<String> = Vec::new();
         let MIN_NS_SIZE = 1000;
@@ -89,7 +89,10 @@ impl SegTree {
 
         infer_namespaces_aux(&mut h, MIN_NS_SIZE);
 
-        let inferred = h.iter().map(|ns| (ns.namespace.clone(), ns.size)).collect();
+        let inferred = h
+            .iter()
+            .map(|ns| (ns.namespace.clone(), ns.size, NamespaceSource::Inference))
+            .collect();
 
         return (inferred, gbg_collected);
     }

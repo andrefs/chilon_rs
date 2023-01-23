@@ -1,7 +1,7 @@
 pub mod community;
 
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
-use crate::ns_trie::{gen_alias, NamespaceTrie};
+use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::InsertFnVisitors;
@@ -51,7 +51,7 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
 
     let mut i = 0;
     let mut start = Instant::now();
-let mut last_i = 0;
+    let mut last_i = 0;
 
     loop {
         if running == 0 {
@@ -81,7 +81,7 @@ let mut last_i = 0;
                                 let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
                                 debug!("Adding inferred namespaces");
-                                let added = ns_trie.add_inferred_namespaces(&inferred);
+                                let added = ns_trie.add_namespaces(&inferred);
 
                                 debug!("Removing {} IRIs with inferred namespaces", added.len());
                                 iri_trie.remove_prefixes(&added);
@@ -136,7 +136,10 @@ let mut last_i = 0;
             }
         }
         if !new_alias.is_empty() {
-            ns_trie.insert(&namespace.clone(), new_alias.clone());
+            ns_trie.insert(
+                &namespace.clone(),
+                (new_alias.clone(), NamespaceSource::GraphFile),
+            );
         }
     }
 

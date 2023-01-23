@@ -11,7 +11,7 @@ use std::{
 };
 use ureq;
 
-use crate::ns_trie::NamespaceTrie;
+use crate::ns_trie::{NamespaceSource, NamespaceTrie};
 
 const PV_URL: &str =
     "https://raw.githubusercontent.com/linkml/prefixmaps/main/src/prefixmaps/data/merged.csv";
@@ -62,7 +62,7 @@ fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
         let res = t.longest_prefix(namespace.as_str(), true);
         if let Some((node, ns)) = res {
             if node.value.is_some() {
-                let existing_alias = node.value.as_ref().unwrap().clone();
+                let (existing_alias, _) = node.value.as_ref().unwrap().clone();
 
                 if namespace.eq(&ns) {
                     warn!(
@@ -80,7 +80,7 @@ fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
                 continue;
             }
         }
-        t.insert(&namespace, alias.clone());
+        t.insert(&namespace, (alias.clone(), NamespaceSource::Community));
     }
     return t;
 }

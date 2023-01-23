@@ -181,3 +181,28 @@ export const update = (
 
   addMouseEventListeners(svg, tooltip);
 }
+
+
+interface NodeColors {
+  default: string,
+  muted: string,
+  highlight: string,
+}
+
+export const nodeColors: { [type: string]: NodeColors } = {
+  namespace: {
+    default: '#B3D9CB',
+    muted: '#b8b8b8',
+    highlight: '#92d6bd'
+  },
+  blank: {
+    default: '#b3bcd9',
+    muted: '#b8b8b8',
+    highlight: '#90a4e3',
+  },
+  unknown: {
+    default: '#dfb6bc',
+    muted: '#b8b8b8',
+    highlight: '#f5a9b5',
+  }
+};

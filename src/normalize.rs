@@ -122,11 +122,11 @@ pub struct GroupNS {
     namespace: String,
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd)]
-pub enum Group {
-    Namespace(GroupNS),
-    Unknown,
-    Blank,
+#[derive(Default)]
+pub struct Groups {
+    namespaces: BTreeSet<GroupNS>,
+    blank: bool,
+    unknown: bool,
 }
 
 pub fn normalize_triples(
@@ -134,9 +134,9 @@ pub fn normalize_triples(
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
-) -> (TripleFreq, BTreeSet<Group>) {
+) -> (TripleFreq, Groups) {
     let mut triples = TripleFreq::new();
-    let mut used_groups = BTreeSet::<Group>::new();
+    let mut used_groups: Groups = Default::default();
 
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -205,7 +205,7 @@ pub fn normalize_triples(
 fn proc_message(
     message: Message,
     triples: &mut TripleFreq,
-    used_groups: &mut BTreeSet<Group>,
+    used_groups: &mut Groups,
     fd: &mut File,
     running: &mut usize,
 ) {
@@ -224,21 +224,21 @@ fn proc_message(
             for resource in vec![subject, predicate, object] {
                 match resource {
                     NormalizedResource::Unknown => {
-                        used_groups.insert(Group::Unknown);
+                        used_groups.unknown = true;
                     }
                     NormalizedResource::BlankNode => {
-                        used_groups.insert(Group::Blank);
+                        used_groups.blank = true;
                     }
                     NormalizedResource::Literal(Lit { lang }) => {
-                        used_groups.insert(match lang {
-                            None => Group::Namespace(GroupNS {
+                        used_groups.namespaces.insert(match lang {
+                            None => GroupNS {
                                 alias: "xsd".into(),
                                 namespace: "http://www.w3.org/TR/xmlschema11-2/".into(),
-                            }),
-                            Some(_) => Group::Namespace(GroupNS {
+                            },
+                            Some(_) => GroupNS {
                                 alias: "rdf".into(),
                                 namespace: "http://www.w3.org/1999/02/22-rdf-syntax-ns#".into(),
-                            }),
+                            },
                         });
                     }
                     NormalizedResource::TypedLiteral(TypedLit {
@@ -246,10 +246,10 @@ fn proc_message(
                         alias,
                         iri: _,
                     }) => {
-                        used_groups.insert(Group::Namespace(GroupNS { alias, namespace }));
+                        used_groups.namespaces.insert(GroupNS { alias, namespace });
                     }
                     NormalizedResource::NamedNode(NNode { alias, namespace }) => {
-                        used_groups.insert(Group::Namespace(GroupNS { alias, namespace }));
+                        used_groups.namespaces.insert(GroupNS { alias, namespace });
                     }
                 }
             }
@@ -296,7 +296,7 @@ fn proc_triples(
         if let Err(err) =
             graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown))
         {
-            error!("Error normalizing file {}: {}", path.to_string_lossy(), err);
+            panic!("Error normalizing file {}: {}", path.to_string_lossy(), err);
         }
     }
     tx.send(Message::Finished).unwrap();
@@ -407,9 +407,9 @@ fn handle_named_node(
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     let res = ns_trie.longest_prefix(n.iri, true);
     if let Some((node, ns)) = res {
-        if node.value.is_some() {
+        if let Some((alias, source)) = &node.value {
             return Ok(NormalizedResource::NamedNode(NNode {
-                alias: node.value.as_ref().unwrap().clone(),
+                alias: alias.clone(),
                 namespace: ns,
             }));
             //return Ok(node.value.as_ref().unwrap().clone());
@@ -441,7 +441,7 @@ fn handle_literal(
             let res = ns_trie.longest_prefix(datatype.iri, true);
             if let Some((node, ns)) = res {
                 if node.value.is_some() {
-                    let alias = node.value.as_ref().unwrap().clone();
+                    let (alias, _) = node.value.as_ref().unwrap().clone();
                     return Ok(NormalizedResource::TypedLiteral(TypedLit {
                         namespace: ns,
                         alias,
@@ -458,7 +458,7 @@ fn handle_literal(
 
 pub fn save_normalized_triples(
     nts: &TripleFreq,
-    used_groups: BTreeSet<Group>,
+    used_groups: Groups,
     min_occurs: Option<i32>,
     outf: &str,
 ) {
@@ -483,9 +483,8 @@ pub fn save_normalized_triples(
 
     let mut formatter = TurtleFormatter::new(fd);
     // print namespace alias
-    for group in used_groups {
-        format_group(group, &mut formatter);
-    }
+    format_groups(used_groups, &mut formatter);
+
     fd = formatter.finish().unwrap();
     writeln!(fd, "").unwrap();
 
@@ -585,28 +584,53 @@ pub fn save_normalized_triples(
     formatter.finish().unwrap();
 }
 
-pub fn format_group(group: Group, formatter: &mut TurtleFormatter<File>) {
-    let blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
+pub fn format_groups(groups: Groups, formatter: &mut TurtleFormatter<File>) {
+    if groups.blank {
+        let blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
+    }
+
+    for group in groups.namespaces {
+        format_group(group, formatter);
+    }
+}
+
+pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
     let unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
-    match group {
-        Group::Namespace(GroupNS { alias, namespace }) => formatter
-            .format(&Triple {
-                subject: NamedNode {
-                    iri: format!("#{}", alias).as_str(),
-                }
-                .into(),
-                predicate: NamedNode {
-                    iri: "namespacePrefix",
-                }
-                .into(),
-                object: NamedNode {
-                    iri: namespace.as_str(),
-                }
-                .into(),
-            })
-            .unwrap(),
-        _ => {}
-    };
+    let ns = "http://andrefs.com/graph-summ/v1/ontology#Namespace";
+
+    formatter
+        .format(&Triple {
+            subject: NamedNode {
+                iri: format!("#{}", group.alias).as_str(),
+            }
+            .into(),
+            predicate: NamedNode {
+                iri: "namespacePrefix",
+            }
+            .into(),
+            object: NamedNode {
+                iri: group.namespace.as_str(),
+            }
+            .into(),
+        })
+        .unwrap();
+
+    formatter
+        .format(&Triple {
+            subject: NamedNode {
+                iri: format!("#{}", group.alias).as_str(),
+            }
+            .into(),
+            predicate: NamedNode {
+                iri: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+            }
+            .into(),
+            object: NamedNode {
+                iri: &group.namespace,
+            }
+            .into(),
+        })
+        .unwrap();
 }
 
 #[cfg(test)]

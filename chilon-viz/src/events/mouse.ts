@@ -15,7 +15,6 @@ const addNodeEventListeners = (
 ) => {
   circle
     .on('mouseover', function(event, d) {
-      console.log('XXXXXXXXXX', { d })
       const hlNodes = new Set();
       edgepaths.each(function(d: any) {
         const s = d.source;

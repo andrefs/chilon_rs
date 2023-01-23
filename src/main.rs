@@ -87,7 +87,7 @@ fn main() {
         let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
         debug!("Adding inferred namespaces");
-        let added = ns_trie.add_inferred_namespaces(&inferred);
+        let added = ns_trie.add_namespaces(&inferred);
 
         debug!("Removing IRIs with inferred namespaces");
         iri_trie.remove_prefixes(&added);

@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt,
     fs::write,
     path::Path,
 };
@@ -8,7 +9,27 @@ use crate::trie::Node;
 use log::{debug, info, warn};
 use url::Url;
 
-pub type NamespaceTrie = Node<String>;
+#[derive(Debug, Clone, Copy)]
+pub enum NamespaceSource {
+    User,
+    Community,
+    GraphFile,
+    Inference,
+}
+
+impl fmt::Display for NamespaceSource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NamespaceSource::User => write!(f, "user"),
+            NamespaceSource::Community => write!(f, "community"),
+            NamespaceSource::GraphFile => write!(f, "graph_file"),
+            NamespaceSource::Inference => write!(f, "inferrence"),
+        }
+    }
+}
+
+pub type NamespaceTrie = Node<(String, NamespaceSource)>;
+pub type NamespaceMap = BTreeMap<String, (String, String)>;
 
 pub trait SaveTrie {
     fn save(&self, outf: &str);
@@ -18,9 +39,12 @@ impl SaveTrie for NamespaceTrie {
     fn save(&self, outf: &str) {
         let file_path = Path::new(".").join(outf).join("all-prefixes.json");
         info!("Saving namespaces in {}", file_path.to_string_lossy());
-        let mut ns_map = HashMap::<String, String>::new();
+
+        let mut ns_map = NamespaceMap::new();
+
         for (ns, node) in self.iter_leaves() {
-            ns_map.insert(node.value.as_ref().unwrap().clone(), ns);
+            let (alias, source) = node.value.as_ref().unwrap().clone();
+            ns_map.insert(alias, (ns, source.to_string()));
         }
 
         write(file_path, serde_json::to_string_pretty(&ns_map).unwrap()).unwrap();
@@ -28,27 +52,27 @@ impl SaveTrie for NamespaceTrie {
 }
 
 pub trait InferredNamespaces {
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String>;
+    fn add_namespaces(&mut self, inferred: &Vec<(String, usize, NamespaceSource)>) -> Vec<String>;
 
-    fn to_map(&self) -> BTreeMap<String, String>;
+    fn to_map(&self) -> NamespaceMap;
 }
 
 impl InferredNamespaces for NamespaceTrie {
-    fn to_map(&self) -> BTreeMap<String, String> {
-        let mut trie = BTreeMap::<String, String>::new();
+    fn to_map(&self) -> NamespaceMap {
+        let mut trie = NamespaceMap::new();
         for (ns, node) in self.iter() {
-            if let Some(alias) = node.value.clone() {
-                trie.insert(alias, ns);
+            if let Some((alias, source)) = node.value.clone() {
+                trie.insert(alias, (ns, source.to_string()));
             }
         }
         return trie;
     }
-    fn add_inferred_namespaces(&mut self, inferred: &Vec<(String, usize)>) -> Vec<String> {
+    fn add_namespaces(&mut self, inferred: &Vec<(String, usize, NamespaceSource)>) -> Vec<String> {
         let mut aliases = self.to_map();
 
         let mut added = Node::<String>::new();
 
-        for (ns, size) in inferred.iter() {
+        for (ns, size, source) in inferred.iter() {
             match Url::parse(ns.as_str()) {
                 Err(err) => warn!("Could not parse IRI {ns}: {err}"),
                 Ok(url_obj) => {
@@ -59,9 +83,10 @@ impl InferredNamespaces for NamespaceTrie {
                     if let Some((node, ns)) =
                         self.longest_prefix(url_obj.to_string().as_str(), true)
                     {
+                        let (alias, _) = node.value.as_ref().unwrap();
                         debug!(
                             "Inferred namespace {ns} already in trie with alias {}",
-                            node.value.as_ref().unwrap()
+                            alias
                         );
                     }
                     let alias_opt = gen_alias(url_obj, &aliases);
@@ -70,8 +95,8 @@ impl InferredNamespaces for NamespaceTrie {
                             "Adding new namespace {} -> {} to namespace trie (size: {size})",
                             alias, ns
                         );
-                        self.insert(ns, alias.clone());
-                        aliases.insert(alias.clone(), ns.clone());
+                        self.insert(ns, (alias.clone(), *source));
+                        aliases.insert(alias.clone(), (ns.clone(), source.to_string()));
                         added.insert(&alias, ns.clone());
                     } else {
                         warn!("gen_alias() returned None for {}", ns);
@@ -94,7 +119,7 @@ impl InferredNamespaces for NamespaceTrie {
     }
 }
 
-pub fn gen_alias(url_obj: Url, aliases: &BTreeMap<String, String>) -> Option<String> {
+pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     let mut domains = url_obj
         .host_str()
         .unwrap_or_else(|| panic!("Url {} has no host str", url_obj.to_string()))
@@ -120,7 +145,7 @@ pub fn gen_alias(url_obj: Url, aliases: &BTreeMap<String, String>) -> Option<Str
     }
 
     // check if tlds are different
-    let confl_url = conflict.unwrap();
+    let confl_url = conflict.unwrap().clone().0;
     let confl_url_obj = Url::parse(&confl_url).unwrap();
     if confl_url_obj.to_string() == url_obj.to_string() {
         return None;

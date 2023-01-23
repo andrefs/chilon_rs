@@ -3,7 +3,7 @@ use oxigraph::{
     io::GraphFormat,
     model::{GraphName, NamedNode},
     sparql::{EvaluationError, QueryResults, QuerySolution},
-    store::Store,
+    store::{StorageError, Store},
 };
 
 use rio_turtle::TurtleParser;
@@ -50,7 +50,8 @@ pub struct VisEdge {
 }
 
 pub fn build_data(outf: &str) -> VisData {
-    let qres = query_graph(outf);
+    let store = load_store(outf);
+    let qres = query_graph(store);
 
     let mut nodes = BTreeMap::<String, VisNode>::new();
     let mut edges = HashMap::<(String, String), Vec<VisEdge>>::new();
@@ -150,7 +151,7 @@ fn sort_pair(a: String, b: String) -> (String, String) {
     }
 }
 
-fn query_graph(outf: &str) -> Result<QueryResults, EvaluationError> {
+fn load_store(outf: &str) -> Store {
     let file_path = Path::new(".").join(outf).join("output.ttl");
     let file = File::open(file_path.clone())
         .unwrap_or_else(|e| panic!("Could not open file {}: {e}", file_path.to_string_lossy()));
@@ -160,18 +161,14 @@ fn query_graph(outf: &str) -> Result<QueryResults, EvaluationError> {
 
     let store = Store::new().unwrap();
 
-    let mut nodes = BTreeMap::<i32, VisNode>::new();
-    let mut edges = Vec::<VisEdge>::new();
-    let mut nodes2ids = BTreeMap::<String, i32>::new();
-
-    let rdf_type = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-    let groups_link = "http://andrefs.com/graph-summ/GroupsLink";
-
     store
         .bulk_loader()
         .load_graph(stream, GraphFormat::Turtle, &GraphName::DefaultGraph, None)
         .unwrap();
+    store
+}
 
+fn query_graph(store: Store) -> Result<QueryResults, EvaluationError> {
     let q = r#"
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
