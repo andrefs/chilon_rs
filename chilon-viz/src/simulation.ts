@@ -1,7 +1,8 @@
 import { Simulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
 import { RawEdge, RawNode, SimData } from './data/raw-data';
-import { selectAll, select } from 'd3-selection';
+import { selectAll, select, Selection } from 'd3-selection';
 import { drag } from './events/drag';
+import { addMouseEventListeners } from './events/mouse';
 
 
 export const initSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimData, width: number, height: number) => {
@@ -79,7 +80,12 @@ const calcLoop = (d: any) => {
 
 }
 
-export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
+export const update = (
+  data: SimData,
+  sim: Simulation<RawNode, RawEdge>,
+  svg: Selection<SVGSVGElement, any, HTMLElement, any>,
+  tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
+) => {
 
   let nodesParent = select("svg g.nodes");
   let edgesParent = select("svg g.edges");
@@ -172,4 +178,6 @@ export const update = (data: SimData, sim: Simulation<RawNode, RawEdge>) => {
 
 
   restartSimulation(sim, data);
+
+  addMouseEventListeners(svg, tooltip);
 }

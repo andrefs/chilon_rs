@@ -2,7 +2,6 @@ import { BaseType, select, Selection } from "d3-selection";
 import humanFormat from 'human-format';
 
 export const addMouseEventListeners = (svg: Selection<SVGSVGElement, any, HTMLElement, any>, tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>) => {
-  const nodes = svg.selectAll('g.nodes g.node-g circle');
   const circle = svg.selectAll('g.nodes g.node-g circle');
   let edgepaths = svg.selectAll("g.edges g.edge-g path");
   addNodeEventListeners(circle, edgepaths, tooltip);

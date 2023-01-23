@@ -4,6 +4,7 @@ import 'range-slider-input/dist/style.css';
 import { filterData, truncateData } from "../data";
 import { update } from "../simulation";
 import { Simulation } from "d3-force";
+import { Selection } from "d3-selection";
 
 export const getSliderElems = () => {
   return {
@@ -47,7 +48,12 @@ const debounce = (func: Function, timeout = 100) => {
 
 
 
-export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>) => {
+export const initSliders = (
+  initData: SimData,
+  sim: Simulation<RawNode, RawEdge>,
+  svg: Selection<SVGSVGElement, any, HTMLElement, any>,
+  tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
+) => {
   let elems = getSliderElems();
 
   const data = truncateData(initData, 50, 50);
@@ -75,7 +81,7 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
         maxEdgeOccurs
       });
 
-      update(newData, sim);
+      update(newData, sim, svg, tooltip);
 
     }, 100)
   });
@@ -98,7 +104,7 @@ export const initSliders = (initData: SimData, sim: Simulation<RawNode, RawEdge>
         maxEdgeOccurs
       });
 
-      update(newData, sim);
+      update(newData, sim, svg, tooltip);
     }, 100)
   });
 

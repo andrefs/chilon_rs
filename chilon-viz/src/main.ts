@@ -8,7 +8,6 @@ import { initSimulation, update } from './simulation';
 import * as d3Zoom from 'd3-zoom';
 import { handleZoom, initZoom } from './zoom';
 import { createTooltip } from './tooltip';
-import { addMouseEventListeners } from './events/mouse';
 
 
 
@@ -26,15 +25,17 @@ const start = () => {
   const width = svg.node()?.getBoundingClientRect().width!;
   const height = svg.node()?.getBoundingClientRect().height!;
 
-  initSimulation(sim, data, width, height);
-  initSliders(initData, sim);
-
-  update(data, sim);
-  initZoom(zoom);
-
   const tooltip = createTooltip();
 
-  addMouseEventListeners(svg, tooltip);
+  initSimulation(sim, data, width, height);
+  initSliders(initData, sim, svg, tooltip);
+
+
+  update(data, sim, svg, tooltip);
+  initZoom(zoom);
+
+
+  //addMouseEventListeners(svg, tooltip);
 
   console.log('XXXXXX end', { sim, initData, data, svg });
 }
