@@ -4,12 +4,12 @@ use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
-use crate::trie::InsertFnVisitors;
+use crate::trie::{InsertFnVisitors, Node};
 use log::{debug, info, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::Instant;
 use std::{path::PathBuf, sync::mpsc::sync_channel};
 use unicode_segmentation::UnicodeSegmentation;
@@ -18,8 +18,14 @@ use url::Url;
 use crate::ns_trie::InferredNamespaces;
 use rio_api::parser::TriplesParser;
 
+pub enum Position {
+    Subject,
+    Predicate,
+    Object,
+}
+
 pub enum Message {
-    Resource { iri: String },
+    Resource { iri: String, pos: Position },
     PrefixDecl { namespace: String, alias: String },
     Finished,
 }
@@ -48,63 +54,84 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             });
         }
 
+        handle_loop(&mut running, rx, &mut iri_trie, ns_trie, &mut local_ns);
+    });
 
-    let mut i = 0;
+    handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
+
+    return iri_trie;
+}
+
+#[derive(Default)]
+pub struct Counter {
+    prev: usize,
+    cur: usize,
+}
+
+impl Counter {
+    fn delta(&mut self) -> usize {
+        self.cur - self.prev
+    }
+
+    fn inc(&mut self) {
+        self.cur += 1;
+    }
+
+    fn lap(&mut self) {
+        self.prev = self.cur;
+    }
+}
+
+fn handle_loop(
+    running: &mut usize,
+    rx: Receiver<Message>,
+    iri_trie: &mut Node<NodeStats>,
+    ns_trie: &mut NamespaceTrie,
+    local_ns: &mut BTreeMap<String, String>,
+) {
+    let mut res_c = Counter::default();
+    let mut trip_c = Counter::default();
     let mut start = Instant::now();
-    let mut last_i = 0;
 
     loop {
-        if running == 0 {
+        if *running == 0 {
             break;
         }
         if let Ok(message) = rx.recv() {
             match message {
-                Message::Resource { iri } => {
-                    i += 1;
-                    if i % 1_000_000 == 1 {
-                        let elapsed = start.elapsed().as_millis();
-                        if elapsed != 0 {
-                            trace!(
-                                "Received {i} resources so far ({} resources/s, trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
-                                ((i - last_i) / elapsed) * 1000,
+                Message::Resource { iri, pos } => {
+                    if let Position::Predicate = pos {
+                        trip_c.inc();
+                    }
+                    res_c.inc();
+                    if res_c.cur % 1_000_000 == 1 {
+                        restart_timers(
+                            &mut start,
+                            &mut res_c,
+                            &mut trip_c,
                             iri_trie.count(),
                             ns_trie.count_terminals(),
-                            start.elapsed().as_secs()
-                            );
-                        }
-
+                        );
                         if let Some(size) = iri_trie.value {
                             let IRI_TRIE_SIZE = 1_000_000;
                             if size.desc > IRI_TRIE_SIZE {
-                                warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
-                                let seg_tree = SegTree::from(&iri_trie);
-                                let (inferred, gbg_collected) = seg_tree.infer_namespaces();
-
-                                debug!("Adding inferred namespaces");
-                                let added = ns_trie.add_namespaces(&inferred);
-
-                                debug!("Removing {} IRIs with inferred namespaces", added.len());
-                                iri_trie.remove_prefixes(&added);
-
-                                debug!("Removing {} IRIs with garbage collected namespaces", gbg_collected.len());
-                                iri_trie.remove_prefixes(&gbg_collected);
+                                maintenance(iri_trie, IRI_TRIE_SIZE, ns_trie);
                             }
                         }
-                                    last_i = i;
-                        start = Instant::now();
                     }
 
+                    // find namespace for resource
                     let res = ns_trie.longest_prefix(iri.as_str(), true);
                     if res.is_none() || res.unwrap().1.is_empty() {
-                                let stats = NodeStats::new_terminal();
-                                iri_trie.insert_fn(
-                                    &iri,
-                                    stats,
-                                    &InsertFnVisitors {
-                                        node: Some(&update_stats),
-                                        terminal: Some(&inc_own),
-                                    },
-                                );
+                        let stats = NodeStats::new_terminal();
+                        iri_trie.insert_fn(
+                            &iri,
+                            stats,
+                            &InsertFnVisitors {
+                                node: Some(&update_stats),
+                                terminal: Some(&inc_own),
+                            },
+                        );
                     }
                 }
                 Message::PrefixDecl { namespace, alias } => {
@@ -112,13 +139,36 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
                     local_ns.insert(namespace, alias);
                 }
                 Message::Finished => {
-                    running -= 1;
+                    *running -= 1;
                 }
             }
         }
     }
-    });
+}
 
+fn maintenance(iri_trie: &mut Node<NodeStats>, IRI_TRIE_SIZE: usize, ns_trie: &mut NamespaceTrie) {
+    warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
+    let seg_tree = SegTree::from(&*iri_trie);
+    let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+
+    debug!("Adding inferred namespaces");
+    let added = ns_trie.add_namespaces(&inferred);
+
+    debug!("Removing {} IRIs with inferred namespaces", added.len());
+    iri_trie.remove_prefixes(&added);
+
+    debug!(
+        "Removing {} IRIs with garbage collected namespaces",
+        gbg_collected.len()
+    );
+    iri_trie.remove_prefixes(&gbg_collected);
+}
+
+fn handle_pref_decls(
+    iri_trie: &mut Node<NodeStats>,
+    local_ns: BTreeMap<String, String>,
+    ns_trie: &mut NamespaceTrie,
+) {
     // message with local file prefix decls is only sent in the end
     // remove the prefix from iri trie and add to namespace trie
     iri_trie.remove_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
@@ -142,8 +192,34 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             );
         }
     }
+}
 
-    return iri_trie;
+fn restart_timers(
+    start: &mut Instant,
+    res_c: &mut Counter,
+    trip_c: &mut Counter,
+    iri_trie_count: usize,
+    ns_trie_count_t: u32,
+) {
+    let elapsed = start.elapsed().as_millis();
+    if elapsed != 0 {
+        trace!(
+            "Received {} resources, {} triples so far",
+            res_c.cur,
+            trip_c.cur
+        );
+        trace!("{} resources/s, {} triples/s, trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
+            (res_c.delta() as u128 / elapsed) * 1000,
+            (trip_c.delta() as u128 / elapsed) * 1000,
+            iri_trie_count,
+            ns_trie_count_t,
+            start.elapsed().as_secs()
+        );
+    }
+
+    res_c.lap();
+    trip_c.lap();
+    *start = Instant::now();
 }
 
 fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) {
@@ -194,18 +270,21 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(), TurtleError> {
     if let Subject::NamedNode(NamedNode { iri }) = t.subject {
         tx.send(Message::Resource {
             iri: normalize_iri(iri),
+            pos: Position::Subject,
         })
         .unwrap();
     }
     // predicate
     tx.send(Message::Resource {
         iri: normalize_iri(t.predicate.iri),
+        pos: Position::Predicate,
     })
     .unwrap();
     // object
     if let Term::NamedNode(NamedNode { iri }) = t.object {
         tx.send(Message::Resource {
             iri: normalize_iri(iri),
+            pos: Position::Object,
         })
         .unwrap();
     }
