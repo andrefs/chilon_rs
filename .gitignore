@@ -8,3 +8,5 @@ results/
 _*
 tmp/*
 old/*
+*.dat
+flamegraph.svg
