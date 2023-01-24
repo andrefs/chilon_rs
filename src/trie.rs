@@ -608,4 +608,14 @@ mod tests {
         assert!(all_strs.contains(&"this is even more".to_string()));
         assert_eq!(all_strs.len(), 3);
     }
+
+    #[test]
+    fn count_nodes() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
+
+        assert_eq!(t.count_nodes(), 26);
+    }
 }
