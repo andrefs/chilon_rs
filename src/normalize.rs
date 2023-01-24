@@ -2,21 +2,21 @@ use crate::{
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
 };
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
     model::Triple,
-    model::{BlankNode, Literal, NamedNode, Subject, Term},
+    model::{Literal, NamedNode, Subject, Term},
     parser::TriplesParser,
 };
-use rio_turtle::{TurtleError, TurtleFormatter, TurtleParser};
+use rio_turtle::{TurtleError, TurtleFormatter};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{File, OpenOptions},
-    io::{BufRead, Write},
+    io::Write,
     path::{Path, PathBuf},
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{sync_channel, Sender, SyncSender},
     time::Instant,
 };
 
@@ -148,7 +148,7 @@ pub fn normalize_triples(
         .unwrap();
 
     pool.scope_fifo(|s| {
-        let (tx, rx) = channel::<Message>();
+        let (tx, rx) = sync_channel::<Message>(100);
         for path in paths {
             let tx = tx.clone();
             s.spawn_fifo(move |_| {
@@ -267,7 +267,7 @@ fn proc_message(
 fn proc_triples(
     graph: &mut ParserWrapper,
     path: &PathBuf,
-    tx: &Sender<Message>,
+    tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
 ) {
@@ -304,7 +304,7 @@ fn proc_triples(
 
 fn proc_triple<E>(
     t: Triple,
-    tx: &Sender<Message>,
+    tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
 ) -> Result<(), E> {
@@ -636,7 +636,7 @@ pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
 #[cfg(test)]
 mod tests {
 
-    use crate::trie::Node;
+    use crate::{ns_trie::NamespaceSource, trie::Node};
 
     use super::*;
 
@@ -690,7 +690,7 @@ mod tests {
         };
 
         let mut ns_trie = NamespaceTrie::new();
-        ns_trie.insert(ns, alias.into());
+        ns_trie.insert(ns, (alias.into(), NamespaceSource::User));
 
         let res = handle_literal(lit, &ns_trie);
 
