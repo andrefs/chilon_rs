@@ -127,6 +127,7 @@ fn handle_loop(
                         trip_c.inc();
                     }
                     res_c.inc();
+
                     if res_c.cur % 1_000_000 == 1 {
                         let it_c = iri_trie.count();
                         let it_n = iri_trie.count_nodes();
