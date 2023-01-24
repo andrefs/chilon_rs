@@ -139,7 +139,12 @@ fn restart_task_timer(timer: &mut Instant, msg: &str) {
 
 fn init_log(outf: &str) {
     let file_path = Path::new(".").join(outf).join("chilon.log");
-    let log_config = ConfigBuilder::new()
+    let term_log_config = ConfigBuilder::new()
+        .set_location_level(LevelFilter::Off)
+        .set_target_level(LevelFilter::Error)
+        .set_thread_mode(ThreadLogMode::Both)
+        .build();
+    let file_log_config = ConfigBuilder::new()
         .set_time_format_rfc3339()
         .set_target_level(LevelFilter::Error)
         .build();
@@ -147,13 +152,13 @@ fn init_log(outf: &str) {
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Trace,
-            log_config.clone(),
+            term_log_config.clone(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
         ),
         WriteLogger::new(
             LevelFilter::Trace,
-            log_config,
+            file_log_config,
             File::create(file_path).unwrap(),
         ),
     ])
