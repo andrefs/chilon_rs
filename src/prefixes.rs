@@ -104,18 +104,14 @@ fn handle_loop(
                         trip_c.inc();
                     }
                     res_c.inc();
+
                     if res_c.cur % 1_000_000 == 1 {
                         let it_c = iri_trie.count();
                         let it_n = iri_trie.count_nodes();
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        if let Some(size) = iri_trie.value {
-                            let IRI_TRIE_SIZE = 1_000_000;
-                            if size.desc > IRI_TRIE_SIZE {
-                                maintenance(iri_trie, IRI_TRIE_SIZE, ns_trie);
-                            }
-                        }
+                        maintenance(iri_trie, ns_trie);
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -148,22 +144,28 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
     }
 }
 
-fn maintenance(iri_trie: &mut Node<NodeStats>, IRI_TRIE_SIZE: usize, ns_trie: &mut NamespaceTrie) {
-    warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
-    let seg_tree = SegTree::from(&*iri_trie);
-    let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie) {
+    if let Some(size) = iri_trie.value {
+        let IRI_TRIE_SIZE = 100_000;
 
-    debug!("Adding inferred namespaces");
-    let added = ns_trie.add_namespaces(&inferred);
+        if size.desc > IRI_TRIE_SIZE {
+            warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
+            let seg_tree = SegTree::from(&*iri_trie);
+            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
-    debug!("Removing {} IRIs with inferred namespaces", added.len());
-    iri_trie.remove_prefixes(&added);
+            debug!("Adding inferred namespaces");
+            let added = ns_trie.add_namespaces(&inferred);
 
-    debug!(
-        "Removing {} IRIs with garbage collected namespaces",
-        gbg_collected.len()
-    );
-    iri_trie.remove_prefixes(&gbg_collected);
+            debug!("Removing {} IRIs with inferred namespaces", added.len());
+            iri_trie.remove_prefixes(&added);
+
+            debug!(
+                "Removing {} IRIs with garbage collected namespaces",
+                gbg_collected.len()
+            );
+            iri_trie.remove_prefixes(&gbg_collected);
+        }
+    }
 }
 
 fn handle_pref_decls(
