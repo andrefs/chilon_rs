@@ -69,7 +69,7 @@ pub struct Counter {
 }
 
 impl Counter {
-    fn delta(&mut self) -> usize {
+    fn delta(&self) -> usize {
         self.cur - self.prev
     }
 
@@ -89,9 +89,9 @@ fn handle_loop(
     ns_trie: &mut NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
 ) {
-    let mut res_c = Counter::default();
-    let mut trip_c = Counter::default();
-    let mut start = Instant::now();
+    let res_c = &mut Counter::default();
+    let trip_c = &mut Counter::default();
+    let start = &mut Instant::now();
 
     loop {
         if *running == 0 {
@@ -105,13 +105,11 @@ fn handle_loop(
                     }
                     res_c.inc();
                     if res_c.cur % 1_000_000 == 1 {
-                        restart_timers(
-                            &mut start,
-                            &mut res_c,
-                            &mut trip_c,
-                            iri_trie.count(),
-                            ns_trie.count_terminals(),
-                        );
+                        let it_c = iri_trie.count();
+                        let it_n = iri_trie.count_nodes();
+                        let nst_ct = ns_trie.count_terminals();
+                        restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
+
                         if let Some(size) = iri_trie.value {
                             let IRI_TRIE_SIZE = 1_000_000;
                             if size.desc > IRI_TRIE_SIZE {
@@ -120,19 +118,7 @@ fn handle_loop(
                         }
                     }
 
-                    // find namespace for resource
-                    let res = ns_trie.longest_prefix(iri.as_str(), true);
-                    if res.is_none() || res.unwrap().1.is_empty() {
-                        let stats = NodeStats::new_terminal();
-                        iri_trie.insert_fn(
-                            &iri,
-                            stats,
-                            &InsertFnVisitors {
-                                node: Some(&update_stats),
-                                terminal: Some(&inc_own),
-                            },
-                        );
-                    }
+                    insert_resource(ns_trie, iri, iri_trie);
                 }
                 Message::PrefixDecl { namespace, alias } => {
                     debug!("Found local prefix {alias}: {namespace}");
@@ -143,6 +129,22 @@ fn handle_loop(
                 }
             }
         }
+    }
+}
+
+fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<NodeStats>) {
+    // find namespace for resource
+    let res = ns_trie.longest_prefix(iri.as_str(), true);
+    if res.is_none() || res.unwrap().1.is_empty() {
+        let stats = NodeStats::new_terminal();
+        iri_trie.insert_fn(
+            &iri,
+            stats,
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
     }
 }
 
@@ -199,19 +201,22 @@ fn restart_timers(
     res_c: &mut Counter,
     trip_c: &mut Counter,
     iri_trie_count: usize,
+    iri_trie_nodes: u32,
     ns_trie_count_t: u32,
 ) {
     let elapsed = start.elapsed().as_millis();
     if elapsed != 0 {
         trace!(
-            "Received {} resources, {} triples so far",
+            "Received {} resources ({}/s), {} triples ({}/s) so far",
             res_c.cur,
-            trip_c.cur
-        );
-        trace!("{} resources/s, {} triples/s, trie size: {}, ns_trie size: {}, total seconds elapsed: {}s)",
             (res_c.delta() as u128 / elapsed) * 1000,
+            trip_c.cur,
             (trip_c.delta() as u128 / elapsed) * 1000,
+        );
+        trace!(
+            "iri trie size: {} ({} nodes), ns_trie size: {}, total seconds elapsed: {}s)",
             iri_trie_count,
+            iri_trie_nodes,
             ns_trie_count_t,
             start.elapsed().as_secs()
         );
