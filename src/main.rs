@@ -139,6 +139,7 @@ fn restart_task_timer(timer: &mut Instant, msg: &str) {
 
 fn init_log(outf: &str) {
     let file_path = Path::new(".").join(outf).join("chilon.log");
+
     let term_log_config = ConfigBuilder::new()
         .set_location_level(LevelFilter::Off)
         .set_target_level(LevelFilter::Error)
