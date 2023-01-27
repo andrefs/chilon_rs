@@ -236,7 +236,7 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     info!("Building Vite");
     let output = Command::new("sh")
         .arg("-c")
-        .arg("yarn build")
+        .arg("yarn build-no-tsc")
         .current_dir(RENDER_DIR.clone())
         .output()
         .expect("Failed to execute vite build");
