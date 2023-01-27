@@ -5,6 +5,7 @@ import { filterData, truncateData } from "../data";
 import { update } from "../simulation";
 import { Simulation } from "d3-force";
 import { Selection } from "d3-selection";
+import { scaleLog } from "d3-scale";
 
 export const getSliderElems = () => {
   return {
@@ -58,21 +59,36 @@ export const initSliders = (
 
   const data = truncateData(initData, 50, 50);
 
-  let minNodeOccurs = 0;
+  let minNodeOccurs = initData.nodes.slice(-1)[0].count;
   let maxNodeOccurs = initData.nodes[0].count;
-  let minEdgeOccurs = 0;
+  let minEdgeOccurs = initData.edges.slice(-1)[0].count;
   let maxEdgeOccurs = initData.edges[0].count;
+
+  const scaleNode = scaleLog()
+    .domain([minNodeOccurs, maxNodeOccurs])
+    .range([0, 100]);
+  const scaleEdge = scaleLog()
+    .domain([minEdgeOccurs, maxEdgeOccurs])
+    .range([0, 100]);
+
+
+  elems.minNodeOccursOut.value = minNodeOccurs.toString();
+  elems.maxNodeOccursOut.value = maxNodeOccurs.toString();
+  elems.minEdgeOccursOut.value = minEdgeOccurs.toString();
+  elems.maxEdgeOccursOut.value = maxEdgeOccurs.toString();
 
 
   let nodeSlider = rangeSlider(elems.nodeOccursIn, {
-    min: minNodeOccurs,
-    max: maxNodeOccurs,
-    value: [data.nodes.slice(-1)[0].count, data.nodes[0].count],
-    onInput: debounce(([minNO, maxNO]: [number, number]) => {
+    min: 0,
+    max: 100,
+    value: [scaleNode(data.nodes.slice(-1)[0].count), scaleNode(data.nodes[0].count)],
+    onInput: debounce(([_minNO, _maxNO]: [number, number]) => {
+      const minNO = scaleNode.invert(_minNO);
+      const maxNO = scaleNode.invert(_maxNO);
       minNodeOccurs = minNO;
       maxNodeOccurs = maxNO;
-      elems.minNodeOccursOut.value = minNO.toString();
-      elems.maxNodeOccursOut.value = maxNO.toString();
+      elems.minNodeOccursOut.value = Math.floor(minNO).toString();
+      elems.maxNodeOccursOut.value = Math.floor(maxNO).toString();
 
       const newData = filterData(initData, {
         minNodeOccurs,
@@ -87,12 +103,14 @@ export const initSliders = (
   });
 
   let edgeSlider = rangeSlider(elems.edgeOccursIn, {
-    min: minEdgeOccurs,
-    max: maxEdgeOccurs,
-    value: [data.edges.slice(-1)[0].count, data.edges[0].count],
-    onInput: debounce(([minEO, maxEO]: [number, number]) => {
-      elems.minEdgeOccursOut.value = minEO.toString();
-      elems.maxEdgeOccursOut.value = maxEO.toString();
+    min: 0,
+    max: 100,
+    value: [scaleEdge(data.edges.slice(-1)[0].count), scaleEdge(data.edges[0].count)],
+    onInput: debounce(([_minEO, _maxEO]: [number, number]) => {
+      const minEO = scaleEdge.invert(_minEO);
+      const maxEO = scaleEdge.invert(_maxEO);
+      elems.minEdgeOccursOut.value = Math.floor(minEO).toString();
+      elems.maxEdgeOccursOut.value = Math.floor(maxEO).toString().toString();
 
       minEdgeOccurs = minEO;
       maxEdgeOccurs = maxEO;
