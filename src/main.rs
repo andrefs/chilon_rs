@@ -8,6 +8,7 @@ mod ns_trie;
 mod parse;
 mod prefixes;
 mod seg_tree;
+mod timed_task;
 mod trie;
 mod util;
 mod visualization;
