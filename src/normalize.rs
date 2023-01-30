@@ -223,6 +223,7 @@ fn handle_loop(
                     predicate,
                     object,
                 } => {
+                    trip_c.inc();
                     proc_message(subject, predicate, object, triples, used_groups);
                 }
                 Message::NamespacesUnknown { iris } => {
@@ -248,7 +249,7 @@ fn restart_timers(start: &mut Instant, msg_c: &mut Counter, trip_c: &mut Counter
     let elapsed = start.elapsed().as_millis();
     if elapsed != 0 {
         trace!(
-            "Received {} msg ({}/s), {} triples ({}/s) so far",
+            "Received {} messages ({}/s), {} triples ({}/s) so far",
             msg_c.cur,
             (msg_c.delta() as u128 / elapsed) * 1000,
             trip_c.cur,
