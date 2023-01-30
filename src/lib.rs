@@ -1,6 +1,7 @@
 #![feature(btree_drain_filter)]
 
 pub mod args;
+pub mod counter;
 pub mod extract;
 pub mod iri_trie;
 pub mod normalize;

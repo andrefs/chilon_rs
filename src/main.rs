@@ -1,6 +1,7 @@
 #![feature(btree_drain_filter)]
 
 mod args;
+mod counter;
 mod extract;
 mod iri_trie;
 mod normalize;
@@ -33,7 +34,6 @@ use std::process::Command;
 use std::str;
 
 use simplelog::*;
-use std::time::Instant;
 
 fn main() {
     /**********************
@@ -85,7 +85,6 @@ fn main() {
             TaskType::InferNamespaces,
             tasks_path.clone(),
         );
-        //task_start = Instant::now();
 
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
@@ -113,8 +112,7 @@ fn main() {
         debug!("Saving namespaces");
         ns_trie.save(outf);
 
-        //restart_task_timer(&mut task_start, "Finished namespace inferrence");
-        infer_t.finish("Finished namespace inferrence");
+        infer_t.finish("Finished namespace inference");
     }
 
     /*********************
@@ -142,7 +140,6 @@ fn main() {
     debug!("saving normalized triples");
     save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
-    //restart_task_timer(&mut task_start, "Finished summarizing graph");
     norm_t.finish("Finished summarizing graph");
 
     /*****************
@@ -161,7 +158,7 @@ fn main() {
     dump_json(&vis_data, outf);
 
     full_t.finish("Finished generating visualization");
-    render_vis(&vis_data, outf);
+    //render_vis(&vis_data, outf);
 }
 
 fn init_log(outf: &str) {

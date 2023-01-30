@@ -1,5 +1,6 @@
 pub mod community;
 
+use crate::counter::Counter;
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
@@ -82,26 +83,6 @@ pub fn build_iri_trie(
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
     return (iri_trie, total_triples);
-}
-
-#[derive(Default)]
-pub struct Counter {
-    prev: usize,
-    cur: usize,
-}
-
-impl Counter {
-    fn delta(&self) -> usize {
-        self.cur - self.prev
-    }
-
-    fn inc(&mut self) {
-        self.cur += 1;
-    }
-
-    fn lap(&mut self) {
-        self.prev = self.cur;
-    }
 }
 
 fn handle_loop(

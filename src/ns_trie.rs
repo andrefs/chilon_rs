@@ -23,7 +23,7 @@ impl fmt::Display for NamespaceSource {
             NamespaceSource::User => write!(f, "user"),
             NamespaceSource::Community => write!(f, "community"),
             NamespaceSource::GraphFile => write!(f, "graph_file"),
-            NamespaceSource::Inference => write!(f, "inferrence"),
+            NamespaceSource::Inference => write!(f, "inference"),
         }
     }
 }

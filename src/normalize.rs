@@ -1,4 +1,5 @@
 use crate::{
+    counter::Counter,
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
     timed_task::Task,
@@ -17,7 +18,7 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::mpsc::{sync_channel, Sender, SyncSender},
+    sync::mpsc::{sync_channel, Receiver, Sender, SyncSender},
     time::Instant,
 };
 
@@ -61,8 +62,8 @@ pub enum Message {
         predicate: NormalizedResource,
         object: NormalizedResource,
     },
-    NamespaceUnknown {
-        iri: String,
+    NamespacesUnknown {
+        iris: Vec<String>,
     },
     Finished {
         path: String,
@@ -139,7 +140,7 @@ pub fn normalize_triples(
     ignore_unknown: bool,
     outf: &str,
     task: &mut Task,
-) -> (TripleFreq, Groups, u128) {
+) -> (TripleFreq, Groups, usize) {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
@@ -155,8 +156,10 @@ pub fn normalize_triples(
     let mut tasks = BTreeMap::<String, Task>::new();
 
     let mut trip_c = 0;
+
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
+
         for path in paths {
             let tx = tx.clone();
 
@@ -172,113 +175,135 @@ pub fn normalize_triples(
             });
         }
 
-        let mut last_trip_c = 0;
-        let mut start = Instant::now();
-
-        let file_path = Path::new(".").join(outf).join("errors.log");
-
+        let errors_path = Path::new(".").join(outf).join("errors.log");
         let mut fd = OpenOptions::new()
             .write(true)
             .create(true)
-            .open(file_path.clone())
+            .open(errors_path.clone())
             .unwrap();
 
-        loop {
-            trip_c += 1;
-            if trip_c % 1_000_000 == 1 {
-                let elapsed = start.elapsed().as_millis();
-                if elapsed != 0 {
-                    trace!(
-                        "Normalized {trip_c} triples so far ({} triples/s)",
-                        ((trip_c - last_trip_c) / elapsed) * 1000
-                    );
-                }
-                last_trip_c = trip_c;
-                start = Instant::now();
-            }
-            if running == 0 {
-                info!("All threads finished");
-                break;
-            }
-            if let Ok(message) = rx.recv() {
-                proc_message(
-                    message,
-                    &mut triples,
-                    &mut used_groups,
-                    &mut fd,
-                    &mut running,
-                    &mut tasks,
-                );
-            }
-        }
+        trip_c = handle_loop(
+            &mut running,
+            rx,
+            &mut triples,
+            &mut used_groups,
+            &mut tasks,
+            &mut fd,
+        );
     });
 
     return (triples, used_groups, trip_c);
 }
 
-fn proc_message(
-    message: Message,
+fn handle_loop(
+    running: &mut usize,
+    rx: Receiver<Message>,
     triples: &mut TripleFreq,
     used_groups: &mut Groups,
-    fd: &mut File,
-    running: &mut usize,
     tasks: &mut BTreeMap<String, Task>,
-) {
-    match message {
-        Message::NormalizedTriple {
-            subject,
-            predicate,
-            object,
-        } => {
-            triples.add((
-                subject.clone().into(),
-                predicate.clone().into(),
-                object.clone().into(),
-            ));
+    fd: &mut File,
+) -> usize {
+    let msg_c = &mut Counter::default();
+    let trip_c = &mut Counter::default();
+    let start = &mut Instant::now();
 
-            for resource in vec![subject, predicate, object] {
-                match resource {
-                    NormalizedResource::Unknown => {
-                        used_groups.unknown = true;
+    loop {
+        msg_c.inc();
+        if msg_c.cur % 1_000_000 == 1 {
+            restart_timers(start, msg_c, trip_c);
+        }
+        if *running == 0 {
+            info!("All threads finished");
+            break;
+        }
+        if let Ok(message) = rx.recv() {
+            match message {
+                Message::NormalizedTriple {
+                    subject,
+                    predicate,
+                    object,
+                } => {
+                    proc_message(subject, predicate, object, triples, used_groups);
+                }
+                Message::NamespacesUnknown { iris } => {
+                    for iri in iris.iter() {
+                        //let msg = format!("Unknown namespace for resource '{iri}'");
+                        //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
                     }
-                    NormalizedResource::BlankNode => {
-                        used_groups.blank = true;
-                    }
-                    NormalizedResource::Literal(Lit { lang }) => {
-                        used_groups.namespaces.insert(match lang {
-                            None => GroupNS {
-                                alias: "xsd".into(),
-                                namespace: "http://www.w3.org/TR/xmlschema11-2/".into(),
-                            },
-                            Some(_) => GroupNS {
-                                alias: "rdf".into(),
-                                namespace: "http://www.w3.org/1999/02/22-rdf-syntax-ns#".into(),
-                            },
-                        });
-                    }
-                    NormalizedResource::TypedLiteral(TypedLit {
-                        namespace,
-                        alias,
-                        iri: _,
-                    }) => {
-                        used_groups.namespaces.insert(GroupNS { alias, namespace });
-                    }
-                    NormalizedResource::NamedNode(NNode { alias, namespace }) => {
-                        used_groups.namespaces.insert(GroupNS { alias, namespace });
-                    }
+                }
+                Message::Finished { path, triples } => {
+                    let mut t = tasks.remove(&path).unwrap();
+                    t.triples = triples;
+                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+
+                    *running -= 1;
                 }
             }
         }
-        Message::NamespaceUnknown { iri } => {
-            let msg = format!("Unknown namespace for resource '{iri}'");
-            writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-        }
-        Message::Finished { path, triples } => {
-            let mut t = tasks.remove(&path).unwrap();
-            t.triples = triples;
-            t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+    }
+    return trip_c.cur;
+}
 
-            *running -= 1;
+fn restart_timers(start: &mut Instant, msg_c: &mut Counter, trip_c: &mut Counter) {
+    let elapsed = start.elapsed().as_millis();
+    if elapsed != 0 {
+        trace!(
+            "Received {} msg ({}/s), {} triples ({}/s) so far",
+            msg_c.cur,
+            (msg_c.delta() as u128 / elapsed) * 1000,
+            trip_c.cur,
+            (trip_c.delta() as u128 / elapsed) * 1000,
+        );
+    }
+
+    msg_c.lap();
+    trip_c.lap();
+    *start = Instant::now();
+}
+
+fn proc_message(
+    subject: NormalizedResource,
+    predicate: NormalizedResource,
+    object: NormalizedResource,
+    triples: &mut TripleFreq,
+    used_groups: &mut Groups,
+) {
+    triples.add((
+        subject.clone().into(),
+        predicate.clone().into(),
+        object.clone().into(),
+    ));
+
+    for resource in vec![subject, predicate, object] {
+        match resource {
+            NormalizedResource::Unknown => {
+                used_groups.unknown = true;
+            }
+            NormalizedResource::BlankNode => {
+                used_groups.blank = true;
+            }
+            NormalizedResource::Literal(Lit { lang }) => {
+                used_groups.namespaces.insert(match lang {
+                    None => GroupNS {
+                        alias: "xsd".into(),
+                        namespace: "http://www.w3.org/TR/xmlschema11-2/".into(),
+                    },
+                    Some(_) => GroupNS {
+                        alias: "rdf".into(),
+                        namespace: "http://www.w3.org/1999/02/22-rdf-syntax-ns#".into(),
+                    },
+                });
+            }
+            NormalizedResource::TypedLiteral(TypedLit {
+                namespace,
+                alias,
+                iri: _,
+            }) => {
+                used_groups.namespaces.insert(GroupNS { alias, namespace });
+            }
+            NormalizedResource::NamedNode(NNode { alias, namespace }) => {
+                used_groups.namespaces.insert(GroupNS { alias, namespace });
+            }
         }
     }
 }
@@ -298,6 +323,7 @@ fn proc_triples(
     let mut i = 0;
     let mut last_i = 0;
     let mut start = Instant::now();
+
     while !graph.is_end() {
         i += 1;
 
@@ -306,7 +332,7 @@ fn proc_triples(
             if elapsed != 0 {
                 trace!(
                     "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                    ((i - last_i) as u128 / elapsed) * 1000
+                    ((i - last_i) / elapsed) * 1000
                 );
             }
             last_i = i;
@@ -320,7 +346,7 @@ fn proc_triples(
     }
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
-        triples: i,
+        triples: i as usize,
     })
     .unwrap();
 }
@@ -347,27 +373,26 @@ fn proc_triple<E>(
         }
     }
 
+    let mut unknown_ns = Vec::new();
+
     if let Err(UnknownNamespaceError { iri: _ }) = subject {
         if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-            tx.send(Message::NamespaceUnknown {
-                iri: iri.to_string(),
-            })
-            .unwrap();
+            unknown_ns.push(iri.to_string());
         }
     }
     if let Err(UnknownNamespaceError { iri: _ }) = predicate {
-        tx.send(Message::NamespaceUnknown {
-            iri: t.predicate.to_string(),
-        })
-        .unwrap();
+        unknown_ns.push(t.predicate.to_string());
     }
+
     if let Err(UnknownNamespaceError { iri: _ }) = object {
         if let Term::NamedNode(NamedNode { iri }) = t.object {
-            tx.send(Message::NamespaceUnknown {
-                iri: iri.to_string(),
-            })
-            .unwrap();
+            unknown_ns.push(iri.to_string());
         }
+    }
+
+    if !unknown_ns.is_empty() {
+        tx.send(Message::NamespacesUnknown { iris: unknown_ns })
+            .unwrap();
     }
 
     tx.send(Message::NormalizedTriple {

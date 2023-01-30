@@ -64,18 +64,18 @@ fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
             if node.value.is_some() {
                 let (existing_alias, _) = node.value.as_ref().unwrap().clone();
 
-                if namespace.eq(&ns) {
-                    warn!(
-                        "Namespace {namespace} (alias {alias}) is already in trie with alias {}",
-                        existing_alias
-                    );
-                } else {
-                    warn!(
-                        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
-                        existing_alias,
-                        ns
-                    );
-                }
+                //if namespace.eq(&ns) {
+                //    warn!(
+                //        "Namespace {namespace} (alias {alias}) is already in trie with alias {}",
+                //        existing_alias
+                //    );
+                //} else {
+                //    warn!(
+                //        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
+                //        existing_alias,
+                //        ns
+                //    );
+                //}
 
                 continue;
             }
