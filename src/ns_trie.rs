@@ -52,7 +52,11 @@ impl SaveTrie for NamespaceTrie {
 }
 
 pub trait InferredNamespaces {
-    fn add_namespaces(&mut self, inferred: &Vec<(String, usize, NamespaceSource)>) -> Vec<String>;
+    fn add_namespaces(
+        &mut self,
+        inferred: &Vec<(String, usize, NamespaceSource)>,
+        allow_subns: bool,
+    ) -> Vec<String>;
 
     fn to_map(&self) -> NamespaceMap;
 }
@@ -67,7 +71,11 @@ impl InferredNamespaces for NamespaceTrie {
         }
         return trie;
     }
-    fn add_namespaces(&mut self, inferred: &Vec<(String, usize, NamespaceSource)>) -> Vec<String> {
+    fn add_namespaces(
+        &mut self,
+        inferred: &Vec<(String, usize, NamespaceSource)>,
+        allow_subns: bool,
+    ) -> Vec<String> {
         let mut aliases = self.to_map();
 
         let mut added = Node::<String>::new();
@@ -80,14 +88,19 @@ impl InferredNamespaces for NamespaceTrie {
                         warn!("IRI {ns} does not have host");
                         continue;
                     }
-                    if let Some((node, ns)) =
+                    if let Some((node, exists_ns)) =
                         self.longest_prefix(url_obj.to_string().as_str(), true)
                     {
                         let (alias, _) = node.value.as_ref().unwrap();
-                        debug!(
-                            "Inferred namespace {ns} already in trie with alias {}",
-                            alias
-                        );
+
+                        if *ns == exists_ns {
+                            debug!("Inferred namespace {ns} already in trie with alias {alias}",);
+                            continue;
+                        }
+                        if !allow_subns {
+                            debug!("Inferred namespace {ns} is contained in existing namespace {exists_ns} ({alias})",);
+                            continue;
+                        }
                     }
                     let alias_opt = gen_alias(url_obj, &aliases);
                     if let Some(alias) = alias_opt {

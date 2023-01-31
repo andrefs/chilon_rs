@@ -76,8 +76,10 @@ fn main() {
      * Prepare namespaces *
      **********************/
 
+    let allow_subns = false;
+
     info!("Loading community namespaces");
-    let mut ns_trie: NamespaceTrie = community::load();
+    let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
     if cli.infer_ns {
         let mut infer_t = Task::new(
@@ -88,7 +90,8 @@ fn main() {
 
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
-        let (mut iri_trie, trip_c) = build_iri_trie(cli.files.clone(), &mut ns_trie, &mut infer_t);
+        let (mut iri_trie, trip_c) =
+            build_iri_trie(cli.files.clone(), &mut ns_trie, &mut infer_t, allow_subns);
         infer_t.triples = trip_c;
 
         info!("Inferring namespaces from IRIs left");
@@ -96,7 +99,7 @@ fn main() {
         let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
         debug!("Adding inferred namespaces");
-        let added = ns_trie.add_namespaces(&inferred);
+        let added = ns_trie.add_namespaces(&inferred, allow_subns);
 
         debug!("Removing IRIs with inferred namespaces");
         iri_trie.remove_prefixes(&added);

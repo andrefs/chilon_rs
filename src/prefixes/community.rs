@@ -45,7 +45,7 @@ fn parse<'a>(reader: impl Read) -> Vec<Record> {
         .collect()
 }
 
-fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
+fn vec_to_trie<'a>(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
     let mut t = NamespaceTrie::new();
     for (alias, namespace) in v.into_iter().sorted_by(|(_, ns1), (_, ns2)| {
         let len1 = ns1.len();
@@ -64,20 +64,18 @@ fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
             if node.value.is_some() {
                 let (existing_alias, _) = node.value.as_ref().unwrap().clone();
 
-                //if namespace.eq(&ns) {
-                //    warn!(
-                //        "Namespace {namespace} (alias {alias}) is already in trie with alias {}",
-                //        existing_alias
-                //    );
-                //} else {
-                //    warn!(
-                //        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
-                //        existing_alias,
-                //        ns
-                //    );
-                //}
-
-                continue;
+                if namespace.eq(&ns) {
+                    warn!("Namespace {namespace} (alias {alias}) is already in trie with alias {existing_alias}");
+                    continue;
+                }
+                if !allow_subns {
+                    warn!(
+                        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
+                        existing_alias,
+                        ns
+                    );
+                    continue;
+                }
             }
         }
         t.insert(&namespace, (alias.clone(), NamespaceSource::Community));
@@ -85,7 +83,7 @@ fn vec_to_trie<'a>(v: PrefixVec) -> NamespaceTrie {
     return t;
 }
 
-pub fn load() -> NamespaceTrie {
+pub fn load(allow_subns: bool) -> NamespaceTrie {
     if !Path::new(PV_PATH).exists() {
         download();
     }
@@ -95,7 +93,7 @@ pub fn load() -> NamespaceTrie {
     buf_reader.read_to_string(&mut s).unwrap();
 
     let map: PrefixVec = serde_json::from_str(s.as_str()).unwrap();
-    return vec_to_trie(map);
+    return vec_to_trie(map, allow_subns);
 }
 
 fn fix_pv(pv: Vec<Record>) -> PrefixVec {

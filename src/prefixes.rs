@@ -36,6 +36,7 @@ pub fn build_iri_trie(
     paths: Vec<PathBuf>,
     ns_trie: &mut NamespaceTrie,
     task: &mut Task,
+    allow_subns: bool,
 ) -> (IriTrie, usize) {
     debug!("Building IRI trie");
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
@@ -77,6 +78,7 @@ pub fn build_iri_trie(
             ns_trie,
             &mut local_ns,
             &mut tasks,
+            allow_subns,
         );
     });
 
@@ -92,6 +94,7 @@ fn handle_loop(
     ns_trie: &mut NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
     tasks: &mut BTreeMap<String, Task>,
+    allow_subns: bool,
 ) -> usize {
     let res_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
@@ -115,7 +118,7 @@ fn handle_loop(
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        maintenance(iri_trie, ns_trie);
+                        maintenance(iri_trie, ns_trie, allow_subns);
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -154,7 +157,7 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
     }
 }
 
-fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie) {
+fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie, allow_subns: bool) {
     if let Some(size) = iri_trie.value {
         let IRI_TRIE_SIZE = 1_000_000;
 
@@ -164,7 +167,7 @@ fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie) {
             let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
             debug!("Adding inferred namespaces");
-            let added = ns_trie.add_namespaces(&inferred);
+            let added = ns_trie.add_namespaces(&inferred, allow_subns);
 
             debug!("Removing {} IRIs with inferred namespaces", added.len());
             iri_trie.remove_prefixes(&added);
