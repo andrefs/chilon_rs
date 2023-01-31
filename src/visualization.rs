@@ -12,6 +12,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs::{rename, File, OpenOptions},
     io::{self, BufRead, BufReader},
+    path::PathBuf,
     process::Command,
 };
 use std::{io::Write, path::Path};
@@ -213,7 +214,7 @@ pub fn dump_json(data: &VisData, outf: &str) {
     writeln!(fd, "{}", serde_json::to_string_pretty(&data).unwrap()).unwrap();
 }
 
-pub fn render_vis(data: &VisData, outf: &str) {
+pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     let RENDER_DIR = Path::new(".").join("chilon-viz");
     let tera = Tera::new("templates/**/*").unwrap();
     let mut ctx = Context::new();
@@ -252,11 +253,15 @@ pub fn render_vis(data: &VisData, outf: &str) {
     );
     rename(src, dst).unwrap();
 
+    return RENDER_DIR;
+}
+
+pub fn vis_dev_server(dir: PathBuf) {
     info!("Opening dev env");
     let output = Command::new("sh")
         .arg("-c")
         .arg("yarn dev")
-        .current_dir(RENDER_DIR.clone())
+        .current_dir(dir)
         .output()
         .expect("Failed to execute vite build");
 

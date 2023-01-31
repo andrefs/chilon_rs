@@ -19,6 +19,7 @@ pub enum TaskObjectType {
 pub enum TaskType {
     Execution,
     InferNamespaces,
+    Visualization,
 
     #[default]
     Normalize,

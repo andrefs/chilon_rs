@@ -20,7 +20,7 @@ use crate::seg_tree::SegTree;
 use crate::timed_task::{Task, TaskType};
 use args::Cli;
 use chilon_rs::util::gen_file_name;
-use chilon_rs::visualization::{build_data, dump_json, render_vis};
+use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
 use chrono::Utc;
 use clap::Parser;
 use log::{debug, info};
@@ -121,7 +121,11 @@ fn main() {
      * Normalize triples *
      *********************/
 
-    let mut norm_t = Task::new("normalize".to_string(), TaskType::Normalize, tasks_path);
+    let mut norm_t = Task::new(
+        "normalize".to_string(),
+        TaskType::Normalize,
+        tasks_path.clone(),
+    );
 
     info!("Normalizing triples");
     let (nts, used_groups, trip_c) = normalize_triples(
@@ -147,18 +151,17 @@ fn main() {
 
     //let mut summ = load_summary(path);
 
+    let mut vis_t = Task::new(
+        "visualization".to_string(),
+        TaskType::Visualization,
+        tasks_path,
+    );
+
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
 
     full_t.finish("Finished generating visualization");
     render_vis(&vis_data, outf);
-
-    //restart_task_timer(&mut task_start, "Finished generating visualization");
-}
-
-fn restart_task_timer(timer: &mut Instant, msg: &str) {
-    info!("{msg} ({:?})", timer.elapsed());
-    *timer = Instant::now();
 }
 
 fn init_log(outf: &str) {
