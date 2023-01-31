@@ -114,6 +114,7 @@ export const update = (
           .attr("data-target", (d: any) => d.target.name)
           .attr("data-label", (d: any) => d.label)
           .style("stroke", (d: any) => d.colorHash)
+          .style("stroke-dasharray", (d: any) => d.is_datatype ? `${Math.ceil(d.normCount / 3)},${Math.ceil(d.normCount / 3)}` : null)
           //.style("stroke", '#b8b8b8')
           .attr("data-stroke", (d: any) => d.colorHash)
           //.style("pointer-events", "none");

@@ -47,6 +47,7 @@ pub struct VisEdge {
     target: String,
     count: i32,
     label: String,
+    is_datatype: bool,
     link_num: i32, // number signal indicates direction for edge path calcs
 }
 
@@ -113,6 +114,15 @@ fn proc_solution(
         occurs = Some(l.value());
     }
 
+    let mut is_datatype = false;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("type").unwrap() {
+        if let Some(type_val) = get_fragment(n.clone()) {
+            if type_val == "DatatypeLink" {
+                is_datatype = true
+            }
+        }
+    }
+
     if let (Some(src_name), Some(tgt_name), Some(edge_label), Some(occurs_val)) =
         (src, tgt, label, occurs)
     {
@@ -140,6 +150,7 @@ fn proc_solution(
             target: tgt_name.clone(),
             count: occurs_val.parse().unwrap(),
             label: edge_label,
+            is_datatype,
             link_num: signal * (colliding.len() + 1) as i32,
         });
     }
@@ -266,6 +277,6 @@ pub fn vis_dev_server(dir: PathBuf) {
         .output()
         .expect("Failed to execute vite build");
 
-    io::stdout().write_all(&output.stdout).unwrap();
-    io::stderr().write_all(&output.stderr).unwrap();
+    //io::stdout().write_all(&output.stdout).unwrap();
+    //io::stderr().write_all(&output.stderr).unwrap();
 }

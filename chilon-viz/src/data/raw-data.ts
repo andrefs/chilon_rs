@@ -16,6 +16,7 @@ export interface RawEdge extends SimulationLinkDatum<RawNode> {
   source: string;
   target: string;
   label: string;
+  is_datatype?: boolean;
   count: number;
   link_num: number;
 };
@@ -81,554 +82,166 @@ export class SimData {
 export const initData = new SimData({
   "edges": [
     {
-      "count": 471214,
-      "label": "skos",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "STRING@en"
-    },
-    {
-      "count": 141685,
-      "label": "rdfs",
-      "link_num": 1,
-      "source": "kbpedia",
-      "target": "kbpedia"
-    },
-    {
-      "count": 78899,
-      "label": "kko",
-      "link_num": 2,
-      "source": "kbpedia",
-      "target": "kbpedia"
-    },
-    {
-      "count": 62786,
+      "count": 366287,
+      "is_datatype": false,
       "label": "rdf",
-      "link_num": 1,
-      "source": "kbpedia",
-      "target": "owl"
-    },
-    {
-      "count": 45564,
-      "label": "kko",
       "link_num": -1,
-      "source": "wd",
-      "target": "kbpedia"
+      "source": "wordnet-rdf",
+      "target": "ontolex"
     },
     {
-      "count": 44965,
+      "count": 285668,
+      "is_datatype": false,
+      "label": "wordnet",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "wordn2"
+    },
+    {
+      "count": 207272,
+      "is_datatype": false,
+      "label": "ontolex",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "wordn2"
+    },
+    {
+      "count": 207272,
+      "is_datatype": true,
+      "label": "ontolex",
+      "link_num": 1,
+      "source": "BLANK",
+      "target": "rdf"
+    },
+    {
+      "count": 207272,
+      "is_datatype": false,
+      "label": "ontolex",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "BLANK"
+    },
+    {
+      "count": 207272,
+      "is_datatype": false,
+      "label": "ontolex",
+      "link_num": 1,
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
+    },
+    {
+      "count": 159015,
+      "is_datatype": false,
+      "label": "wordnet",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "wordnet"
+    },
+    {
+      "count": 117791,
+      "is_datatype": true,
+      "label": "rdf",
+      "link_num": 2,
+      "source": "BLANK",
+      "target": "rdf"
+    },
+    {
+      "count": 117791,
+      "is_datatype": false,
+      "label": "owl",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "ili"
+    },
+    {
+      "count": 117791,
+      "is_datatype": true,
+      "label": "dcterms",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "xsd"
+    },
+    {
+      "count": 117791,
+      "is_datatype": false,
+      "label": "rdf",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "ontolex"
+    },
+    {
+      "count": 117791,
+      "is_datatype": false,
+      "label": "wordnet",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "BLANK"
+    },
+    {
+      "count": 117791,
+      "is_datatype": false,
+      "label": "wordnet",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "wordnet"
+    },
+    {
+      "count": 98923,
+      "is_datatype": true,
       "label": "rdfs",
-      "link_num": -2,
-      "source": "wd",
-      "target": "kbpedia"
-    },
-    {
-      "count": 44965,
-      "label": "kko",
       "link_num": 3,
-      "source": "kbpedia",
-      "target": "wd"
+      "source": "BLANK",
+      "target": "rdf"
     },
     {
-      "count": 44905,
-      "label": "rdfs",
-      "link_num": 4,
-      "source": "kbpedia",
-      "target": "wd"
-    },
-    {
-      "count": 44432,
-      "label": "owl",
-      "link_num": -5,
-      "source": "wd",
-      "target": "kbpedia"
-    },
-    {
-      "count": 33036,
-      "label": "kko",
-      "link_num": -1,
-      "source": "wikipno",
-      "target": "kbpedia"
-    },
-    {
-      "count": 32398,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "kbpedia",
-      "target": "wikipno"
-    },
-    {
-      "count": 31892,
-      "label": "rdfs",
-      "link_num": -3,
-      "source": "wikipno",
-      "target": "kbpedia"
-    },
-    {
-      "count": 31892,
-      "label": "kko",
-      "link_num": 4,
-      "source": "kbpedia",
-      "target": "wikipno"
-    },
-    {
-      "count": 31447,
-      "label": "owl",
-      "link_num": -5,
-      "source": "wikipno",
-      "target": "kbpedia"
-    },
-    {
-      "count": 5194,
-      "label": "rdfs",
-      "link_num": 1,
-      "source": "kbpedia",
-      "target": "kko"
-    },
-    {
-      "count": 4101,
-      "label": "kko",
-      "link_num": 1,
-      "source": "UNKNOWN",
-      "target": "kbpedia"
-    },
-    {
-      "count": 4023,
-      "label": "rdfs",
+      "count": 98923,
+      "is_datatype": false,
+      "label": "www",
       "link_num": -2,
-      "source": "kbpedia",
-      "target": "UNKNOWN"
+      "source": "wordnet-rdf",
+      "target": "BLANK"
     },
     {
-      "count": 3953,
-      "label": "kko",
-      "link_num": -3,
-      "source": "kbpedia",
-      "target": "UNKNOWN"
-    },
-    {
-      "count": 3953,
-      "label": "rdfs",
-      "link_num": 4,
-      "source": "UNKNOWN",
-      "target": "kbpedia"
-    },
-    {
-      "count": 3910,
-      "label": "owl",
-      "link_num": 5,
-      "source": "UNKNOWN",
-      "target": "kbpedia"
-    },
-    {
-      "count": 1137,
-      "label": "rdfs",
+      "count": 92518,
+      "is_datatype": false,
+      "label": "wordnet",
       "link_num": 2,
-      "source": "kbpedia",
-      "target": "owl"
-    },
-    {
-      "count": 918,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "geonames"
-    },
-    {
-      "count": 918,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "geonames",
-      "target": "kbpedia"
-    },
-    {
-      "count": 890,
-      "label": "kko",
-      "link_num": -1,
-      "source": "wikiCategory",
-      "target": "kbpedia"
-    },
-    {
-      "count": 886,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "kbpedia",
-      "target": "wikiCategory"
-    },
-    {
-      "count": 879,
-      "label": "kko",
-      "link_num": 3,
-      "source": "kbpedia",
-      "target": "wikiCategory"
-    },
-    {
-      "count": 879,
-      "label": "rdfs",
-      "link_num": -4,
-      "source": "wikiCategory",
-      "target": "kbpedia"
-    },
-    {
-      "count": 875,
-      "label": "owl",
-      "link_num": -5,
-      "source": "wikiCategory",
-      "target": "kbpedia"
-    },
-    {
-      "count": 769,
-      "label": "rdfs",
-      "link_num": -1,
-      "source": "schema",
-      "target": "kbpedia"
-    },
-    {
-      "count": 769,
-      "label": "kko",
-      "link_num": 2,
-      "source": "kbpedia",
-      "target": "schema"
-    },
-    {
-      "count": 753,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "db"
-    },
-    {
-      "count": 753,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "db",
-      "target": "kbpedia"
-    },
-    {
-      "count": 530,
-      "label": "rdfs",
-      "link_num": -3,
-      "source": "kbpedia",
-      "target": "db"
-    },
-    {
-      "count": 530,
-      "label": "kko",
-      "link_num": 4,
-      "source": "db",
-      "target": "kbpedia"
-    },
-    {
-      "count": 522,
-      "label": "owl",
-      "link_num": 5,
-      "source": "db",
-      "target": "kbpedia"
-    },
-    {
-      "count": 506,
-      "label": "kko",
-      "link_num": -3,
-      "source": "schema",
-      "target": "kbpedia"
-    },
-    {
-      "count": 506,
-      "label": "rdfs",
-      "link_num": 4,
-      "source": "kbpedia",
-      "target": "schema"
-    },
-    {
-      "count": 442,
-      "label": "owl",
-      "link_num": -3,
-      "source": "kbpedia",
-      "target": "geonames"
-    },
-    {
-      "count": 442,
-      "label": "rdfs",
-      "link_num": -4,
-      "source": "kbpedia",
-      "target": "geonames"
-    },
-    {
-      "count": 442,
-      "label": "kko",
-      "link_num": 5,
-      "source": "geonames",
-      "target": "kbpedia"
-    },
-    {
-      "count": 437,
-      "label": "owl",
-      "link_num": -5,
-      "source": "schema",
-      "target": "kbpedia"
-    },
-    {
-      "count": 141,
-      "label": "kko",
-      "link_num": -2,
-      "source": "kko",
-      "target": "kbpedia"
-    },
-    {
-      "count": 27,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "foaf"
-    },
-    {
-      "count": 27,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "foaf",
-      "target": "kbpedia"
-    },
-    {
-      "count": 25,
-      "label": "kko",
-      "link_num": 1,
-      "source": "UNKNOWN",
-      "target": "frbr"
-    },
-    {
-      "count": 23,
-      "label": "rdfs",
-      "link_num": -2,
-      "source": "frbr",
-      "target": "UNKNOWN"
-    },
-    {
-      "count": 20,
-      "label": "rdfs",
-      "link_num": -3,
-      "source": "kbpedia",
-      "target": "foaf"
-    },
-    {
-      "count": 20,
-      "label": "kko",
-      "link_num": 4,
-      "source": "foaf",
-      "target": "kbpedia"
-    },
-    {
-      "count": 20,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "bibo"
-    },
-    {
-      "count": 20,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "bibo",
-      "target": "kbpedia"
-    },
-    {
-      "count": 19,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "dct"
-    },
-    {
-      "count": 19,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "dct",
-      "target": "kbpedia"
-    },
-    {
-      "count": 19,
-      "label": "kko",
-      "link_num": 3,
-      "source": "bibo",
-      "target": "kbpedia"
-    },
-    {
-      "count": 19,
-      "label": "owl",
-      "link_num": -4,
-      "source": "kbpedia",
-      "target": "bibo"
-    },
-    {
-      "count": 19,
-      "label": "rdfs",
-      "link_num": -5,
-      "source": "kbpedia",
-      "target": "bibo"
-    },
-    {
-      "count": 18,
-      "label": "owl",
-      "link_num": 5,
-      "source": "foaf",
-      "target": "kbpedia"
-    },
-    {
-      "count": 14,
-      "label": "rdfs",
-      "link_num": 1,
-      "source": "dcm",
-      "target": "kbpedia"
-    },
-    {
-      "count": 14,
-      "label": "kko",
-      "link_num": -2,
-      "source": "kbpedia",
-      "target": "dcm"
-    },
-    {
-      "count": 14,
-      "label": "kko",
-      "link_num": -1,
-      "source": "kbpedia",
-      "target": "dc"
-    },
-    {
-      "count": 14,
-      "label": "rdfs",
-      "link_num": 2,
-      "source": "dc",
-      "target": "kbpedia"
-    },
-    {
-      "count": 12,
-      "label": "kko",
-      "link_num": 1,
-      "source": "kko",
-      "target": "wd"
-    },
-    {
-      "count": 12,
-      "label": "rdfs",
-      "link_num": -2,
-      "source": "wd",
-      "target": "kko"
-    },
-    {
-      "count": 12,
-      "label": "owl",
-      "link_num": -1,
-      "source": "UNKNOWN",
-      "target": "STRING@en"
-    },
-    {
-      "count": 10,
-      "label": "kko",
-      "link_num": -1,
-      "source": "mo",
-      "target": "kbpedia"
-    },
-    {
-      "count": 10,
-      "label": "owl",
-      "link_num": 2,
-      "source": "kbpedia",
-      "target": "mo"
-    },
-    {
-      "count": 10,
-      "label": "rdfs",
-      "link_num": -3,
-      "source": "mo",
-      "target": "kbpedia"
-    },
-    {
-      "count": 10,
-      "label": "rdfs",
-      "link_num": 4,
-      "source": "kbpedia",
-      "target": "mo"
-    },
-    {
-      "count": 10,
-      "label": "kko",
-      "link_num": 5,
-      "source": "kbpedia",
-      "target": "mo"
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
     }
   ],
   "nodes": [
     {
-      "count": 1401075,
-      "name": "kbpedia"
+      "count": 1638349,
+      "name": "wordnet-rdf"
     },
     {
-      "count": 471226,
-      "name": "STRING@en"
+      "count": 1367563,
+      "name": "wordn2"
     },
     {
-      "count": 224855,
-      "name": "wd"
+      "count": 847972,
+      "name": "BLANK"
     },
     {
-      "count": 160665,
-      "name": "wikipno"
+      "count": 484078,
+      "name": "ontolex"
     },
     {
-      "count": 63923,
-      "name": "owl"
+      "count": 423986,
+      "name": "rdf"
     },
     {
-      "count": 20000,
-      "name": "UNKNOWN"
+      "count": 276806,
+      "name": "wordnet"
     },
     {
-      "count": 5359,
-      "name": "kko"
+      "count": 117791,
+      "name": "ili"
     },
     {
-      "count": 4409,
-      "name": "wikiCategory"
-    },
-    {
-      "count": 3162,
-      "name": "geonames"
-    },
-    {
-      "count": 3088,
-      "name": "db"
-    },
-    {
-      "count": 2987,
-      "name": "schema"
-    },
-    {
-      "count": 112,
-      "name": "foaf"
-    },
-    {
-      "count": 97,
-      "name": "bibo"
-    },
-    {
-      "count": 50,
-      "name": "mo"
-    },
-    {
-      "count": 48,
-      "name": "frbr"
-    },
-    {
-      "count": 38,
-      "name": "dct"
-    },
-    {
-      "count": 28,
-      "name": "dc"
-    },
-    {
-      "count": 28,
-      "name": "dcm"
+      "count": 117791,
+      "name": "xsd"
     }
   ]
 });

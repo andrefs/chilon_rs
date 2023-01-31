@@ -161,7 +161,7 @@ fn main() {
     dump_json(&vis_data, outf);
 
     full_t.finish("Finished generating visualization");
-    //render_vis(&vis_data, outf);
+    render_vis(&vis_data, outf);
 }
 
 fn init_log(outf: &str) {

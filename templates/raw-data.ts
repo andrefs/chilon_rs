@@ -16,6 +16,7 @@ export interface RawEdge extends SimulationLinkDatum<RawNode> {
   source: string;
   target: string;
   label: string;
+  is_datatype?: boolean;
   count: number;
   link_num: number;
 };
