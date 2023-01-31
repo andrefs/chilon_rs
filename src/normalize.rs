@@ -24,31 +24,36 @@ use std::{
 
 type TripleFreq = BTreeMap<String, TripleFreqSec>;
 type TripleFreqSec = BTreeMap<String, TripleFreqThird>;
-type TripleFreqThird = BTreeMap<String, i32>;
+type TripleFreqThird = BTreeMap<String, ObjIsDatatype>;
+type ObjIsDatatype = BTreeMap<bool, i32>;
 
 trait TripleFreqFns {
-    fn add(&mut self, triple: (String, String, String));
-    fn iter_all(&self) -> Vec<(String, String, String, i32)>;
+    fn add(&mut self, triple: (String, String, String, bool));
+    fn iter_all(&self) -> Vec<(String, String, String, bool, i32)>;
 }
 
 impl TripleFreqFns for TripleFreq {
-    fn add(&mut self, triple: (String, String, String)) {
+    fn add(&mut self, triple: (String, String, String, bool)) {
         let count = self
             .entry(triple.0)
             .or_default()
             .entry(triple.1)
             .or_default()
             .entry(triple.2)
+            .or_default()
+            .entry(triple.3)
             .or_default();
         *count += 1;
     }
 
-    fn iter_all(&self) -> Vec<(String, String, String, i32)> {
+    fn iter_all(&self) -> Vec<(String, String, String, bool, i32)> {
         self.into_iter()
             .flat_map(|(s, m)| {
                 m.into_iter().flat_map(|(p, m)| {
-                    m.into_iter()
-                        .map(|(o, count)| (s.clone(), p.clone(), o.clone(), *count))
+                    m.into_iter().flat_map(|(o, m)| {
+                        m.into_iter()
+                            .map(|(d, count)| (s.clone(), p.clone(), o.clone(), *d, *count))
+                    })
                 })
             })
             .collect()
@@ -103,15 +108,18 @@ impl From<NormalizedResource> for String {
             NormalizedResource::Unknown => "UNKNOWN".to_string(),
             NormalizedResource::BlankNode => "BLANK".to_string(),
             NormalizedResource::Literal(Lit { lang }) => match lang {
-                None => "STRING".into(),
-                Some(l) => format!("STRING@{l}"),
+                //None => "STRING".into(),
+                //Some(l) => format!("STRING@{l}"),
+                None => "xsd".into(),
+                Some(_) => "rdf".into(),
             },
             NormalizedResource::TypedLiteral(TypedLit {
                 namespace,
                 alias,
                 iri,
             }) => {
-                format!("{}:{}", alias, &iri[namespace.len()..])
+                alias
+                //format!("{}:{}", alias, &iri[namespace.len()..])
             }
             NormalizedResource::NamedNode(NNode {
                 alias,
@@ -269,13 +277,9 @@ fn proc_message(
     triples: &mut TripleFreq,
     used_groups: &mut Groups,
 ) {
-    triples.add((
-        subject.clone().into(),
-        predicate.clone().into(),
-        object.clone().into(),
-    ));
+    let mut is_datatype = false;
 
-    for resource in vec![subject, predicate, object] {
+    for resource in vec![subject.clone(), predicate.clone(), object.clone()] {
         match resource {
             NormalizedResource::Unknown => {
                 used_groups.unknown = true;
@@ -284,6 +288,7 @@ fn proc_message(
                 used_groups.blank = true;
             }
             NormalizedResource::Literal(Lit { lang }) => {
+                is_datatype = true;
                 used_groups.namespaces.insert(match lang {
                     None => GroupNS {
                         alias: "xsd".into(),
@@ -300,6 +305,7 @@ fn proc_message(
                 alias,
                 iri: _,
             }) => {
+                is_datatype = true;
                 used_groups.namespaces.insert(GroupNS { alias, namespace });
             }
             NormalizedResource::NamedNode(NNode { alias, namespace }) => {
@@ -307,6 +313,8 @@ fn proc_message(
             }
         }
     }
+
+    triples.add((subject.into(), predicate.into(), object.into(), is_datatype));
 }
 
 fn proc_triples(
@@ -363,14 +371,10 @@ fn proc_triple<E>(
     let object = handle_object(t.object, ns_trie);
 
     if ignore_unknown {
-        if let Err(UnknownNamespaceError) = subject {
-            return Ok(());
-        }
-        if let Err(UnknownNamespaceError) = predicate {
-            return Ok(());
-        }
-        if let Err(UnknownNamespaceError) = object {
-            return Ok(());
+        for res in vec![&subject, &predicate, &object] {
+            if let Err(UnknownNamespaceError) = res {
+                return Ok(());
+            }
         }
     }
 
@@ -538,8 +542,8 @@ pub fn save_normalized_triples(
     writeln!(fd, "").unwrap();
 
     formatter = TurtleFormatter::new(fd);
-    for tf in nts.iter_all() {
-        if min_occurs.is_some() && tf.3 < min_occurs.unwrap() {
+    for (s, p, o, is_datatype, occurs) in nts.iter_all() {
+        if min_occurs.is_some() && occurs < min_occurs.unwrap() {
             continue;
         }
 
@@ -553,7 +557,14 @@ pub fn save_normalized_triples(
                 predicate: NamedNode {
                     iri: format!("{rdf}type").as_str(),
                 },
-                object: NamedNode { iri: "#GroupsLink" }.into(),
+                object: NamedNode {
+                    iri: if is_datatype {
+                        "#DatatypeLink"
+                    } else {
+                        "#GroupsLink"
+                    },
+                }
+                .into(),
             })
             .unwrap();
 
@@ -579,7 +590,7 @@ pub fn save_normalized_triples(
                     iri: format!("{rdf}subject").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("#{}", tf.0).as_str(),
+                    iri: format!("#{}", s).as_str(),
                 }
                 .into(),
             })
@@ -593,7 +604,7 @@ pub fn save_normalized_triples(
                     iri: format!("{rdf}predicate").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("#{}", tf.1).as_str(),
+                    iri: format!("#{}", p).as_str(),
                 }
                 .into(),
             })
@@ -607,7 +618,7 @@ pub fn save_normalized_triples(
                     iri: format!("{rdf}object").as_str(),
                 },
                 object: NamedNode {
-                    iri: format!("#{}", tf.2).as_str(),
+                    iri: format!("#{}", o).as_str(),
                 }
                 .into(),
             })
@@ -621,7 +632,7 @@ pub fn save_normalized_triples(
                     iri: "#occurrences",
                 },
                 object: Literal::Typed {
-                    value: tf.3.to_string().as_str(),
+                    value: occurs.to_string().as_str(),
                     datatype: NamedNode {
                         iri: "http://www.w3.org/2001/XMLSchema#integer",
                     },
@@ -659,23 +670,6 @@ pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
             .into(),
             object: NamedNode {
                 iri: group.namespace.as_str(),
-            }
-            .into(),
-        })
-        .unwrap();
-
-    formatter
-        .format(&Triple {
-            subject: NamedNode {
-                iri: format!("#{}", group.alias).as_str(),
-            }
-            .into(),
-            predicate: NamedNode {
-                iri: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-            }
-            .into(),
-            object: NamedNode {
-                iri: &group.namespace,
             }
             .into(),
         })

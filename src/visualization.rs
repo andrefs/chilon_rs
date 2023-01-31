@@ -174,12 +174,13 @@ fn query_graph(store: Store) -> Result<QueryResults, EvaluationError> {
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
     
-        SELECT ?stmt_id ?src ?label ?tgt ?occurs WHERE {
-            ?id rdf:type afsgs:GroupsLink .
-            ?id rdf:subject ?src .
-            ?id rdf:predicate ?label .
-            ?id rdf:object ?tgt .
-            ?id afsgs:occurrences ?occurs .
+        SELECT ?stmt_id ?src ?label ?tgt ?type ?occurs WHERE {
+            VALUES ?type { afsgs:GroupsLink afsgs:DatatypeLink }
+            ?stmt_id rdf:type ?type  .
+            ?stmt_id rdf:subject ?src .
+            ?stmt_id rdf:predicate ?label .
+            ?stmt_id rdf:object ?tgt .
+            ?stmt_id afsgs:occurrences ?occurs .
         }
         ORDER BY DESC(?occurs)
         "#;
