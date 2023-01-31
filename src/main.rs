@@ -161,7 +161,10 @@ fn main() {
     dump_json(&vis_data, outf);
 
     full_t.finish("Finished generating visualization");
-    render_vis(&vis_data, outf);
+    let render_dir = render_vis(&vis_data, outf);
+
+    vis_t.finish("Finished generating visualization");
+    //vis_dev_server(render_dir);
 }
 
 fn init_log(outf: &str) {
