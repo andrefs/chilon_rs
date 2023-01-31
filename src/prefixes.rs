@@ -7,7 +7,7 @@ use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::timed_task::Task;
 use crate::trie::{InsertFnVisitors, Node};
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
@@ -65,7 +65,7 @@ pub fn build_iri_trie(
             );
 
             s.spawn_fifo(move |_| {
-                debug!("Parsing {:?}", path);
+                info!("Parsing {:?}", path);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &path, &tx);
             });
@@ -102,6 +102,7 @@ fn handle_loop(
 
     loop {
         if *running == 0 {
+            info!("All threads finished");
             break;
         }
         if let Ok(message) = rx.recv() {
@@ -173,7 +174,7 @@ fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie, allo
             iri_trie.remove_prefixes(&added);
 
             debug!(
-                "Removing {} IRIs with garbage collected namespaces",
+                "Forgetting {} IRIs with low occurring namespaces",
                 gbg_collected.len()
             );
             iri_trie.remove_prefixes(&gbg_collected);

@@ -177,7 +177,7 @@ pub fn normalize_triples(
             );
 
             s.spawn_fifo(move |_| {
-                debug!("Parsing {:?}", path);
+                info!("Parsing {:?}", path);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &path, &tx, ns_trie, ignore_unknown);
             });

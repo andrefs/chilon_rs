@@ -24,7 +24,7 @@ use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
 use chrono::Utc;
 use clap::Parser;
-use log::{debug, info};
+use log::info;
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::community;
@@ -98,13 +98,13 @@ fn main() {
         let seg_tree = SegTree::from(&iri_trie);
         let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
-        debug!("Adding inferred namespaces");
+        info!("Adding inferred namespaces");
         let added = ns_trie.add_namespaces(&inferred, allow_subns);
 
-        debug!("Removing IRIs with inferred namespaces");
+        info!("Removing IRIs with inferred namespaces");
         iri_trie.remove_prefixes(&added);
 
-        debug!("Removing IRIs with garbage collected namespaces");
+        info!("Removing IRIs with garbage collected namespaces");
         iri_trie.remove_prefixes(&gbg_collected);
 
         //warn!(
@@ -112,7 +112,7 @@ fn main() {
         //    iri_trie.iter().map(|x| x.0).collect::<Vec<_>>()
         //);
 
-        debug!("Saving namespaces");
+        info!("Saving namespaces");
         ns_trie.save(outf);
 
         infer_t.finish("Finished namespace inference");
@@ -140,7 +140,7 @@ fn main() {
     norm_t.triples = trip_c as usize;
     full_t.triples = trip_c as usize;
 
-    debug!("saving normalized triples");
+    info!("Saving normalized triples");
     save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
     norm_t.finish("Finished summarizing graph");

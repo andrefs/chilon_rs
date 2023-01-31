@@ -23,7 +23,7 @@ pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let file =
         File::open(path.clone()).unwrap_or_else(|e| panic!("Could not open file {}: {e}", path));
     let buf_reader = BufReader::new(file);
-    debug!("extracting {:?}", path);
+    info!("extracting {:?}", path);
     let stream = BufReader::new(buf_reader);
     let parser = TurtleParser::new(stream, None);
     return parser;
@@ -168,7 +168,7 @@ fn load_store(outf: &str) -> Store {
     let file = File::open(file_path.clone())
         .unwrap_or_else(|e| panic!("Could not open file {}: {e}", file_path.to_string_lossy()));
     let buf_reader = BufReader::new(file);
-    debug!("extracting {:?}", file_path);
+    info!("extracting {:?}", file_path);
     let stream = BufReader::new(buf_reader);
 
     let store = Store::new().unwrap();
