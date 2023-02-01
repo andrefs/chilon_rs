@@ -4,6 +4,7 @@ use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
+use crate::timed_task::Task;
 use crate::trie::{InsertFnVisitors, Node};
 use log::{debug, info, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
@@ -27,10 +28,14 @@ pub enum Position {
 pub enum Message {
     Resource { iri: String, pos: Position },
     PrefixDecl { namespace: String, alias: String },
-    Finished,
+    Finished { path: String, triples: usize },
 }
 
-pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTrie {
+pub fn build_iri_trie(
+    paths: Vec<PathBuf>,
+    ns_trie: &mut NamespaceTrie,
+    task: &mut Task,
+) -> (IriTrie, usize) {
     debug!("Building IRI trie");
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
@@ -43,10 +48,20 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
 
+    let mut total_triples = 0;
+
+    let mut tasks = BTreeMap::<String, Task>::new();
+
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
         for path in paths {
             let tx = tx.clone();
+
+            tasks.insert(
+                path.to_string_lossy().to_string(),
+                task.file_task(path.to_string_lossy().to_string()),
+            );
+
             s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
@@ -54,12 +69,19 @@ pub fn build_iri_trie(paths: Vec<PathBuf>, ns_trie: &mut NamespaceTrie) -> IriTr
             });
         }
 
-        handle_loop(&mut running, rx, &mut iri_trie, ns_trie, &mut local_ns);
+        total_triples = handle_loop(
+            &mut running,
+            rx,
+            &mut iri_trie,
+            ns_trie,
+            &mut local_ns,
+            &mut tasks,
+        );
     });
 
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
-    return iri_trie;
+    return (iri_trie, total_triples);
 }
 
 #[derive(Default)]
@@ -88,7 +110,8 @@ fn handle_loop(
     iri_trie: &mut Node<NodeStats>,
     ns_trie: &mut NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
-) {
+    tasks: &mut BTreeMap<String, Task>,
+) -> usize {
     let res_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
@@ -110,12 +133,7 @@ fn handle_loop(
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        if let Some(size) = iri_trie.value {
-                            let IRI_TRIE_SIZE = 1_000_000;
-                            if size.desc > IRI_TRIE_SIZE {
-                                maintenance(iri_trie, IRI_TRIE_SIZE, ns_trie);
-                            }
-                        }
+                        maintenance(iri_trie, ns_trie);
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -124,12 +142,18 @@ fn handle_loop(
                     debug!("Found local prefix {alias}: {namespace}");
                     local_ns.insert(namespace, alias);
                 }
-                Message::Finished => {
+                Message::Finished { path, triples } => {
+                    let mut t = tasks.remove(&path).unwrap();
+                    t.triples = triples;
+                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+
                     *running -= 1;
                 }
             }
         }
     }
+
+    return trip_c.cur;
 }
 
 fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<NodeStats>) {
@@ -148,22 +172,28 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
     }
 }
 
-fn maintenance(iri_trie: &mut Node<NodeStats>, IRI_TRIE_SIZE: usize, ns_trie: &mut NamespaceTrie) {
-    warn!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
-    let seg_tree = SegTree::from(&*iri_trie);
-    let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie) {
+    if let Some(size) = iri_trie.value {
+        let IRI_TRIE_SIZE = 1_000_000;
 
-    debug!("Adding inferred namespaces");
-    let added = ns_trie.add_namespaces(&inferred);
+        if size.desc > IRI_TRIE_SIZE {
+            info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
+            let seg_tree = SegTree::from(&*iri_trie);
+            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
 
-    debug!("Removing {} IRIs with inferred namespaces", added.len());
-    iri_trie.remove_prefixes(&added);
+            debug!("Adding inferred namespaces");
+            let added = ns_trie.add_namespaces(&inferred);
 
-    debug!(
-        "Removing {} IRIs with garbage collected namespaces",
-        gbg_collected.len()
-    );
-    iri_trie.remove_prefixes(&gbg_collected);
+            debug!("Removing {} IRIs with inferred namespaces", added.len());
+            iri_trie.remove_prefixes(&added);
+
+            debug!(
+                "Removing {} IRIs with garbage collected namespaces",
+                gbg_collected.len()
+            );
+            iri_trie.remove_prefixes(&gbg_collected);
+        }
+    }
 }
 
 fn handle_pref_decls(
@@ -227,7 +257,7 @@ fn restart_timers(
     *start = Instant::now();
 }
 
-fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) {
+fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) -> usize {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {
@@ -235,21 +265,21 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
     } else {
         "".to_string()
     };
-    let mut i = 0;
+    let mut trip_c = 0;
     let mut start = Instant::now();
-    let mut last_i = 0;
+    let mut last_trip_c = 0;
 
     while !graph.is_end() {
-        i += 1;
-        if i % 1_000_000 == 1 {
+        trip_c += 1;
+        if trip_c % 1_000_000 == 1 {
             let elapsed = start.elapsed().as_millis();
             if elapsed != 0 {
                 trace!(
-                    "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                    ((i - last_i) / elapsed) * 1000
+                    "[Thread#{tid}] Parsed {trip_c} triples so far ({} triples/s)",
+                    ((trip_c - last_trip_c) / elapsed) * 1000
                 );
             }
-            last_i = i;
+            last_trip_c = trip_c;
             start = Instant::now();
         }
 
@@ -267,7 +297,13 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
         })
         .unwrap()
     }
-    tx.send(Message::Finished).unwrap();
+    tx.send(Message::Finished {
+        path: path.to_string_lossy().to_string(),
+        triples: trip_c as usize,
+    })
+    .unwrap();
+
+    return trip_c as usize;
 }
 
 fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(), TurtleError> {

@@ -17,6 +17,7 @@ use crate::iri_trie::IriTrieExt;
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
+use crate::timed_task::{Task, TaskType};
 use args::Cli;
 use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, render_vis};
@@ -39,18 +40,20 @@ fn main() {
      * Initializing stuff *
      **********************/
 
-    // start timers
-    let start = Instant::now();
-    let mut task_start = start;
-
-    // create output folder
+    // output folder path
     let out = gen_file_name(
         format!("results/{}", Utc::now().format("%Y%m%d")),
         "".to_string(),
     );
     let outf = out.as_str();
+
+    // create output folder
     println!("Creating folder {outf} to store results");
     fs::create_dir(outf).unwrap();
+
+    // start timers
+    let tasks_path = Path::new(".").join(outf).join("tasks.jsonl");
+    let mut full_t = Task::new("full".to_string(), TaskType::Execution, tasks_path.clone());
 
     // start logging
     init_log(outf);
@@ -77,11 +80,17 @@ fn main() {
     let mut ns_trie: NamespaceTrie = community::load();
 
     if cli.infer_ns {
-        task_start = Instant::now();
+        let mut infer_t = Task::new(
+            "infer".to_string(),
+            TaskType::InferNamespaces,
+            tasks_path.clone(),
+        );
+        //task_start = Instant::now();
 
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
-        let mut iri_trie = build_iri_trie(cli.files.clone(), &mut ns_trie);
+        let (mut iri_trie, trip_c) = build_iri_trie(cli.files.clone(), &mut ns_trie, &mut infer_t);
+        infer_t.triples = trip_c;
 
         info!("Inferring namespaces from IRIs left");
         let seg_tree = SegTree::from(&iri_trie);
@@ -104,21 +113,33 @@ fn main() {
         debug!("Saving namespaces");
         ns_trie.save(outf);
 
-        restart_task_timer(&mut task_start, "Finished namespace inferrence");
+        //restart_task_timer(&mut task_start, "Finished namespace inferrence");
+        infer_t.finish("Finished namespace inferrence");
     }
 
     /*********************
      * Normalize triples *
      *********************/
 
+    let mut norm_t = Task::new("normalize".to_string(), TaskType::Normalize, tasks_path);
+
     info!("Normalizing triples");
-    let (nts, used_groups) =
-        normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
+    let (nts, used_groups, trip_c) = normalize_triples(
+        cli.files.clone(),
+        &mut ns_trie,
+        cli.ignore_unknown,
+        outf,
+        &mut norm_t,
+    );
+
+    norm_t.triples = trip_c as usize;
+    full_t.triples = trip_c as usize;
 
     debug!("saving normalized triples");
     save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
-    restart_task_timer(&mut task_start, "Finished summarizing graph");
+    //restart_task_timer(&mut task_start, "Finished summarizing graph");
+    norm_t.finish("Finished summarizing graph");
 
     /*****************
      * Visualization *
@@ -128,9 +149,11 @@ fn main() {
 
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
+
+    full_t.finish("Finished generating visualization");
     render_vis(&vis_data, outf);
 
-    restart_task_timer(&mut task_start, "Finished generating visualization");
+    //restart_task_timer(&mut task_start, "Finished generating visualization");
 }
 
 fn restart_task_timer(timer: &mut Instant, msg: &str) {

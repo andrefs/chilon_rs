@@ -1,6 +1,7 @@
 use crate::{
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
+    timed_task::Task,
 };
 use log::{debug, info, trace};
 use rayon::ThreadPoolBuilder;
@@ -63,7 +64,10 @@ pub enum Message {
     NamespaceUnknown {
         iri: String,
     },
-    Finished,
+    Finished {
+        path: String,
+        triples: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -134,7 +138,8 @@ pub fn normalize_triples(
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
-) -> (TripleFreq, Groups) {
+    task: &mut Task,
+) -> (TripleFreq, Groups, u128) {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
@@ -147,10 +152,19 @@ pub fn normalize_triples(
         .build()
         .unwrap();
 
+    let mut tasks = BTreeMap::<String, Task>::new();
+
+    let mut trip_c = 0;
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
         for path in paths {
             let tx = tx.clone();
+
+            tasks.insert(
+                path.to_string_lossy().to_string(),
+                task.file_task(path.to_string_lossy().to_string()),
+            );
+
             s.spawn_fifo(move |_| {
                 debug!("Parsing {:?}", path);
                 let mut graph = parse(&path);
@@ -158,8 +172,7 @@ pub fn normalize_triples(
             });
         }
 
-        let mut i = 0;
-        let mut last_i = 0;
+        let mut last_trip_c = 0;
         let mut start = Instant::now();
 
         let file_path = Path::new(".").join(outf).join("errors.log");
@@ -171,16 +184,16 @@ pub fn normalize_triples(
             .unwrap();
 
         loop {
-            i += 1;
-            if i % 1_000_000 == 1 {
+            trip_c += 1;
+            if trip_c % 1_000_000 == 1 {
                 let elapsed = start.elapsed().as_millis();
                 if elapsed != 0 {
                     trace!(
-                        "Normalized {i} triples so far ({} triples/s)",
-                        ((i - last_i) / elapsed) * 1000
+                        "Normalized {trip_c} triples so far ({} triples/s)",
+                        ((trip_c - last_trip_c) / elapsed) * 1000
                     );
                 }
-                last_i = i;
+                last_trip_c = trip_c;
                 start = Instant::now();
             }
             if running == 0 {
@@ -194,12 +207,13 @@ pub fn normalize_triples(
                     &mut used_groups,
                     &mut fd,
                     &mut running,
+                    &mut tasks,
                 );
             }
         }
     });
 
-    return (triples, used_groups);
+    return (triples, used_groups, trip_c);
 }
 
 fn proc_message(
@@ -208,6 +222,7 @@ fn proc_message(
     used_groups: &mut Groups,
     fd: &mut File,
     running: &mut usize,
+    tasks: &mut BTreeMap<String, Task>,
 ) {
     match message {
         Message::NormalizedTriple {
@@ -258,7 +273,11 @@ fn proc_message(
             let msg = format!("Unknown namespace for resource '{iri}'");
             writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
         }
-        Message::Finished => {
+        Message::Finished { path, triples } => {
+            let mut t = tasks.remove(&path).unwrap();
+            t.triples = triples;
+            t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+
             *running -= 1;
         }
     }
@@ -299,7 +318,11 @@ fn proc_triples(
             panic!("Error normalizing file {}: {}", path.to_string_lossy(), err);
         }
     }
-    tx.send(Message::Finished).unwrap();
+    tx.send(Message::Finished {
+        path: path.to_string_lossy().to_string(),
+        triples: i,
+    })
+    .unwrap();
 }
 
 fn proc_triple<E>(
