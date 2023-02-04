@@ -160,7 +160,7 @@ fn main() {
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
 
-    full_t.finish("Finished generating visualization");
+    full_t.finish("Finished summarizing graph");
     let render_dir = render_vis(&vis_data, outf);
 
     vis_t.finish("Finished generating visualization");
