@@ -4,7 +4,7 @@ use crate::{
     parse::{parse, ParserWrapper},
     timed_task::Task,
 };
-use log::{debug, info, trace};
+use log::{error, info, trace};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
@@ -18,7 +18,7 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::mpsc::{sync_channel, Receiver, Sender, SyncSender},
+    sync::mpsc::{sync_channel, Receiver, SyncSender},
     time::Instant,
 };
 
@@ -60,7 +60,7 @@ impl TripleFreqFns for TripleFreq {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Message {
     NormalizedTriple {
         subject: NormalizedResource,
@@ -73,6 +73,9 @@ pub enum Message {
     Finished {
         path: String,
         triples: usize,
+    },
+    FatalError {
+        err: TurtleError,
     },
 }
 
@@ -152,7 +155,7 @@ pub fn normalize_triples(
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
-    let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
+    let n_workers = std::cmp::max(2, std::cmp::min(paths.len() + 1, num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
 
     let mut running = paths.len();
@@ -245,6 +248,9 @@ fn handle_loop(
                     t.triples = triples;
                     t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
 
+                    *running -= 1;
+                }
+                Message::FatalError { err } => {
                     *running -= 1;
                 }
             }
@@ -350,7 +356,10 @@ fn proc_triples(
         if let Err(err) =
             graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown))
         {
-            panic!("Error normalizing file {}: {}", path.to_string_lossy(), err);
+            let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
+            error!("{}", msg);
+            tx.send(Message::FatalError { err }).unwrap();
+            panic!("{}", msg);
         }
     }
     tx.send(Message::Finished {

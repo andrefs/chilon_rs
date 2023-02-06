@@ -7,7 +7,7 @@ use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::timed_task::Task;
 use crate::trie::{InsertFnVisitors, Node};
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
@@ -30,6 +30,7 @@ pub enum Message {
     Resource { iri: String, pos: Position },
     PrefixDecl { namespace: String, alias: String },
     Finished { path: String, triples: usize },
+    FatalError { err: TurtleError },
 }
 
 pub fn build_iri_trie(
@@ -39,13 +40,15 @@ pub fn build_iri_trie(
     allow_subns: bool,
 ) -> (IriTrie, usize) {
     debug!("Building IRI trie");
-    let n_workers = std::cmp::max(2, std::cmp::min(paths.len(), num_cpus::get() - 2));
+    let n_workers = std::cmp::max(2, std::cmp::min(paths.len() + 1, num_cpus::get() - 2));
     info!("Creating pool with {n_workers} threads");
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()
         .unwrap();
-    let mut running = paths.len();
+    let paths_len = paths.len();
+    let mut running = paths_len;
+    debug!("Processing {running} files: {paths:?}");
 
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
@@ -56,7 +59,7 @@ pub fn build_iri_trie(
 
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
-        for path in paths {
+        for (index, path) in paths.iter().enumerate() {
             let tx = tx.clone();
 
             tasks.insert(
@@ -65,7 +68,7 @@ pub fn build_iri_trie(
             );
 
             s.spawn_fifo(move |_| {
-                info!("Parsing {:?}", path);
+                info!("Parsing {:?} ({}/{running})", path, index + 1);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &path, &tx);
             });
@@ -134,6 +137,10 @@ fn handle_loop(
                     t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
 
                     *running -= 1;
+                    trace!("Running: {running}");
+                }
+                Message::FatalError { err } => {
+                    *running -= 1;
                 }
             }
         }
@@ -160,7 +167,7 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
 
 fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie, allow_subns: bool) {
     if let Some(size) = iri_trie.value {
-        let IRI_TRIE_SIZE = 1_000_000;
+        let IRI_TRIE_SIZE = 500_000;
 
         if size.desc > IRI_TRIE_SIZE {
             info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
@@ -272,7 +279,10 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
         graph
             .parse_step(&mut |t| proc_triple(t, &tx))
             .unwrap_or_else(|err| {
-                panic!("Error processing file {}: {}", path.to_string_lossy(), err)
+                let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
+                error!("{}", msg);
+                tx.send(Message::FatalError { err }).unwrap();
+                panic!("{}", msg)
             });
     }
 

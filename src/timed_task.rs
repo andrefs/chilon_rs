@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::Write,
     path::PathBuf,
     time::{Duration, Instant},
@@ -57,7 +57,9 @@ impl Task {
         }
     }
 
-    pub fn file_task(&self, path: String) -> Task {
+    pub fn file_task(&mut self, path: String) -> Task {
+        let file_size = fs::metadata(path.clone()).unwrap().len() as usize;
+        self.size += file_size;
         Task {
             obj_name: path,
             obj_type: TaskObjectType::File,
@@ -67,7 +69,7 @@ impl Task {
             parent: Some(self.obj_name.clone()),
             file: self.file.clone(),
             triples: Default::default(),
-            size: Default::default(),
+            size: file_size,
         }
     }
 
