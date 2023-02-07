@@ -2,15 +2,16 @@ pub mod community;
 
 use crate::counter::Counter;
 use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
+use crate::meta_info::{InferHK, InferHKTask, Task, TaskType};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
-use crate::timed_task::Task;
 use crate::trie::{InsertFnVisitors, Node};
 use log::{debug, error, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
+use std::fs::metadata;
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::Instant;
 use std::{path::PathBuf, sync::mpsc::sync_channel};
@@ -27,20 +28,37 @@ pub enum Position {
 }
 
 pub enum Message {
-    Resource { iri: String, pos: Position },
-    PrefixDecl { namespace: String, alias: String },
-    Finished { path: String, triples: usize },
-    FatalError { err: TurtleError },
+    Started {
+        path: String,
+    },
+    Resource {
+        iri: String,
+        pos: Position,
+    },
+    PrefixDecl {
+        namespace: String,
+        alias: String,
+    },
+    Finished {
+        path: String,
+        triples: usize,
+        iris: usize,
+        blanks: usize,
+        literals: usize,
+    },
+    FatalError {
+        err: TurtleError,
+    },
 }
 
 pub fn build_iri_trie(
     paths: Vec<PathBuf>,
     ns_trie: &mut NamespaceTrie,
-    task: &mut Task,
     allow_subns: bool,
-) -> (IriTrie, usize) {
+) -> (IriTrie, BTreeMap<String, Task>, InferHK) {
     debug!("Building IRI trie");
     let n_workers = std::cmp::max(2, std::cmp::min(paths.len() + 1, num_cpus::get() - 2));
+
     info!("Creating pool with {n_workers} threads");
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)
@@ -56,38 +74,40 @@ pub fn build_iri_trie(
     let mut total_triples = 0;
 
     let mut tasks = BTreeMap::<String, Task>::new();
+    let mut hk = InferHK::new();
 
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
         for (index, path) in paths.iter().enumerate() {
             let tx = tx.clone();
 
-            tasks.insert(
-                path.to_string_lossy().to_string(),
-                task.file_task(path.to_string_lossy().to_string()),
-            );
-
             s.spawn_fifo(move |_| {
+                tx.send(Message::Started {
+                    path: path.to_string_lossy().to_string(),
+                })
+                .unwrap();
+
                 info!("Parsing {:?} ({}/{running})", path, index + 1);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &path, &tx);
             });
         }
 
-        total_triples = handle_loop(
+        handle_loop(
             &mut running,
             rx,
             &mut iri_trie,
             ns_trie,
             &mut local_ns,
             &mut tasks,
+            &mut hk,
             allow_subns,
         );
     });
 
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
-    return (iri_trie, total_triples);
+    return (iri_trie, tasks, hk);
 }
 
 fn handle_loop(
@@ -97,8 +117,9 @@ fn handle_loop(
     ns_trie: &mut NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
     tasks: &mut BTreeMap<String, Task>,
+    hk: &mut InferHK,
     allow_subns: bool,
-) -> usize {
+) {
     let res_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
@@ -110,6 +131,11 @@ fn handle_loop(
         }
         if let Ok(message) = rx.recv() {
             match message {
+                Message::Started { path } => {
+                    let mut t = Task::new(path.clone(), TaskType::InferNamespaces);
+                    t.size = metadata(path.clone()).unwrap().len() as usize;
+                    tasks.insert(path, t);
+                }
                 Message::Resource { iri, pos } => {
                     if let Position::Predicate = pos {
                         trip_c.inc();
@@ -122,7 +148,10 @@ fn handle_loop(
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        maintenance(iri_trie, ns_trie, allow_subns);
+                        let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
+                        if let Some(infer_hk) = infer_hk {
+                            hk.add(infer_hk);
+                        }
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -131,10 +160,20 @@ fn handle_loop(
                     debug!("Found local prefix {alias}: {namespace}");
                     local_ns.insert(namespace, alias);
                 }
-                Message::Finished { path, triples } => {
-                    let mut t = tasks.remove(&path).unwrap();
+                Message::Finished {
+                    path,
+                    triples,
+                    iris,
+                    blanks,
+                    literals,
+                } => {
+                    let mut t = tasks.get_mut(&path).unwrap();
                     t.triples = triples;
-                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+                    t.blanks = blanks;
+                    t.iris = iris;
+                    t.literals = literals;
+
+                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
 
                     *running -= 1;
                     trace!("Running: {running}");
@@ -145,8 +184,6 @@ fn handle_loop(
             }
         }
     }
-
-    return trip_c.cur;
 }
 
 fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<NodeStats>) {
@@ -165,11 +202,19 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
     }
 }
 
-fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie, allow_subns: bool) {
+fn maintenance(
+    iri_trie: &mut Node<NodeStats>,
+    ns_trie: &mut NamespaceTrie,
+    allow_subns: bool,
+) -> Option<InferHKTask> {
+    let mut res = None::<InferHKTask>;
+
     if let Some(size) = iri_trie.value {
         let IRI_TRIE_SIZE = 500_000;
 
         if size.desc > IRI_TRIE_SIZE {
+            let t = InferHKTask::new();
+
             info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
             let seg_tree = SegTree::from(&*iri_trie);
             let (inferred, gbg_collected) = seg_tree.infer_namespaces();
@@ -185,8 +230,13 @@ fn maintenance(iri_trie: &mut Node<NodeStats>, ns_trie: &mut NamespaceTrie, allo
                 gbg_collected.len()
             );
             iri_trie.remove_prefixes(&gbg_collected);
+
+            t.finish();
+            res = Some(t);
         }
     }
+
+    res
 }
 
 fn handle_pref_decls(
@@ -262,6 +312,10 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
     let mut start = Instant::now();
     let mut last_trip_c = 0;
 
+    let mut blank_c = 0;
+    let mut iri_c = 0;
+    let mut literal_c = 0;
+
     while !graph.is_end() {
         trip_c += 1;
         if trip_c % 1_000_000 == 1 {
@@ -277,7 +331,14 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
         }
 
         graph
-            .parse_step(&mut |t| proc_triple(t, &tx))
+            .parse_step(&mut |t| {
+                let (blanks, literals, iris) = proc_triple(t, &tx);
+                iri_c += iris;
+                blank_c += blanks;
+                literal_c += literals;
+
+                Ok(())
+            })
             .unwrap_or_else(|err| {
                 let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
@@ -296,37 +357,68 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
         triples: trip_c as usize,
+        iris: iri_c as usize,
+        blanks: blank_c as usize,
+        literals: literal_c as usize,
     })
     .unwrap();
 
     return trip_c as usize;
 }
 
-fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(), TurtleError> {
+fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
+    let mut blanks = 0;
+    let mut literals = 0;
+    let mut iris = 0;
+
     // subject
-    if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-        tx.send(Message::Resource {
-            iri: normalize_iri(iri),
-            pos: Position::Subject,
-        })
-        .unwrap();
+    match t.subject {
+        Subject::NamedNode(NamedNode { iri }) => {
+            iris += 1;
+            tx.send(Message::Resource {
+                iri: normalize_iri(iri),
+                pos: Position::Subject,
+            })
+            .unwrap();
+        }
+        Subject::BlankNode(_) => {
+            blanks += 1;
+        }
+        Subject::Triple(_) => {
+            unimplemented!("Triple as subject not supported");
+        }
     }
+
     // predicate
+    iris += 1;
     tx.send(Message::Resource {
         iri: normalize_iri(t.predicate.iri),
         pos: Position::Predicate,
     })
     .unwrap();
+
     // object
-    if let Term::NamedNode(NamedNode { iri }) = t.object {
-        tx.send(Message::Resource {
-            iri: normalize_iri(iri),
-            pos: Position::Object,
-        })
-        .unwrap();
+    match t.object {
+        Term::NamedNode(NamedNode { iri }) => {
+            iris += 1;
+            tx.send(Message::Resource {
+                iri: normalize_iri(iri),
+                pos: Position::Object,
+            })
+            .unwrap();
+        }
+        Term::BlankNode(_) => {
+            blanks += 1;
+        }
+        Term::Literal(_) => {
+            literals += 1;
+        }
+        Term::Triple(_) => {
+            unimplemented!("Triple as object not supported");
+        }
     }
 
-    Ok(()) as Result<(), TurtleError>
+    (blanks, literals, iris)
 }
 
 // TODO: improve IRI normalization

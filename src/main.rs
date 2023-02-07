@@ -4,21 +4,21 @@ mod args;
 mod counter;
 mod extract;
 mod iri_trie;
+mod meta_info;
 mod normalize;
 mod ns_trie;
 mod parse;
 mod prefixes;
 mod seg_tree;
-mod timed_task;
 mod trie;
 mod util;
 mod visualization;
 
 use crate::iri_trie::IriTrieExt;
+use crate::meta_info::{MetaInfo, MetaInfoNormalization, MetaInfoVisualization, StageTask};
 use crate::normalize::save_normalized_triples;
 use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
-use crate::timed_task::{Task, TaskType};
 use args::Cli;
 use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
@@ -52,8 +52,8 @@ fn main() {
     fs::create_dir(outf).unwrap();
 
     // start timers
-    let tasks_path = Path::new(".").join(outf).join("tasks.jsonl");
-    let mut full_t = Task::new("full".to_string(), TaskType::Execution, tasks_path.clone());
+    let tasks_path = Path::new(".").join(outf).join("tasks.json");
+    let mut meta = MetaInfo::new(tasks_path);
 
     // start logging
     init_log(outf);
@@ -82,17 +82,13 @@ fn main() {
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
     if cli.infer_ns {
-        let mut infer_t = Task::new(
-            "infer".to_string(),
-            TaskType::InferNamespaces,
-            tasks_path.clone(),
-        );
-
-        // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         info!("Getting namespaces");
-        let (mut iri_trie, trip_c) =
-            build_iri_trie(cli.files.clone(), &mut ns_trie, &mut infer_t, allow_subns);
-        infer_t.triples = trip_c;
+        // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
+        let mut infer_t = meta_info::MetaInfoInference::new();
+        let (mut iri_trie, tasks, hk) =
+            build_iri_trie(cli.files.clone(), &mut ns_trie, allow_subns);
+        infer_t.add_tasks(tasks);
+        infer_t.housekeeping = hk;
 
         info!("Inferring namespaces from IRIs left");
         let seg_tree = SegTree::from(&iri_trie);
@@ -116,34 +112,27 @@ fn main() {
         ns_trie.save(outf);
 
         infer_t.finish("Finished namespace inference");
+        meta.inference = Some(infer_t);
     }
 
     /*********************
      * Normalize triples *
      *********************/
 
-    let mut norm_t = Task::new(
-        "normalize".to_string(),
-        TaskType::Normalize,
-        tasks_path.clone(),
-    );
+    let mut norm_t = MetaInfoNormalization::new();
 
     info!("Normalizing triples");
-    let (nts, used_groups, trip_c) = normalize_triples(
-        cli.files.clone(),
-        &mut ns_trie,
-        cli.ignore_unknown,
-        outf,
-        &mut norm_t,
-    );
+    let (nts, used_groups, tasks) =
+        normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
 
-    norm_t.triples = trip_c as usize;
-    full_t.triples = trip_c as usize;
+    norm_t.add_tasks(tasks);
+    norm_t.namespaces = used_groups.namespaces.len();
 
     info!("Saving normalized triples");
     save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
 
     norm_t.finish("Finished summarizing graph");
+    meta.normalization = Some(norm_t);
 
     /*****************
      * Visualization *
@@ -151,19 +140,16 @@ fn main() {
 
     //let mut summ = load_summary(path);
 
-    let mut vis_t = Task::new(
-        "visualization".to_string(),
-        TaskType::Visualization,
-        tasks_path,
-    );
+    let mut vis_t = MetaInfoVisualization::new();
 
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
 
-    full_t.finish("Finished summarizing graph");
     let render_dir = render_vis(&vis_data, outf);
 
     vis_t.finish("Finished generating visualization");
+    meta.visualization = Some(vis_t);
+    meta.save();
     //vis_dev_server(render_dir);
 }
 

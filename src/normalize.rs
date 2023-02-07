@@ -1,21 +1,20 @@
 use crate::{
     counter::Counter,
+    meta_info::{Task, TaskType},
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
-    timed_task::Task,
 };
 use log::{error, info, trace};
 use rayon::ThreadPoolBuilder;
 use rio_api::{
     formatter::TriplesFormatter,
-    model::Triple,
-    model::{Literal, NamedNode, Subject, Term},
+    model::{Literal, NamedNode, Subject, Term, Triple},
     parser::TriplesParser,
 };
 use rio_turtle::{TurtleError, TurtleFormatter};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs::{File, OpenOptions},
+    fs::{metadata, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     sync::mpsc::{sync_channel, Receiver, SyncSender},
@@ -62,6 +61,9 @@ impl TripleFreqFns for TripleFreq {
 
 #[derive(Debug)]
 pub enum Message {
+    Started {
+        path: String,
+    },
     NormalizedTriple {
         subject: NormalizedResource,
         predicate: NormalizedResource,
@@ -73,6 +75,9 @@ pub enum Message {
     Finished {
         path: String,
         triples: usize,
+        blanks: usize,
+        iris: usize,
+        literals: usize,
     },
     FatalError {
         err: TurtleError,
@@ -140,7 +145,7 @@ pub struct GroupNS {
 
 #[derive(Default)]
 pub struct Groups {
-    namespaces: BTreeSet<GroupNS>,
+    pub namespaces: BTreeSet<GroupNS>,
     blank: bool,
     unknown: bool,
 }
@@ -150,8 +155,7 @@ pub fn normalize_triples(
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
-    task: &mut Task,
-) -> (TripleFreq, Groups, usize) {
+) -> (TripleFreq, Groups, BTreeMap<String, Task>) {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
@@ -164,9 +168,9 @@ pub fn normalize_triples(
         .build()
         .unwrap();
 
-    let mut tasks = BTreeMap::<String, Task>::new();
-
     let mut trip_c = 0;
+
+    let mut tasks = BTreeMap::<String, Task>::new();
 
     pool.scope_fifo(|s| {
         let (tx, rx) = sync_channel::<Message>(100);
@@ -174,12 +178,12 @@ pub fn normalize_triples(
         for path in paths {
             let tx = tx.clone();
 
-            tasks.insert(
-                path.to_string_lossy().to_string(),
-                task.file_task(path.to_string_lossy().to_string()),
-            );
-
             s.spawn_fifo(move |_| {
+                tx.send(Message::Started {
+                    path: path.to_string_lossy().to_string(),
+                })
+                .unwrap();
+
                 info!("Parsing {:?}", path);
                 let mut graph = parse(&path);
                 proc_triples(&mut graph, &path, &tx, ns_trie, ignore_unknown);
@@ -193,7 +197,7 @@ pub fn normalize_triples(
             .open(errors_path.clone())
             .unwrap();
 
-        trip_c = handle_loop(
+        handle_loop(
             &mut running,
             rx,
             &mut triples,
@@ -203,7 +207,7 @@ pub fn normalize_triples(
         );
     });
 
-    return (triples, used_groups, trip_c);
+    return (triples, used_groups, tasks);
 }
 
 fn handle_loop(
@@ -213,7 +217,7 @@ fn handle_loop(
     used_groups: &mut Groups,
     tasks: &mut BTreeMap<String, Task>,
     fd: &mut File,
-) -> usize {
+) {
     let msg_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
@@ -229,6 +233,11 @@ fn handle_loop(
         }
         if let Ok(message) = rx.recv() {
             match message {
+                Message::Started { path } => {
+                    let mut t = Task::new(path.clone(), TaskType::Normalize);
+                    t.size = metadata(path.clone()).unwrap().len() as usize;
+                    tasks.insert(path, t);
+                }
                 Message::NormalizedTriple {
                     subject,
                     predicate,
@@ -243,10 +252,19 @@ fn handle_loop(
                         //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
                     }
                 }
-                Message::Finished { path, triples } => {
-                    let mut t = tasks.remove(&path).unwrap();
+                Message::Finished {
+                    path,
+                    triples,
+                    iris,
+                    blanks,
+                    literals,
+                } => {
+                    let mut t = tasks.get_mut(&path).unwrap();
                     t.triples = triples;
-                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.obj_name).as_str());
+                    t.iris = iris;
+                    t.blanks = blanks;
+                    t.literals = literals;
+                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
 
                     *running -= 1;
                 }
@@ -256,7 +274,6 @@ fn handle_loop(
             }
         }
     }
-    return trip_c.cur;
 }
 
 fn restart_timers(start: &mut Instant, msg_c: &mut Counter, trip_c: &mut Counter) {
@@ -339,6 +356,10 @@ fn proc_triples(
     let mut last_i = 0;
     let mut start = Instant::now();
 
+    let mut iri_c = 0;
+    let mut blank_c = 0;
+    let mut literal_c = 0;
+
     while !graph.is_end() {
         i += 1;
 
@@ -353,9 +374,16 @@ fn proc_triples(
             last_i = i;
             start = Instant::now();
         }
-        if let Err(err) =
-            graph.parse_step(&mut |t| proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown))
-        {
+        let res = graph.parse_step(&mut |t| {
+            let (iris, blanks, literals) =
+                proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown);
+            iri_c += iris;
+            blank_c += blanks;
+            literal_c += literals;
+            Ok(())
+        });
+
+        if let Err(err) = res {
             let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
             error!("{}", msg);
             tx.send(Message::FatalError { err }).unwrap();
@@ -365,8 +393,39 @@ fn proc_triples(
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
         triples: i as usize,
+        iris: iri_c,
+        blanks: blank_c,
+        literals: literal_c,
     })
     .unwrap();
+}
+
+fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
+    let mut iris = 0;
+    let mut blanks = 0;
+    let mut literals = 0;
+
+    match subject {
+        Subject::NamedNode(_) => iris += 1,
+        Subject::BlankNode(_) => blanks += 1,
+        Subject::Triple(_) => {
+            unimplemented!("Triple subjects are not supported yet")
+        }
+    }
+
+    // predicate is always a NamedNode
+    iris += 1;
+
+    match object {
+        Term::NamedNode(_) => iris += 1,
+        Term::BlankNode(_) => blanks += 1,
+        Term::Literal(_) => literals += 1,
+        Term::Triple(_) => {
+            unimplemented!("Triple objects are not supported yet")
+        }
+    }
+
+    (iris, blanks, literals)
 }
 
 fn proc_triple<E>(
@@ -374,15 +433,17 @@ fn proc_triple<E>(
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-) -> Result<(), E> {
+) -> (usize, usize, usize) {
     let subject = handle_subject(t.subject, ns_trie);
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
 
+    let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
+
     if ignore_unknown {
         for res in vec![&subject, &predicate, &object] {
             if let Err(UnknownNamespaceError) = res {
-                return Ok(());
+                return (iris, blanks, literals);
             }
         }
     }
@@ -425,7 +486,7 @@ fn proc_triple<E>(
     })
     .unwrap();
 
-    Ok(()) as Result<(), E>
+    (iris, blanks, literals)
 }
 
 fn handle_subject(
