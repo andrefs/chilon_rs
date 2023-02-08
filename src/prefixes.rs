@@ -218,9 +218,12 @@ fn maintenance(
             info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
             let seg_tree = SegTree::from(&*iri_trie);
             let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+            t.inferred_ns = inferred.len();
+            t.discarded_ns = gbg_collected.len();
 
             debug!("Adding inferred namespaces");
             let added = ns_trie.add_namespaces(&inferred, allow_subns);
+            t.added_ns = added.len();
 
             debug!("Removing {} IRIs with inferred namespaces", added.len());
             iri_trie.remove_prefixes(&added);

@@ -105,6 +105,9 @@ impl MetaInfoInference {
 pub struct InferHK {
     pub rounds: usize, // number of rounds of housekeeping performed on the iri trie
     pub duration: Duration, // total duration of housekeeping (maintenance) performed on the iri trie
+    pub discarded_ns: usize, // number of discarded iris due to low frequency
+    pub inferred_ns: usize, // number of namespaces inferred from iris
+    pub added_ns: usize,    // number of inferred iris actually new and added to the trie
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -112,6 +115,9 @@ pub struct InferHKTask {
     pub rounds: usize,
     pub duration: Duration,
     pub start: Instant,
+    pub discarded_ns: usize,
+    pub inferred_ns: usize,
+    pub added_ns: usize,
 }
 
 impl InferHK {
@@ -119,6 +125,9 @@ impl InferHK {
         InferHK {
             rounds: self.rounds + task.rounds,
             duration: self.duration + task.duration,
+            discarded_ns: self.discarded_ns + task.discarded_ns,
+            added_ns: self.added_ns + task.added_ns,
+            inferred_ns: self.inferred_ns + task.inferred_ns,
         }
     }
 
@@ -126,6 +135,9 @@ impl InferHK {
         InferHK {
             rounds: 0,
             duration: Default::default(),
+            discarded_ns: 0,
+            added_ns: 0,
+            inferred_ns: 0,
         }
     }
 }
@@ -136,6 +148,9 @@ impl InferHKTask {
             rounds: 0,
             duration: Default::default(),
             start: Instant::now(),
+            discarded_ns: 0,
+            added_ns: 0,
+            inferred_ns: 0,
         }
     }
 
@@ -143,6 +158,9 @@ impl InferHKTask {
         InferHK {
             rounds: self.rounds,
             duration: self.start.elapsed(),
+            discarded_ns: self.discarded_ns,
+            added_ns: self.added_ns,
+            inferred_ns: self.inferred_ns,
         }
     }
 }
@@ -185,7 +203,6 @@ pub struct MetaInfoVisualization {
     pub size: usize,
     #[serde(skip)]
     start: Instant,
-    pub tasks: BTreeMap<String, Task>,
 }
 
 impl MetaInfoVisualization {
@@ -194,7 +211,6 @@ impl MetaInfoVisualization {
             duration: Default::default(),
             size: 0,
             start: Instant::now(),
-            tasks: BTreeMap::new(),
         }
     }
 }
