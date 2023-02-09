@@ -341,7 +341,6 @@ impl StageTask for MetaInfoVisualization {
         MetaInfoVisualization {
             duration: Default::default(),
             size: 0,
-            tasks: Default::default(),
             start: Instant::now(),
         }
     }
