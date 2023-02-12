@@ -5,7 +5,7 @@ use std::{
 };
 
 use log::{info, warn};
-use r3bl_rs_utils::Arena;
+use r3bl_rs_utils::{Arena, MTArena};
 
 use crate::trie::{NodeData, Trie};
 

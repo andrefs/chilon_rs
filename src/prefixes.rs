@@ -148,10 +148,10 @@ fn handle_loop(
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        //let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
-                        //if let Some(infer_hk) = infer_hk {
-                        //    hk.add(infer_hk);
-                        //}
+                        let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
+                        if let Some(infer_hk) = infer_hk {
+                            hk.add(infer_hk);
+                        }
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -202,45 +202,53 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut IriTrie)
     }
 }
 
-//fn maintenance(
-//    iri_trie: &mut IriTrie,
-//    ns_trie: &mut NamespaceTrie,
-//    allow_subns: bool,
-//) -> Option<InferHKTask> {
-//    let mut res = None::<InferHKTask>;
-//
-//    if let Some(size) = iri_trie.value {
-//        let IRI_TRIE_SIZE = 500_000;
-//
-//        if size.desc > IRI_TRIE_SIZE {
-//            let t = InferHKTask::new();
-//
-//            info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
-//            let seg_tree = SegTree::from(&*iri_trie);
-//            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
-//            t.inferred_ns = inferred.len();
-//            t.discarded_ns = gbg_collected.len();
-//
-//            debug!("Adding inferred namespaces");
-//            let added = ns_trie.add_namespaces(&inferred, allow_subns);
-//            t.added_ns = added.len();
-//
-//            debug!("Removing {} IRIs with inferred namespaces", added.len());
-//            iri_trie.remove_prefixes(&added);
-//
-//            debug!(
-//                "Forgetting {} IRIs with low occurring namespaces",
-//                gbg_collected.len()
-//            );
-//            iri_trie.remove_prefixes(&gbg_collected);
-//
-//            t.finish();
-//            res = Some(t);
-//        }
-//    }
-//
-//    res
-//}
+fn maintenance(
+    iri_trie: &mut IriTrie,
+    ns_trie: &mut NamespaceTrie,
+    allow_subns: bool,
+) -> Option<InferHKTask> {
+    let mut res = None::<InferHKTask>;
+
+    let value = {
+        let arena_arc = iri_trie.arena.get_arena_arc();
+        let arena_read = arena_arc.read().unwrap();
+        let root_arc = arena_read.get_node_arc(iri_trie.root_id).unwrap();
+        let root_read = root_arc.read().unwrap();
+        root_read.payload.value
+    };
+
+    if let Some(size) = value {
+        let IRI_TRIE_SIZE = 500_000;
+
+        if size.desc > IRI_TRIE_SIZE {
+            let mut t = InferHKTask::new();
+
+            info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
+            let seg_tree = SegTree::from(&*iri_trie);
+            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+            t.inferred_ns = inferred.len();
+            t.discarded_ns = gbg_collected.len();
+
+            debug!("Adding inferred namespaces");
+            let added = ns_trie.add_namespaces(&inferred, allow_subns);
+            t.added_ns = added.len();
+
+            debug!("Removing {} IRIs with inferred namespaces", added.len());
+            iri_trie.remove_prefixes(&added);
+
+            debug!(
+                "Forgetting {} IRIs with low occurring namespaces",
+                gbg_collected.len()
+            );
+            iri_trie.remove_prefixes(&gbg_collected);
+
+            t.finish();
+            res = Some(t);
+        }
+    }
+
+    res
+}
 
 fn handle_pref_decls(
     iri_trie: &mut IriTrie,
