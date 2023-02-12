@@ -53,7 +53,7 @@ pub enum Message {
 
 pub fn build_iri_trie(
     paths: Vec<PathBuf>,
-    ns_trie: &mut NamespaceTrie,
+    ns_trie: &NamespaceTrie,
     allow_subns: bool,
 ) -> (IriTrie, BTreeMap<String, Task>, InferHK) {
     debug!("Building IRI trie");
@@ -89,7 +89,7 @@ pub fn build_iri_trie(
 
                 info!("Parsing {:?} ({}/{running})", path, index + 1);
                 let mut graph = parse(&path);
-                proc_triples(&mut graph, &path, &tx);
+                proc_triples(&mut graph, &path, &tx, &ns_trie);
             });
         }
 
@@ -97,7 +97,7 @@ pub fn build_iri_trie(
             &mut running,
             rx,
             &mut iri_trie,
-            ns_trie,
+            &ns_trie,
             &mut local_ns,
             &mut tasks,
             &mut hk,
@@ -105,7 +105,7 @@ pub fn build_iri_trie(
         );
     });
 
-    handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
+    handle_pref_decls(&iri_trie, local_ns, &ns_trie);
 
     return (iri_trie, tasks, hk);
 }
@@ -114,7 +114,7 @@ fn handle_loop(
     running: &mut usize,
     rx: Receiver<Message>,
     iri_trie: &mut IriTrie,
-    ns_trie: &mut NamespaceTrie,
+    ns_trie: &NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
     tasks: &mut BTreeMap<String, Task>,
     hk: &mut InferHK,
@@ -188,23 +188,23 @@ fn handle_loop(
 
 fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut IriTrie) {
     // find namespace for resource
-    let res = ns_trie.longest_prefix(iri.as_str(), true);
-    if res.is_none() || res.unwrap().1.is_empty() {
-        let stats = NodeStats::new_terminal();
-        iri_trie.insert_fn(
-            &iri,
-            stats,
-            &InsertFnVisitors {
-                node: Some(&update_stats),
-                terminal: Some(&inc_own),
-            },
-        );
-    }
+    //let res = ns_trie.longest_prefix(iri.as_str(), true);
+    //if res.is_none() || res.unwrap().1.is_empty() {
+    let stats = NodeStats::new_terminal();
+    iri_trie.insert_fn(
+        &iri,
+        stats,
+        &InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        },
+    );
+    //}
 }
 
 fn maintenance(
     iri_trie: &mut IriTrie,
-    ns_trie: &mut NamespaceTrie,
+    ns_trie: &NamespaceTrie,
     allow_subns: bool,
 ) -> Option<InferHKTask> {
     let mut res = None::<InferHKTask>;
@@ -251,9 +251,9 @@ fn maintenance(
 }
 
 fn handle_pref_decls(
-    iri_trie: &mut IriTrie,
+    iri_trie: &IriTrie,
     local_ns: BTreeMap<String, String>,
-    ns_trie: &mut NamespaceTrie,
+    ns_trie: &NamespaceTrie,
 ) {
     // message with local file prefix decls is only sent in the end
     // remove the prefix from iri trie and add to namespace trie
@@ -311,7 +311,12 @@ fn restart_timers(
     *start = Instant::now();
 }
 
-fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) -> usize {
+fn proc_triples(
+    graph: &mut ParserWrapper,
+    path: &PathBuf,
+    tx: &SyncSender<Message>,
+    ns_trie: &NamespaceTrie,
+) -> usize {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {
@@ -343,7 +348,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
 
         graph
             .parse_step(&mut |t| {
-                let (blanks, literals, iris) = proc_triple(t, &tx);
+                let (blanks, literals, iris) = proc_triple(t, &tx, ns_trie);
                 iri_c += iris;
                 blank_c += blanks;
                 literal_c += literals;
@@ -377,7 +382,11 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
     return trip_c as usize;
 }
 
-fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
+fn proc_triple(
+    t: Triple,
+    tx: &SyncSender<Message>,
+    ns_trie: &NamespaceTrie,
+) -> (usize, usize, usize) {
     let mut blanks = 0;
     let mut literals = 0;
     let mut iris = 0;
@@ -386,11 +395,7 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
     match t.subject {
         Subject::NamedNode(NamedNode { iri }) => {
             iris += 1;
-            tx.send(Message::Resource {
-                iri: normalize_iri(iri),
-                pos: Position::Subject,
-            })
-            .unwrap();
+            send_iri(iri, Position::Subject, tx, ns_trie);
         }
         Subject::BlankNode(_) => {
             blanks += 1;
@@ -402,21 +407,13 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
 
     // predicate
     iris += 1;
-    tx.send(Message::Resource {
-        iri: normalize_iri(t.predicate.iri),
-        pos: Position::Predicate,
-    })
-    .unwrap();
+    send_iri(t.predicate.iri, Position::Predicate, tx, ns_trie);
 
     // object
     match t.object {
         Term::NamedNode(NamedNode { iri }) => {
             iris += 1;
-            tx.send(Message::Resource {
-                iri: normalize_iri(iri),
-                pos: Position::Object,
-            })
-            .unwrap();
+            send_iri(iri, Position::Object, tx, ns_trie)
         }
         Term::BlankNode(_) => {
             blanks += 1;
@@ -430,6 +427,18 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
     }
 
     (blanks, literals, iris)
+}
+
+fn send_iri(iri: &str, pos: Position, tx: &SyncSender<Message>, ns_trie: &NamespaceTrie) {
+    // find namespace for resource
+    let res = ns_trie.longest_prefix(iri, true);
+    if res.is_none() || res.unwrap().1.is_empty() {
+        tx.send(Message::Resource {
+            iri: normalize_iri(iri),
+            pos,
+        })
+        .unwrap();
+    }
 }
 
 // TODO: improve IRI normalization

@@ -85,8 +85,7 @@ fn main() {
         info!("Getting namespaces");
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         let mut infer_t = meta_info::MetaInfoInference::new();
-        let (mut iri_trie, tasks, hk) =
-            build_iri_trie(cli.files.clone(), &mut ns_trie, allow_subns);
+        let (mut iri_trie, tasks, hk) = build_iri_trie(cli.files.clone(), &ns_trie, allow_subns);
         infer_t.add_tasks(tasks);
         infer_t.housekeeping = hk;
 

@@ -109,7 +109,7 @@ impl<T: Clone + Send + Debug + Sync> Trie<T> {
         s
     }
 
-    pub fn insert(&mut self, key: &str, value: T) {
+    pub fn insert(&self, key: &str, value: T) {
         self.insert_fn(
             key,
             value,
@@ -120,7 +120,7 @@ impl<T: Clone + Send + Debug + Sync> Trie<T> {
         )
     }
 
-    pub fn insert_fn(&mut self, key: &str, value: T, visitors: &InsertFnVisitors<T>) {
+    pub fn insert_fn(&self, key: &str, value: T, visitors: &InsertFnVisitors<T>) {
         let arena_arc = self.arena.get_arena_arc();
 
         let mut cur_node_id = self.root_id;
@@ -199,15 +199,15 @@ impl<T: Clone + Send + Debug + Sync> Trie<T> {
         self.remove_fn(
             key,
             remove_subtree,
-            None::<&dyn Fn(&mut Trie<T>, usize, char) -> ()>,
+            None::<&dyn Fn(&Trie<T>, usize, char) -> ()>,
         )
     }
 
     pub fn remove_fn<U>(
-        &mut self,
+        &self,
         key: &str,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Trie<T>, usize, char) -> U>,
+        cb: Option<&dyn Fn(&Trie<T>, usize, char) -> U>,
     ) -> Option<T> {
         let arena_arc = self.arena.get_arena_arc();
 
@@ -381,8 +381,8 @@ impl<T: Clone + Send + Debug + Sync> Trie<T> {
 }
 
 pub struct InsertFnVisitors<'a, T: Clone + Send + Sync + Debug + 'static> {
-    pub node: Option<&'a dyn Fn(&mut Trie<T>, usize)>,
-    pub terminal: Option<&'a dyn Fn(&mut Trie<T>, usize)>,
+    pub node: Option<&'a dyn Fn(&Trie<T>, usize)>,
+    pub terminal: Option<&'a dyn Fn(&Trie<T>, usize)>,
 }
 
 struct LongestPrefOpts {
@@ -520,7 +520,7 @@ mod tests {
 
     fn ins_vis() -> InsertFnVisitors<'static, usize> {
         InsertFnVisitors {
-            node: Some(&|trie: &mut Trie<usize>, node_id: usize| {
+            node: Some(&|trie: &Trie<usize>, node_id: usize| {
                 let arena_arc = trie.arena.get_arena_arc();
                 let arena_read = arena_arc.read().unwrap();
                 let node_arc = arena_read.get_node_arc(node_id).unwrap();
@@ -558,7 +558,7 @@ mod tests {
                 }
                 node_arc.write().unwrap().payload.value = Some(new_value);
             }),
-            terminal: Some(&|trie: &mut Trie<usize>, node_id: usize| {
+            terminal: Some(&|trie: &Trie<usize>, node_id: usize| {
                 trie.arena
                     .get_arena_arc()
                     .read()

@@ -49,7 +49,7 @@ impl SaveTrie for NamespaceTrie {
 
 pub trait InferredNamespaces {
     fn add_namespaces(
-        &mut self,
+        &self,
         inferred: &Vec<(String, usize, NamespaceSource)>,
         allow_subns: bool,
     ) -> Vec<String>;
@@ -57,7 +57,7 @@ pub trait InferredNamespaces {
     fn to_map(&self) -> NamespaceMap;
 
     fn add_namespace(
-        &mut self,
+        &self,
         ns: &str,
         size: usize,
         source: NamespaceSource,
@@ -78,7 +78,7 @@ impl InferredNamespaces for NamespaceTrie {
         return trie;
     }
     fn add_namespace(
-        &mut self,
+        &self,
         ns: &str,
         size: usize,
         source: NamespaceSource,
@@ -123,7 +123,7 @@ impl InferredNamespaces for NamespaceTrie {
         }
     }
     fn add_namespaces(
-        &mut self,
+        &self,
         inferred: &Vec<(String, usize, NamespaceSource)>,
         allow_subns: bool,
     ) -> Vec<String> {

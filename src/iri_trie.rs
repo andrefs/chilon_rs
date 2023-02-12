@@ -86,7 +86,7 @@ impl Default for NodeStats {
     }
 }
 
-pub fn inc_own(trie: &mut IriTrie, id: usize) {
+pub fn inc_own(trie: &IriTrie, id: usize) {
     let arena_arc = trie.arena.get_arena_arc();
     let arena_read = arena_arc.read().unwrap();
     let node_arc = arena_read.get_node_arc(id).unwrap();
@@ -98,11 +98,11 @@ pub fn inc_own(trie: &mut IriTrie, id: usize) {
     node_write.payload.set_stats(Some(stats));
 }
 
-pub fn upd_stats_visitor(trie: &mut IriTrie, parent_id: usize, ch: char) {
+pub fn upd_stats_visitor(trie: &IriTrie, parent_id: usize, ch: char) {
     update_stats(trie, parent_id);
 }
 
-pub fn update_stats(trie: &mut IriTrie, id: usize) {
+pub fn update_stats(trie: &IriTrie, id: usize) {
     let arena_arc = trie.arena.get_arena_arc();
     let arena_read = arena_arc.read().unwrap();
     let node_arc = arena_read.get_node_arc(id).unwrap();
@@ -191,8 +191,8 @@ pub trait IriTrieExt {
     fn count(&self) -> usize;
     //fn remove_leaves(&mut self) -> bool;
     //fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>);
-    fn remove_prefix(&mut self, namespace: &str) -> Option<NodeStats>;
+    fn remove_prefixes(&self, ns_vec: &Vec<String>);
+    fn remove_prefix(&self, namespace: &str) -> Option<NodeStats>;
     //fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
 }
 
@@ -209,7 +209,7 @@ impl IriTrieExt for IriTrie {
         return total;
     }
 
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>) {
+    fn remove_prefixes(&self, ns_vec: &Vec<String>) {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }
@@ -225,7 +225,7 @@ impl IriTrieExt for IriTrie {
         }
     }
 
-    fn remove_prefix(&mut self, namespace: &str) -> Option<NodeStats> {
+    fn remove_prefix(&self, namespace: &str) -> Option<NodeStats> {
         let res = self.remove_fn(namespace, true, Some(&upd_stats_visitor));
         res
     }
