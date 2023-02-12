@@ -1,15 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    fs::write,
-    path::Path,
-};
+use std::{collections::BTreeMap, fmt, fs::write, path::Path};
 
-use crate::trie::Node;
+use crate::trie::Trie;
 use log::{debug, info, warn};
+use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub enum NamespaceSource {
     User,
     Community,
@@ -28,8 +24,8 @@ impl fmt::Display for NamespaceSource {
     }
 }
 
-pub type NamespaceTrie = Node<(String, NamespaceSource)>;
-pub type NamespaceMap = BTreeMap<String, (String, String)>;
+pub type NamespaceTrie = Trie<(String, NamespaceSource)>;
+pub type NamespaceMap = BTreeMap<String, (String, NamespaceSource)>;
 
 pub trait SaveTrie {
     fn save(&self, outf: &str);
@@ -44,7 +40,7 @@ impl SaveTrie for NamespaceTrie {
 
         for (ns, node) in self.iter_leaves() {
             let (alias, source) = node.value.as_ref().unwrap().clone();
-            ns_map.insert(alias, (ns, source.to_string()));
+            ns_map.insert(alias, (ns, source));
         }
 
         write(file_path, serde_json::to_string_pretty(&ns_map).unwrap()).unwrap();
@@ -59,6 +55,16 @@ pub trait InferredNamespaces {
     ) -> Vec<String>;
 
     fn to_map(&self) -> NamespaceMap;
+
+    fn add_namespace(
+        &mut self,
+        ns: &str,
+        size: usize,
+        source: NamespaceSource,
+        allow_subns: bool,
+        aliases: &mut NamespaceMap,
+        added: &mut Trie<String>,
+    );
 }
 
 impl InferredNamespaces for NamespaceTrie {
@@ -66,10 +72,55 @@ impl InferredNamespaces for NamespaceTrie {
         let mut trie = NamespaceMap::new();
         for (ns, node) in self.iter() {
             if let Some((alias, source)) = node.value.clone() {
-                trie.insert(alias, (ns, source.to_string()));
+                trie.insert(alias, (ns, source));
             }
         }
         return trie;
+    }
+    fn add_namespace(
+        &mut self,
+        ns: &str,
+        size: usize,
+        source: NamespaceSource,
+        allow_subns: bool,
+        aliases: &mut NamespaceMap,
+        added: &mut Trie<String>,
+    ) {
+        match Url::parse(ns) {
+            Err(err) => warn!("Could not parse IRI {ns}: {err}"),
+            Ok(url_obj) => {
+                if !url_obj.has_host() {
+                    warn!("IRI {ns} does not have host");
+                    return;
+                }
+                if let Some((node, exists_ns)) =
+                    self.longest_prefix(url_obj.to_string().as_str(), true)
+                {
+                    let (alias, _) = node.value.as_ref().unwrap();
+
+                    if *ns == exists_ns {
+                        debug!("Inferred namespace {ns} already in trie with alias {alias}",);
+                        return;
+                    }
+                    if !allow_subns {
+                        debug!("Inferred namespace {ns} is contained in existing namespace {exists_ns} ({alias})",);
+                        return;
+                    }
+                }
+                let alias_opt = gen_alias(url_obj, &aliases);
+                if let Some(alias) = alias_opt {
+                    debug!(
+                        "Adding new namespace {} -> {} to namespace trie (size: {size})",
+                        alias, ns
+                    );
+                    self.insert(ns, (alias.clone(), source));
+                    aliases.insert(alias.clone(), (ns.to_string(), source));
+                    added.insert(&alias, ns.to_string());
+                } else {
+                    warn!("gen_alias() returned None for {}", ns);
+                }
+            }
+        }
     }
     fn add_namespaces(
         &mut self,
@@ -78,44 +129,10 @@ impl InferredNamespaces for NamespaceTrie {
     ) -> Vec<String> {
         let mut aliases = self.to_map();
 
-        let mut added = Node::<String>::new();
+        let mut added = Trie::<String>::new();
 
         for (ns, size, source) in inferred.iter() {
-            match Url::parse(ns.as_str()) {
-                Err(err) => warn!("Could not parse IRI {ns}: {err}"),
-                Ok(url_obj) => {
-                    if !url_obj.has_host() {
-                        warn!("IRI {ns} does not have host");
-                        continue;
-                    }
-                    if let Some((node, exists_ns)) =
-                        self.longest_prefix(url_obj.to_string().as_str(), true)
-                    {
-                        let (alias, _) = node.value.as_ref().unwrap();
-
-                        if *ns == exists_ns {
-                            debug!("Inferred namespace {ns} already in trie with alias {alias}",);
-                            continue;
-                        }
-                        if !allow_subns {
-                            debug!("Inferred namespace {ns} is contained in existing namespace {exists_ns} ({alias})",);
-                            continue;
-                        }
-                    }
-                    let alias_opt = gen_alias(url_obj, &aliases);
-                    if let Some(alias) = alias_opt {
-                        debug!(
-                            "Adding new namespace {} -> {} to namespace trie (size: {size})",
-                            alias, ns
-                        );
-                        self.insert(ns, (alias.clone(), *source));
-                        aliases.insert(alias.clone(), (ns.clone(), source.to_string()));
-                        added.insert(&alias, ns.clone());
-                    } else {
-                        warn!("gen_alias() returned None for {}", ns);
-                    }
-                }
-            }
+            self.add_namespace(ns, *size, *source, allow_subns, &mut aliases, &mut added);
         }
 
         let res = added
@@ -201,4 +218,9 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     }
 
     return Some(alias);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
 }

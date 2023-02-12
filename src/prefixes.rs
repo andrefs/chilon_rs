@@ -6,7 +6,7 @@ use crate::meta_info::{InferHK, InferHKTask, Task, TaskType};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
-use crate::trie::{InsertFnVisitors, Node};
+use crate::trie::{InsertFnVisitors, Trie};
 use log::{debug, error, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
@@ -113,7 +113,7 @@ pub fn build_iri_trie(
 fn handle_loop(
     running: &mut usize,
     rx: Receiver<Message>,
-    iri_trie: &mut Node<NodeStats>,
+    iri_trie: &mut IriTrie,
     ns_trie: &mut NamespaceTrie,
     local_ns: &mut BTreeMap<String, String>,
     tasks: &mut BTreeMap<String, Task>,
@@ -148,10 +148,10 @@ fn handle_loop(
                         let nst_ct = ns_trie.count_terminals();
                         restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
 
-                        let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
-                        if let Some(infer_hk) = infer_hk {
-                            hk.add(infer_hk);
-                        }
+                        //let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
+                        //if let Some(infer_hk) = infer_hk {
+                        //    hk.add(infer_hk);
+                        //}
                     }
 
                     insert_resource(ns_trie, iri, iri_trie);
@@ -186,7 +186,7 @@ fn handle_loop(
     }
 }
 
-fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<NodeStats>) {
+fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut IriTrie) {
     // find namespace for resource
     let res = ns_trie.longest_prefix(iri.as_str(), true);
     if res.is_none() || res.unwrap().1.is_empty() {
@@ -202,48 +202,48 @@ fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<Nod
     }
 }
 
-fn maintenance(
-    iri_trie: &mut Node<NodeStats>,
-    ns_trie: &mut NamespaceTrie,
-    allow_subns: bool,
-) -> Option<InferHKTask> {
-    let mut res = None::<InferHKTask>;
-
-    if let Some(size) = iri_trie.value {
-        let IRI_TRIE_SIZE = 500_000;
-
-        if size.desc > IRI_TRIE_SIZE {
-            let t = InferHKTask::new();
-
-            info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
-            let seg_tree = SegTree::from(&*iri_trie);
-            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
-            t.inferred_ns = inferred.len();
-            t.discarded_ns = gbg_collected.len();
-
-            debug!("Adding inferred namespaces");
-            let added = ns_trie.add_namespaces(&inferred, allow_subns);
-            t.added_ns = added.len();
-
-            debug!("Removing {} IRIs with inferred namespaces", added.len());
-            iri_trie.remove_prefixes(&added);
-
-            debug!(
-                "Forgetting {} IRIs with low occurring namespaces",
-                gbg_collected.len()
-            );
-            iri_trie.remove_prefixes(&gbg_collected);
-
-            t.finish();
-            res = Some(t);
-        }
-    }
-
-    res
-}
+//fn maintenance(
+//    iri_trie: &mut IriTrie,
+//    ns_trie: &mut NamespaceTrie,
+//    allow_subns: bool,
+//) -> Option<InferHKTask> {
+//    let mut res = None::<InferHKTask>;
+//
+//    if let Some(size) = iri_trie.value {
+//        let IRI_TRIE_SIZE = 500_000;
+//
+//        if size.desc > IRI_TRIE_SIZE {
+//            let t = InferHKTask::new();
+//
+//            info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
+//            let seg_tree = SegTree::from(&*iri_trie);
+//            let (inferred, gbg_collected) = seg_tree.infer_namespaces();
+//            t.inferred_ns = inferred.len();
+//            t.discarded_ns = gbg_collected.len();
+//
+//            debug!("Adding inferred namespaces");
+//            let added = ns_trie.add_namespaces(&inferred, allow_subns);
+//            t.added_ns = added.len();
+//
+//            debug!("Removing {} IRIs with inferred namespaces", added.len());
+//            iri_trie.remove_prefixes(&added);
+//
+//            debug!(
+//                "Forgetting {} IRIs with low occurring namespaces",
+//                gbg_collected.len()
+//            );
+//            iri_trie.remove_prefixes(&gbg_collected);
+//
+//            t.finish();
+//            res = Some(t);
+//        }
+//    }
+//
+//    res
+//}
 
 fn handle_pref_decls(
-    iri_trie: &mut Node<NodeStats>,
+    iri_trie: &mut IriTrie,
     local_ns: BTreeMap<String, String>,
     ns_trie: &mut NamespaceTrie,
 ) {

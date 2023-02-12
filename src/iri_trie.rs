@@ -1,10 +1,13 @@
 use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, VecDeque},
+    collections::VecDeque,
+    fmt::Debug,
+    sync::{Arc, RwLock},
 };
 
-use crate::trie::Node;
 use log::{info, warn};
+use r3bl_rs_utils::Arena;
+
+use crate::trie::{NodeData, Trie};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -22,7 +25,7 @@ pub struct NodeStats {
     pub desc: usize,
     pub uniq_desc: usize,
 }
-pub type IriTrie = Node<NodeStats>; // todo finish
+pub type IriTrie = Trie<NodeStats>; // todo finish
 
 impl NodeStats {
     pub fn new() -> NodeStats {
@@ -47,12 +50,29 @@ pub trait IriTrieStatsExt {
     fn set_stats(&mut self, stats: Option<NodeStats>);
 }
 
-impl IriTrieStatsExt for IriTrie {
+impl IriTrieStatsExt for NodeData<NodeStats> {
     fn stats(&self) -> NodeStats {
         self.value.unwrap_or_default()
     }
     fn set_stats(&mut self, stats: Option<NodeStats>) {
         self.value = stats;
+    }
+}
+
+impl IriTrieStatsExt for IriTrie {
+    fn stats(&self) -> NodeStats {
+        let arena_arc = self.arena.get_arena_arc();
+        let arena_read = arena_arc.read().unwrap();
+        let root_arc = arena_read.get_node_arc(self.root_id).unwrap();
+        let root_read = root_arc.read().unwrap();
+        root_read.payload.stats()
+    }
+    fn set_stats(&mut self, stats: Option<NodeStats>) {
+        let arena_arc = self.arena.get_arena_arc();
+        let arena_read = arena_arc.read().unwrap();
+        let root_arc = arena_read.get_node_arc(self.root_id).unwrap();
+        let mut root_write = root_arc.write().unwrap();
+        root_write.payload.set_stats(stats)
     }
 }
 
@@ -66,71 +86,102 @@ impl Default for NodeStats {
     }
 }
 
-pub fn init_stats(n: &mut IriTrie) {
-    let new_stats = NodeStats::new();
-    n.value = Some(new_stats);
-}
+pub fn inc_own(trie: &mut IriTrie, id: usize) {
+    let arena_arc = trie.arena.get_arena_arc();
+    let arena_read = arena_arc.read().unwrap();
+    let node_arc = arena_read.get_node_arc(id).unwrap();
+    let mut node_write = node_arc.write().unwrap();
 
-pub fn upd_stats_visitor(node: &mut IriTrie, _: char, _: Option<&IriTrie>) {
-    update_stats(node);
-}
+    let mut stats = node_write.payload.stats();
 
-pub fn inc_own(node: &mut IriTrie) {
-    let mut stats = node.stats();
     stats.own += 1;
-    node.set_stats(Some(stats));
+    node_write.payload.set_stats(Some(stats));
 }
 
-pub fn update_stats(node: &mut IriTrie) {
-    let (desc, uniq_desc) = node
-        .children
-        .iter()
-        .map(|(_, child)| {
-            let child_stats = child.stats();
-            let desc = child_stats.own + child_stats.desc;
-            let uniq_desc = if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
-            (desc, uniq_desc)
-        })
-        .fold(
-            (0, 0),
-            |(desc, uniq_desc), (delta_desc, delta_uniq_desc)| {
-                (desc + delta_desc, uniq_desc + delta_uniq_desc)
-            },
-        );
+pub fn upd_stats_visitor(trie: &mut IriTrie, parent_id: usize, ch: char) {
+    update_stats(trie, parent_id);
+}
+
+pub fn update_stats(trie: &mut IriTrie, id: usize) {
+    let arena_arc = trie.arena.get_arena_arc();
+    let arena_read = arena_arc.read().unwrap();
+    let node_arc = arena_read.get_node_arc(id).unwrap();
+
+    let ((desc, uniq_desc), own) = {
+        let node_read = node_arc.read().unwrap();
+        (
+            node_read
+                .payload
+                .children
+                .iter()
+                .map(|(_, child)| {
+                    let child_arc = arena_read.get_node_arc(*child).unwrap();
+                    let child_read = child_arc.read().unwrap();
+                    let child_stats = child_read.payload.stats();
+                    let desc = child_stats.own + child_stats.desc;
+                    let uniq_desc =
+                        if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
+                    (desc, uniq_desc)
+                })
+                .fold(
+                    (0, 0),
+                    |(desc, uniq_desc), (delta_desc, delta_uniq_desc)| {
+                        (desc + delta_desc, uniq_desc + delta_uniq_desc)
+                    },
+                ),
+            node_read.payload.stats().own,
+        )
+    };
 
     let stats = Some(NodeStats {
         desc,
         uniq_desc,
-        own: node.stats().own,
+        own,
     });
-    node.set_stats(stats);
+
+    let mut node_write = node_arc.write().unwrap();
+    node_write.payload.set_stats(stats);
 }
 
-pub struct NodeIter<'a, T> {
-    queue: VecDeque<(String, &'a Node<T>)>,
+pub struct NodeIter<T: Debug + Sync + Send + Clone> {
+    arena_arc: Arc<RwLock<Arena<NodeData<T>>>>,
+    queue: VecDeque<(String, usize)>,
 }
 
-impl<T> Node<T> {
-    pub fn iter_leaves(&self) -> NodeIter<'_, T> {
+impl<T: Debug + Sync + Send + Clone> Trie<T> {
+    pub fn iter_leaves(&self) -> NodeIter<T> {
+        let arena_arc = self.arena.get_arena_arc();
+
         NodeIter {
-            queue: VecDeque::from([("".to_string(), self)]),
+            arena_arc,
+            queue: VecDeque::from([("".to_string(), self.root_id)]),
         }
     }
 }
 
-impl<'a, T> Iterator for NodeIter<'a, T> {
-    type Item = (String, &'a Node<T>);
+impl<T: Debug + Sync + Send + Clone> Iterator for NodeIter<T> {
+    type Item = (String, NodeData<T>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.queue.is_empty() {
             return None;
         }
-        let (s, n) = self.queue.pop_front().unwrap();
-        for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{s}{k}"), &v));
+        let (s, id) = self.queue.pop_front().unwrap();
+
+        let arena_arc = self.arena_arc.clone();
+        let arena_read = arena_arc.read().unwrap();
+        let node_arc = arena_read.get_node_arc(id).unwrap();
+        let node_read = node_arc.read().unwrap();
+
+        let children = node_read.payload.children.clone();
+        let mut sorted_children: Vec<_> = children.iter().collect();
+        sorted_children.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+
+        for (k, v) in sorted_children.iter().rev() {
+            self.queue.push_front((format!("{s}{k}"), **v));
         }
-        if n.children.is_empty() {
-            return Some((s, n));
+        if node_read.payload.children.is_empty() {
+            return Some((s, node_read.payload.clone()));
         }
         return self.next();
     }
@@ -138,80 +189,24 @@ impl<'a, T> Iterator for NodeIter<'a, T> {
 
 pub trait IriTrieExt {
     fn count(&self) -> usize;
-    fn remove_leaves(&mut self) -> bool;
-    fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
+    //fn remove_leaves(&mut self) -> bool;
+    //fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_prefixes(&mut self, ns_vec: &Vec<String>);
-    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
-    fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
+    fn remove_prefix(&mut self, namespace: &str) -> Option<NodeStats>;
+    //fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
 }
 
 impl IriTrieExt for IriTrie {
-    fn value_along_path(
-        &mut self,
-        str_left: String,
-        str_acc: String,
-        v: &mut Vec<(String, String)>,
-    ) {
-        v.push((
-            str_acc.clone(),
-            if self.value.is_some() {
-                self.value.unwrap().desc.to_string()
-            } else {
-                "".to_string()
-            },
-        ));
-        if str_left.is_empty() {
-            return;
-        }
-
-        let first_char = str_left.chars().next().unwrap();
-        let rest = &str_left[first_char.len_utf8()..];
-
-        if !self.children.contains_key(&first_char) {
-            panic!("Something is wrong: {str_left} has no char {first_char} ");
-        }
-
-        let node = self
-            .children
-            .get_mut(&first_char)
-            .unwrap()
-            .value_along_path(rest.to_string(), format!("{str_acc}{first_char}"), v);
-    }
-
     fn count(&self) -> usize {
-        let stats = self.stats();
+        let arena_arc = self.arena.get_arena_arc();
+        let arena_read = arena_arc.read().unwrap();
+        let root_arc = arena_read.get_node_arc(self.root_id).unwrap();
+        let root_read = root_arc.read().unwrap();
+
+        let stats = root_read.payload.stats();
         let mut total = 0;
         total += stats.desc + stats.own;
         return total;
-    }
-
-    fn remove_leaves(&mut self) -> bool {
-        self.remove_leaves_aux("".to_string())
-    }
-
-    fn remove_leaves_aux(&mut self, cur_str: String) -> bool {
-        if self.children.is_empty() {
-            return false;
-        }
-        let mut deleted = false;
-        let mut to_remove = Vec::<char>::new();
-
-        for (&ch, node) in self.children.iter_mut() {
-            let node_had_children = !node.children.is_empty();
-            let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
-            if !child_deleted && ['/', '#'].contains(&ch) {
-                to_remove.push(ch);
-                // if ch was the last one it doesn't count
-                //deleted = node_had_children;
-                deleted = true;
-            }
-            deleted = deleted || child_deleted;
-        }
-        for ch in to_remove.iter() {
-            let sub_node = self.get_mut(*ch).unwrap();
-            sub_node.children = BTreeMap::new();
-        }
-        return deleted;
     }
 
     fn remove_prefixes(&mut self, ns_vec: &Vec<String>) {
@@ -221,7 +216,7 @@ impl IriTrieExt for IriTrie {
         warn!(
             "IRIs with unknown namespaces: {} ({} occurrences).",
             self.count(),
-            self.value.unwrap_or(Default::default()).desc,
+            self.stats().desc,
         );
         let examples = self.iter_leaves().take(10).map(|x| x.0).collect::<Vec<_>>();
         // 1 example is the root node
@@ -230,9 +225,9 @@ impl IriTrieExt for IriTrie {
         }
     }
 
-    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
-        //trace!("Removing namespace {} from IRI trie", namespace.borrow());
-        self.remove_fn(namespace, true, Some(&upd_stats_visitor))
+    fn remove_prefix(&mut self, namespace: &str) -> Option<NodeStats> {
+        let res = self.remove_fn(namespace, true, Some(&upd_stats_visitor));
+        res
     }
 }
 
@@ -243,27 +238,147 @@ mod tests {
     use super::*;
 
     #[test]
+    fn inc_own_test() {
+        let mut trie = IriTrie::new();
+        trie.insert_fn(
+            "http://example.org/",
+            Default::default(),
+            &InsertFnVisitors {
+                node: None,
+                terminal: Some(&inc_own),
+            },
+        );
+
+        let res = trie.find("http://example.org/", true).unwrap();
+
+        assert_eq!(res.0.stats().own, 1);
+        assert_eq!(res.0.stats().desc, 0);
+        assert_eq!(res.0.stats().uniq_desc, 0);
+    }
+
+    #[test]
+    fn update_stats_test() {
+        let mut trie = IriTrie::new();
+        trie.insert_fn(
+            "http://example.org/",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+
+        trie.insert_fn(
+            "http://example.org/path1",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+        trie.insert_fn(
+            "http://example.org/path2",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+
+        let res = trie.find("http://example.org/", true).unwrap();
+
+        assert_eq!(res.0.stats().own, 1);
+        assert_eq!(res.0.stats().desc, 2);
+        assert_eq!(res.0.stats().uniq_desc, 2);
+    }
+
+    #[test]
+    fn iter_test() {
+        let mut trie = IriTrie::new();
+        trie.insert("a", Default::default());
+        trie.insert("abc", Default::default());
+        trie.insert("abcdef", Default::default());
+        trie.insert("ghi", Default::default());
+        trie.insert("g", Default::default());
+
+        let leaves = trie.iter_leaves().collect::<Vec<_>>();
+
+        assert_eq!(leaves.len(), 2);
+        assert_eq!(leaves[0].0, "abcdef");
+        assert_eq!(leaves[1].0, "ghi");
+    }
+
+    #[test]
+    fn count_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("a", Default::default(), &visitors);
+        trie.insert_fn("abc", Default::default(), &visitors);
+        trie.insert_fn("abcdef", Default::default(), &visitors);
+        trie.insert_fn("ghi", Default::default(), &visitors);
+        trie.insert_fn("g", Default::default(), &visitors);
+
+        assert_eq!(trie.count(), 5);
+    }
+
+    #[test]
+
+    fn remove_prefix_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("http://example.org/", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path1", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2", Default::default(), &visitors);
+
+        trie.remove_prefix("http://example.org/pat");
+
+        assert_eq!(trie.count(), 1);
+    }
+
+    #[test]
+    fn remove_prefixes_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("http://example.org/path1/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path1/b", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2/b", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path3/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path3/b", Default::default(), &visitors);
+
+        trie.remove_prefixes(&vec![
+            "http://example.org/path1".to_string(),
+            "http://example.org/path2".to_string(),
+        ]);
+        //trie.remove_prefix("http://example.org/path1");
+        //trie.remove_prefix("http://example.org/path2");
+
+        assert_eq!(trie.count(), 2);
+    }
+
+    #[test]
     fn remove_fn_dec_stats() {
         let stats = NodeStats::new_terminal();
-        let mut t = Node::new();
-        t.insert_fn(
-            "ab",
-            stats,
-            &InsertFnVisitors {
-                node: Some(&update_stats),
-                terminal: Some(&inc_own),
-            },
-        );
-        t.insert_fn(
-            "abcde",
-            stats,
-            &InsertFnVisitors {
-                node: Some(&update_stats),
-                terminal: Some(&inc_own),
-            },
-        );
+        let mut t = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+
+        t.insert_fn("ab", stats, &visitors);
+        t.insert_fn("abcde", stats, &visitors);
         t.remove_fn("abcd", true, Some(&upd_stats_visitor));
 
-        assert_eq!(t.value.unwrap().desc, 1);
+        assert_eq!(t.stats().desc, 2);
+        assert_eq!(t.stats().uniq_desc, 1);
     }
 }

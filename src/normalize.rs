@@ -749,7 +749,7 @@ pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
 #[cfg(test)]
 mod tests {
 
-    use crate::{ns_trie::NamespaceSource, trie::Node};
+    use crate::ns_trie::NamespaceSource;
 
     use super::*;
 
