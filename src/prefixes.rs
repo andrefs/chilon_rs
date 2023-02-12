@@ -213,7 +213,7 @@ fn maintenance(
         let IRI_TRIE_SIZE = 500_000;
 
         if size.desc > IRI_TRIE_SIZE {
-            let t = InferHKTask::new();
+            let mut t = InferHKTask::new();
 
             info!("IRI trie size over {IRI_TRIE_SIZE}, inferring namespaces");
             let seg_tree = SegTree::from(&*iri_trie);
