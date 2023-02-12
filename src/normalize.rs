@@ -152,6 +152,7 @@ pub struct Groups {
 
 pub fn normalize_triples(
     paths: Vec<PathBuf>,
+    n_workers: usize,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
@@ -159,7 +160,9 @@ pub fn normalize_triples(
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
-    let n_workers = std::cmp::max(2, std::cmp::min(paths.len() + 1, num_cpus::get() - 2));
+    if n_workers < 2 {
+        panic!("Number of workers must be at least 2");
+    }
     info!("Creating pool with {n_workers} threads");
 
     let mut running = paths.len();

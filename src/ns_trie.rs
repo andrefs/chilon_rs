@@ -91,6 +91,9 @@ impl InferredNamespaces for NamespaceTrie {
                     if let Some((node, exists_ns)) =
                         self.longest_prefix(url_obj.to_string().as_str(), true)
                     {
+                        if node.value.is_none() {
+                            println!("{ns} {exists_ns} {:#?} {}", node.value, node.is_terminal);
+                        }
                         let (alias, _) = node.value.as_ref().unwrap();
 
                         if *ns == exists_ns {

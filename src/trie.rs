@@ -258,7 +258,7 @@ impl<T: Debug> Node<T> {
             }
 
             if cur_node.is_terminal {
-                last_term = Some((self, format!("{str_acc}{first_char}")));
+                last_term = Some((cur_node, format!("{str_acc}{first_char}")));
             }
 
             cur_node = next_node.unwrap();

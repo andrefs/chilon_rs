@@ -53,12 +53,15 @@ pub enum Message {
 
 pub fn build_iri_trie(
     paths: Vec<PathBuf>,
+    n_workers: usize,
     ns_trie: &mut NamespaceTrie,
     allow_subns: bool,
 ) -> (IriTrie, BTreeMap<String, Task>, InferHK) {
     debug!("Building IRI trie");
-    let n_workers = std::cmp::max(2, std::cmp::min(paths.len() + 1, num_cpus::get() - 2));
 
+    if n_workers < 2 {
+        panic!("Number of workers must be at least 2");
+    }
     info!("Creating pool with {n_workers} threads");
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)

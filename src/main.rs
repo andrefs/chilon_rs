@@ -81,12 +81,15 @@ fn main() {
     info!("Loading community namespaces");
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
+    let n_workers = std::cmp::max(2, std::cmp::min(cli.files.len() + 1, num_cpus::get() - 2));
+
     if cli.infer_ns {
         info!("Getting namespaces");
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         let mut infer_t = meta_info::MetaInfoInference::new();
         let (mut iri_trie, tasks, hk) =
-            build_iri_trie(cli.files.clone(), &mut ns_trie, allow_subns);
+            build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns);
+
         infer_t.add_tasks(tasks);
         infer_t.housekeeping = hk;
 
@@ -122,8 +125,13 @@ fn main() {
     let mut norm_t = MetaInfoNormalization::new();
 
     info!("Normalizing triples");
-    let (nts, used_groups, tasks) =
-        normalize_triples(cli.files.clone(), &mut ns_trie, cli.ignore_unknown, outf);
+    let (nts, used_groups, tasks) = normalize_triples(
+        cli.files.clone(),
+        n_workers,
+        &mut ns_trie,
+        cli.ignore_unknown,
+        outf,
+    );
 
     norm_t.add_tasks(tasks);
     norm_t.namespaces = used_groups.namespaces.len();
