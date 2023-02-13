@@ -213,7 +213,7 @@ fn maintenance(
     let mut res = None::<InferHKTask>;
 
     if let Some(size) = iri_trie.value {
-        let IRI_TRIE_SIZE = 500_000;
+        let IRI_TRIE_SIZE = 1_000_000;
 
         if size.desc > IRI_TRIE_SIZE {
             let mut t = InferHKTask::new();

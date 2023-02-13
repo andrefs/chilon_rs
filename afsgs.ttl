@@ -1,0 +1,14 @@
+@base <http://andrefs.com/graph-summ/v1> .
+@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
+@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+
+<#UserNamespace>      a <#Namespace> .
+<#CommunityNamespace> a <#Namespace> .
+<#GraphFileNamespace> a <#Namespace> .
+<#InferredNamespace>  a <#Namespace> .
+
+<#namespacePrefix> rdfs:domain <#Namespace>
