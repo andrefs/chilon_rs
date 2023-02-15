@@ -1,4 +1,3 @@
-#![feature(btree_drain_filter)]
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},

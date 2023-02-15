@@ -1,15 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-    fs::write,
-    path::Path,
-};
+use std::{collections::BTreeMap, fmt, fs::write, path::Path};
 
 use crate::trie::Node;
 use log::{debug, info, warn};
+use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub enum NamespaceSource {
     User,
     Community,
@@ -29,7 +25,7 @@ impl fmt::Display for NamespaceSource {
 }
 
 pub type NamespaceTrie = Node<(String, NamespaceSource)>;
-pub type NamespaceMap = BTreeMap<String, (String, String)>;
+pub type NamespaceMap = BTreeMap<String, (String, NamespaceSource)>;
 
 pub trait SaveTrie {
     fn save(&self, outf: &str);
@@ -44,7 +40,7 @@ impl SaveTrie for NamespaceTrie {
 
         for (ns, node) in self.iter_leaves() {
             let (alias, source) = node.value.as_ref().unwrap().clone();
-            ns_map.insert(alias, (ns, source.to_string()));
+            ns_map.insert(alias, (ns, source));
         }
 
         write(file_path, serde_json::to_string_pretty(&ns_map).unwrap()).unwrap();
@@ -66,7 +62,7 @@ impl InferredNamespaces for NamespaceTrie {
         let mut trie = NamespaceMap::new();
         for (ns, node) in self.iter() {
             if let Some((alias, source)) = node.value.clone() {
-                trie.insert(alias, (ns, source.to_string()));
+                trie.insert(alias, (ns, source));
             }
         }
         return trie;
@@ -112,7 +108,7 @@ impl InferredNamespaces for NamespaceTrie {
                             alias, ns
                         );
                         self.insert(ns, (alias.clone(), *source));
-                        aliases.insert(alias.clone(), (ns.clone(), source.to_string()));
+                        aliases.insert(alias.clone(), (ns.clone(), *source));
                         added.insert(&alias, ns.clone());
                     } else {
                         warn!("gen_alias() returned None for {}", ns);
