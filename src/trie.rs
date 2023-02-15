@@ -447,6 +447,23 @@ mod tests {
     }
 
     #[test]
+    fn insert_1() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        assert_eq!(t.pp(true), "a· 1\n");
+    }
+
+    #[test]
+    fn insert_2() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        t.insert("bce", 3);
+        t.insert("ac", 4);
+        assert_eq!(t.pp(false), "a·\n bc·\n c·\nbce·\n");
+    }
+
+    #[test]
     fn insert_to_empty_trie() {
         let mut t = Node::new();
         t.insert("a", 1);
