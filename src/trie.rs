@@ -463,6 +463,42 @@ mod tests {
         assert_eq!(t.pp(false), "a·\n bc·\n c·\nbce·\n");
     }
 
+    fn node_vis(node: &mut Node<usize>) {
+        for child in node.children.values_mut() {
+            node_vis(child);
+        }
+        node.value = Some(
+            if node.is_terminal { 1 } else { 0 }
+                + node
+                    .children
+                    .values()
+                    .map(|child| child.value.unwrap())
+                    .sum::<usize>(),
+        );
+    }
+
+    fn term_vis(node: &mut Node<usize>) {
+        node.value = Some(1);
+    }
+
+    fn ins_vis() -> InsertFnVisitors<'static, usize> {
+        InsertFnVisitors {
+            node: Some(&node_vis),
+            terminal: Some(&term_vis),
+        }
+    }
+
+    #[test]
+
+    fn insert_fn() {
+        let visitors = ins_vis();
+
+        let mut trie = Node::new();
+        trie.insert_fn("abc", 0, &visitors);
+        trie.insert_fn("ade", 0, &visitors);
+        trie.insert_fn("ab", 0, &visitors);
+    }
+
     #[test]
     fn insert_to_empty_trie() {
         let mut t = Node::new();
