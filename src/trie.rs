@@ -12,43 +12,56 @@ pub struct Node<T: Clone + Debug> {
 }
 
 impl<T: Debug + Clone> Node<T> {
-    pub fn pp(&self, print_value: bool) -> String {
-        self.pp_fn(0, print_value)
-    }
-
-    fn pp_fn(&self, indent: u8, print_value: bool) -> String {
+    fn pp(&self, print_value: bool) -> String {
         let mut res = "".to_string();
-        // print value
-        //if print_value && self.value.is_some() {
-        if self.is_terminal {
-            res.push('·');
-        }
-        if self.value.is_some() && print_value {
-            res.push_str(
-                format!(
-                    "{}{:?}",
-                    if self.is_terminal { " " } else { "  " },
-                    self.value.as_ref().unwrap()
-                )
-                .as_str(),
-            );
-        }
-        let count = self.children.len();
-        if self.children.is_empty() || self.is_terminal || count > 1 || self.value.is_some() {
-            if indent != 0 {
+
+        let mut root_children = self.children.iter().collect::<Vec<_>>();
+        root_children.sort_by(|(ch1, _), (ch2, _)| ch1.cmp(ch2));
+
+        let mut stack = Vec::from(
+            root_children
+                .iter()
+                .enumerate()
+                .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
+                .rev()
+                .collect::<Vec<_>>(),
+        );
+
+        while stack.len() > 0 {
+            let (ch, node, indent, new_line) = stack.pop().unwrap();
+
+            if new_line {
                 res.push('\n');
+                res.push_str(&" ".repeat(indent));
             }
-        }
-        for (k, v) in self.children.iter() {
-            if self.is_terminal || count > 1 {
-                res.push_str(&" ".repeat(indent.into()));
+            res.push(*ch);
+            if node.is_terminal {
+                res.push('·');
+            }
+            if print_value && node.value.is_some() {
+                res.push_str(
+                    format!(
+                        "{}{:?}",
+                        if node.is_terminal { " " } else { "  " },
+                        node.value.as_ref().unwrap()
+                    )
+                    .as_str(),
+                );
             }
 
-            res.push_str(&k.to_string());
-            res.push_str(v.pp_fn(indent + 1, print_value).as_str());
-        }
+            let child_new_line = (print_value && node.value.is_some())
+                || node.children.len() > 1
+                || node.is_terminal;
 
-        return res;
+            let mut children = node.children.iter().collect::<Vec<_>>();
+            children.sort_by(|(ch1, _), (ch2, _)| ch2.cmp(ch1));
+
+            for (ch, node) in children {
+                stack.push((ch, node, indent + 1, child_new_line));
+            }
+        }
+        res.push('\n');
+        res
     }
 
     pub fn new() -> Node<T> {
@@ -568,6 +581,23 @@ mod tests {
         t.insert("abcde", 3);
         t.remove("abc", false);
         assert_eq!(t.pp(false), "a·\n bcde·\n");
+    }
+
+    fn upd_stats_visitor(node: &mut Node<usize>, ch: char, _: Option<&Node<usize>>) {
+        let visitors = ins_vis();
+        visitors.node.unwrap()(node);
+    }
+
+    #[test]
+    fn remove_callback() {
+        let mut t = Node::new();
+        let visitors = ins_vis();
+        t.insert_fn("a", 1, &visitors);
+        t.insert_fn("abcde", 2, &visitors);
+        t.insert_fn("abc", 3, &visitors);
+        t.remove_fn("abcd", true, Some(&upd_stats_visitor));
+
+        assert_eq!(t.pp(true), "a· 2\n b  1\n  c· 1\n");
     }
 
     #[test]
