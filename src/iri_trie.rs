@@ -314,9 +314,6 @@ mod tests {
 
         let leaves = trie.iter_leaves().collect::<Vec<_>>();
 
-        println!("{}", trie.pp(true));
-        println!("{:#?}", leaves);
-
         assert_eq!(leaves.len(), 2);
         assert_eq!(leaves[0].0, "abcdef");
         assert_eq!(leaves[1].0, "ghi");

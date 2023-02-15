@@ -68,8 +68,6 @@ pub fn build_data(outf: &str) -> VisData {
         }
     }
 
-    println!("edges {:#?}", edges);
-
     let mut sorted_edges = edges
         .into_iter()
         .map(|(_, v)| v)

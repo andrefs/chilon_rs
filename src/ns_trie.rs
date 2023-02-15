@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, fs::write, path::Path};
 
 use crate::trie::Node;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use serde::Serialize;
 use url::Url;
 
@@ -67,6 +67,7 @@ impl InferredNamespaces for NamespaceTrie {
         }
         return trie;
     }
+
     fn add_namespaces(
         &mut self,
         inferred: &Vec<(String, usize, NamespaceSource)>,
@@ -88,7 +89,10 @@ impl InferredNamespaces for NamespaceTrie {
                         self.longest_prefix(url_obj.to_string().as_str(), true)
                     {
                         if node.value.is_none() {
-                            println!("{ns} {exists_ns} {:#?} {}", node.value, node.is_terminal);
+                            error!(
+                                "Empty node {ns} {exists_ns} {:#?} {}",
+                                node.value, node.is_terminal
+                            );
                         }
                         let (alias, _) = node.value.as_ref().unwrap();
 
