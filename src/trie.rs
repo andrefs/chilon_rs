@@ -12,7 +12,7 @@ pub struct Node<T: Clone + Debug> {
 }
 
 impl<T: Debug + Clone> Node<T> {
-    fn pp(&self, print_value: bool) -> String {
+    pub fn pp(&self, print_value: bool) -> String {
         let mut res = "".to_string();
 
         let mut root_children = self.children.iter().collect::<Vec<_>>();

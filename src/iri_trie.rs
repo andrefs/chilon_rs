@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::trie::Node;
+use itertools::Itertools;
 use log::{info, warn};
 
 // Represents occurrences as subject, predicate or object
@@ -108,13 +109,13 @@ pub fn update_stats(node: &mut IriTrie) {
 }
 
 pub struct NodeIter<'a, T: Debug + Clone> {
-    queue: VecDeque<(String, &'a Node<T>)>,
+    queue: Vec<(String, &'a Node<T>)>,
 }
 
 impl<T: Debug + Clone> Node<T> {
     pub fn iter_leaves(&self) -> NodeIter<'_, T> {
         NodeIter {
-            queue: VecDeque::from([("".to_string(), self)]),
+            queue: Vec::from([("".to_string(), self)]),
         }
     }
 }
@@ -126,10 +127,14 @@ impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
         if self.queue.is_empty() {
             return None;
         }
-        let (s, n) = self.queue.pop_front().unwrap();
-        for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{s}{k}"), &v));
+        let (s, n) = self.queue.pop().unwrap();
+
+        let mut sorted_children = n.children.iter().collect::<Vec<_>>();
+        sorted_children.sort_by(|(k1, _), (k2, _)| (**k1).cmp(*k2));
+        for (k, v) in sorted_children.iter().rev() {
+            self.queue.push((format!("{s}{k}"), &v));
         }
+
         if n.children.is_empty() {
             return Some((s, n));
         }
@@ -242,6 +247,80 @@ mod tests {
     use crate::trie::InsertFnVisitors;
 
     use super::*;
+
+    #[test]
+    fn inc_own_test() {
+        let mut trie = IriTrie::new();
+        trie.insert_fn(
+            "http://example.org/",
+            Default::default(),
+            &InsertFnVisitors {
+                node: None,
+                terminal: Some(&inc_own),
+            },
+        );
+
+        let res = trie.find("http://example.org/", true).unwrap();
+
+        assert_eq!(res.0.stats().own, 1);
+        assert_eq!(res.0.stats().desc, 0);
+        assert_eq!(res.0.stats().uniq_desc, 0);
+    }
+
+    #[test]
+    fn update_stats_test() {
+        let mut trie = IriTrie::new();
+        trie.insert_fn(
+            "http://example.org/",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+
+        trie.insert_fn(
+            "http://example.org/path1",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+        trie.insert_fn(
+            "http://example.org/path2",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+
+        let res = trie.find("http://example.org/", true).unwrap();
+
+        assert_eq!(res.0.stats().own, 1);
+        assert_eq!(res.0.stats().desc, 2);
+        assert_eq!(res.0.stats().uniq_desc, 2);
+    }
+
+    #[test]
+    fn iter_test() {
+        let mut trie = IriTrie::new();
+        trie.insert("a", Default::default());
+        trie.insert("abc", Default::default());
+        trie.insert("abcdef", Default::default());
+        trie.insert("ghi", Default::default());
+        trie.insert("g", Default::default());
+
+        let leaves = trie.iter_leaves().collect::<Vec<_>>();
+
+        println!("{}", trie.pp(true));
+        println!("{:#?}", leaves);
+
+        assert_eq!(leaves.len(), 2);
+        assert_eq!(leaves[0].0, "abcdef");
+        assert_eq!(leaves[1].0, "ghi");
+    }
 
     #[test]
     fn remove_fn_dec_stats() {
