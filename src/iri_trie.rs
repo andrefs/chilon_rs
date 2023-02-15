@@ -29,9 +29,9 @@ pub type IriTrie = Node<NodeStats>; // todo finish
 impl NodeStats {
     pub fn new() -> NodeStats {
         NodeStats {
-            own: 0,
-            desc: 0,
-            uniq_desc: 0,
+            own: 0,       // occurrences of this IRI (as terminal)
+            desc: 0,      // occurrences of IRIs with this prefix
+            uniq_desc: 0, // occurrences of IRIs with this prefix (unique)
         }
     }
 
@@ -369,25 +369,24 @@ mod tests {
             "http://example.org/path1".to_string(),
             "http://example.org/path2".to_string(),
         ]);
-        //trie.remove_prefix("http://example.org/path1");
-        //trie.remove_prefix("http://example.org/path2");
 
         assert_eq!(trie.count(), 2);
     }
 
-    //#[test]
-    //fn remove_fn_dec_stats() {
-    //    let stats = NodeStats::new_terminal();
-    //    let mut t = Node::new();
-    //    let visitors = InsertFnVisitors {
-    //        node: Some(&update_stats),
-    //        terminal: Some(&inc_own),
-    //    };
-    //    t.insert_fn("ab", stats, &visitors);
-    //    t.insert_fn("abcde", stats, &visitors);
-    //    t.remove_fn("abcd", true, Some(&upd_stats_visitor));
+    #[test]
+    fn remove_fn_dec_stats() {
+        let stats = NodeStats::new_terminal();
+        let mut t = Node::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        t.insert_fn("ab", stats, &visitors);
+        t.insert_fn("ab", stats, &visitors);
+        t.insert_fn("abcde", stats, &visitors);
+        t.remove_fn("abcd", true, Some(&upd_stats_visitor));
 
-    //    assert_eq!(t.stats().desc, 2);
-    //    assert_eq!(t.stats().uniq_desc, 1);
-    //}
+        assert_eq!(t.stats().desc, 2);
+        assert_eq!(t.stats().uniq_desc, 1);
+    }
 }
