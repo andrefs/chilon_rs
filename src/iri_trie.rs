@@ -1,6 +1,7 @@
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, VecDeque},
+    fmt::Debug,
 };
 
 use crate::trie::Node;
@@ -106,11 +107,11 @@ pub fn update_stats(node: &mut IriTrie) {
     node.set_stats(stats);
 }
 
-pub struct NodeIter<'a, T> {
+pub struct NodeIter<'a, T: Debug + Clone> {
     queue: VecDeque<(String, &'a Node<T>)>,
 }
 
-impl<T> Node<T> {
+impl<T: Debug + Clone> Node<T> {
     pub fn iter_leaves(&self) -> NodeIter<'_, T> {
         NodeIter {
             queue: VecDeque::from([("".to_string(), self)]),
@@ -118,7 +119,7 @@ impl<T> Node<T> {
     }
 }
 
-impl<'a, T> Iterator for NodeIter<'a, T> {
+impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
     type Item = (String, &'a Node<T>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -141,7 +142,7 @@ pub trait IriTrieExt {
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
     fn remove_prefixes(&mut self, ns_vec: &Vec<String>);
-    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool;
+    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> Option<NodeStats>;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
 }
 
@@ -230,7 +231,7 @@ impl IriTrieExt for IriTrie {
         }
     }
 
-    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> bool {
+    fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> Option<NodeStats> {
         //trace!("Removing namespace {} from IRI trie", namespace.borrow());
         self.remove_fn(namespace, true, Some(&upd_stats_visitor))
     }

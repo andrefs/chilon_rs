@@ -5,13 +5,13 @@ use std::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Node<T> {
+pub struct Node<T: Clone + Debug> {
     pub value: Option<T>,
     pub is_terminal: bool,
     pub children: BTreeMap<char, Node<T>>,
 }
 
-impl<T: Debug> Node<T> {
+impl<T: Debug + Clone> Node<T> {
     pub fn pp(&self, print_value: bool) -> String {
         self.pp_fn(0, print_value)
     }
@@ -50,9 +50,7 @@ impl<T: Debug> Node<T> {
 
         return res;
     }
-}
 
-impl<T: Debug> Node<T> {
     pub fn new() -> Node<T> {
         Node {
             value: None,
@@ -138,7 +136,7 @@ impl<T: Debug> Node<T> {
         }
     }
 
-    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool)
+    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool) -> Option<T>
     where
         S: Borrow<str>,
     {
@@ -146,15 +144,26 @@ impl<T: Debug> Node<T> {
             key,
             remove_subtree,
             None::<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> u32>,
-        );
+        )
     }
-
     pub fn remove_fn<U, S: ?Sized>(
         &mut self,
         str_left: &S,
         remove_subtree: bool,
         cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
-    ) -> bool
+    ) -> Option<T>
+    where
+        S: Borrow<str>,
+    {
+        self.remove_fn_aux(str_left, remove_subtree, cb).0
+    }
+
+    pub fn remove_fn_aux<U, S: ?Sized>(
+        &mut self,
+        str_left: &S,
+        remove_subtree: bool,
+        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
+    ) -> (Option<T>, bool)
     where
         S: Borrow<str>,
     {
@@ -163,13 +172,14 @@ impl<T: Debug> Node<T> {
         let rest = &sl[first_char.len_utf8()..];
 
         if self.children.is_empty() {
-            return false;
+            return (None, false);
         }
 
         if !self.children.contains_key(&first_char) {
-            return false;
+            return (None, false);
         }
 
+        // if we are at the end of the string, remove the node
         if rest.is_empty() {
             let sub_node = self.children.get_mut(&first_char).unwrap();
             if sub_node.children.is_empty() || remove_subtree {
@@ -178,35 +188,35 @@ impl<T: Debug> Node<T> {
                     f(self, first_char, Some(&sub_node));
                 }
                 let bubble_up = self.children.is_empty() && !self.is_terminal;
-                return bubble_up;
+                return (sub_node.value, bubble_up);
             }
 
-            if !sub_node.is_terminal {
-                return false;
-            }
             sub_node.is_terminal = false;
-            return true;
-        } else {
-            let bubble_up =
-                self.children
-                    .get_mut(&first_char)
-                    .unwrap()
-                    .remove_fn(rest, remove_subtree, cb);
-            if bubble_up {
-                let old_node = self.children.remove(&first_char).unwrap();
-
-                if let Some(f) = cb {
-                    f(self, first_char, Some(&old_node));
-                }
-                let bubble_up = !self.is_terminal && self.children.is_empty();
-                return bubble_up;
-            } else {
-                if let Some(f) = cb {
-                    f(self, first_char, None);
-                }
-            }
-            return false;
+            return (None, true);
         }
+
+        // if we are not at the end of the string, recurse
+        let res =
+            self.children
+                .get_mut(&first_char)
+                .unwrap()
+                .remove_fn_aux(rest, remove_subtree, cb);
+        if res.1 {
+            let old_node = self.children.remove(&first_char).unwrap();
+
+            // call node visitor
+            if let Some(f) = cb {
+                f(self, first_char, Some(&old_node));
+            }
+            let bubble_up = !self.is_terminal && self.children.is_empty();
+            return (res.0, bubble_up);
+        }
+
+        // call node visitor
+        if let Some(f) = cb {
+            f(self, first_char, None);
+        }
+        return (res.0, false);
     }
 
     pub fn contains_key(&self, s: &str) -> bool {
@@ -320,7 +330,7 @@ impl<T: Debug> Node<T> {
     }
 }
 
-pub struct InsertFnVisitors<'a, T> {
+pub struct InsertFnVisitors<'a, T: Debug + Clone> {
     pub node: Option<&'a dyn Fn(&mut Node<T>)>,
     pub terminal: Option<&'a dyn Fn(&mut Node<T>)>,
 }
@@ -344,11 +354,11 @@ pub enum TraverseDirection {
     Up,
 }
 
-pub struct NodeIter<'a, T> {
+pub struct NodeIter<'a, T: Debug + Clone> {
     queue: VecDeque<(String, &'a Node<T>)>,
 }
 
-impl<T> Node<T> {
+impl<T: Debug + Clone> Node<T> {
     pub fn iter(&self) -> NodeIter<'_, T> {
         NodeIter {
             queue: VecDeque::from([("".to_string(), self)]),
@@ -356,7 +366,7 @@ impl<T> Node<T> {
     }
 }
 
-impl<'a, T> Iterator for NodeIter<'a, T> {
+impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
     type Item = (String, &'a Node<T>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -520,6 +530,43 @@ mod tests {
         t.insert("de", 4);
         t.insert("df", 4);
         assert_eq!(t.pp(false), "a·\n b·\nc·\nd\n e·\n f·\n");
+    }
+
+    #[test]
+    fn delete_node_1() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("ab", 2);
+        t.remove("ab", false);
+        assert_eq!(t.pp(false), "a·\n");
+    }
+
+    #[test]
+    fn delete_node_2() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abcde", 2);
+        t.remove("ab", true);
+        assert_eq!(t.pp(false), "a·\n");
+    }
+
+    #[test]
+    fn delete_node_3() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abcde", 2);
+        let res = t.remove("axyz", true);
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn delete_node_4() {
+        let mut t = Node::new();
+        t.insert("a", 1);
+        t.insert("abc", 2);
+        t.insert("abcde", 3);
+        t.remove("abc", false);
+        assert_eq!(t.pp(false), "a·\n bcde·\n");
     }
 
     #[test]
