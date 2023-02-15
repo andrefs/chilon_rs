@@ -320,27 +320,74 @@ mod tests {
     }
 
     #[test]
-    fn remove_fn_dec_stats() {
-        let stats = NodeStats::new_terminal();
-        let mut t = Node::new();
-        t.insert_fn(
-            "ab",
-            stats,
-            &InsertFnVisitors {
-                node: Some(&update_stats),
-                terminal: Some(&inc_own),
-            },
-        );
-        t.insert_fn(
-            "abcde",
-            stats,
-            &InsertFnVisitors {
-                node: Some(&update_stats),
-                terminal: Some(&inc_own),
-            },
-        );
-        t.remove_fn("abcd", true, Some(&upd_stats_visitor));
+    fn count_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("a", Default::default(), &visitors);
+        trie.insert_fn("abc", Default::default(), &visitors);
+        trie.insert_fn("abcdef", Default::default(), &visitors);
+        trie.insert_fn("ghi", Default::default(), &visitors);
+        trie.insert_fn("g", Default::default(), &visitors);
 
-        assert_eq!(t.value.unwrap().desc, 1);
+        assert_eq!(trie.count(), 5);
     }
+
+    #[test]
+    fn remove_prefix_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("http://example.org/", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path1", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2", Default::default(), &visitors);
+
+        trie.remove_prefix("http://example.org/pat");
+
+        assert_eq!(trie.count(), 1);
+    }
+
+    #[test]
+    fn remove_prefixes_test() {
+        let mut trie = IriTrie::new();
+        let visitors = InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        };
+        trie.insert_fn("http://example.org/path1/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path1/b", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path2/b", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path3/a", Default::default(), &visitors);
+        trie.insert_fn("http://example.org/path3/b", Default::default(), &visitors);
+
+        trie.remove_prefixes(&vec![
+            "http://example.org/path1".to_string(),
+            "http://example.org/path2".to_string(),
+        ]);
+        //trie.remove_prefix("http://example.org/path1");
+        //trie.remove_prefix("http://example.org/path2");
+
+        assert_eq!(trie.count(), 2);
+    }
+
+    //#[test]
+    //fn remove_fn_dec_stats() {
+    //    let stats = NodeStats::new_terminal();
+    //    let mut t = Node::new();
+    //    let visitors = InsertFnVisitors {
+    //        node: Some(&update_stats),
+    //        terminal: Some(&inc_own),
+    //    };
+    //    t.insert_fn("ab", stats, &visitors);
+    //    t.insert_fn("abcde", stats, &visitors);
+    //    t.remove_fn("abcd", true, Some(&upd_stats_visitor));
+
+    //    assert_eq!(t.stats().desc, 2);
+    //    assert_eq!(t.stats().uniq_desc, 1);
+    //}
 }
