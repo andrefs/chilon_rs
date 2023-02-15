@@ -8,8 +8,8 @@ edition = "2021"
 
 
 [dependencies]
-rio_turtle = { path = "/home/andrefs/Projects/3rd_party/oxigraph/rio/turtle/", version = "0.7.1"}
-rio_api = { path = "/home/andrefs/Projects/3rd_party/oxigraph/rio/api/", version = "0.7.1"}
+rio_turtle = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1"}
+rio_api = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1"}
 bzip2 = "0.4.3"
 clap = {version = "4.1", features = ["derive"]}
 num_cpus = "1.13.1"
