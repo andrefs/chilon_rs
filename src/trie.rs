@@ -192,7 +192,8 @@ impl<T: Debug + Clone> Node<T> {
             }
 
             sub_node.is_terminal = false;
-            return (None, true);
+            sub_node.value = None;
+            return (None, false);
         }
 
         // if we are not at the end of the string, recurse
