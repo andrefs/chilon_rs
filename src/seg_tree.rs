@@ -1,7 +1,7 @@
 #![feature(btree_drain_filter)]
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     usize,
 };
 use url::Url;
@@ -168,7 +168,7 @@ impl From<&IriTrie> for SegTree {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub struct NamespaceCandidate {
     size: usize,
     children: usize,
@@ -206,4 +206,62 @@ impl PartialEq for NamespaceCandidate {
     }
 }
 
-impl Eq for NamespaceCandidate {}
+pub struct NodeIter<'a> {
+    queue: VecDeque<(String, &'a SegTree)>,
+}
+
+impl SegTree {
+    pub fn iter(&self) -> NodeIter<'_> {
+        NodeIter {
+            queue: VecDeque::from([("".to_string(), self)]),
+        }
+    }
+}
+
+impl<'a> Iterator for NodeIter<'a> {
+    type Item = (String, &'a SegTree);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.queue.is_empty() {
+            return None;
+        }
+        let (s, n) = self.queue.pop_front().unwrap();
+        for (k, v) in n.children.iter() {
+            self.queue.push_front((format!("{k}"), &v));
+        }
+        return Some((s, n));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::*;
+
+    #[test]
+    fn from_test() {
+        let mut iri_trie = IriTrie::new();
+        iri_trie.insert("http://www.example.com/path/1/more", Default::default());
+        iri_trie.insert("http://www.example.pt/2", Default::default());
+        iri_trie.insert("http://www.example.com/path/2", Default::default());
+
+        let seg_tree = SegTree::from(&iri_trie);
+
+        let mut v = BTreeSet::new();
+
+        for (s, _) in seg_tree.iter() {
+            if !s.is_empty() {
+                v.insert(s);
+            }
+        }
+
+        assert_eq!(v.len(), 6);
+        assert!(v.contains("http://www.example.com/"));
+        assert!(v.contains("http://www.example.pt/"));
+        assert!(v.contains("path/"));
+        assert!(v.contains("1/"));
+        assert!(v.contains("2"));
+        assert!(v.contains("more"));
+    }
+}
