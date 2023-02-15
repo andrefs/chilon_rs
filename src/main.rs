@@ -82,6 +82,7 @@ fn main() {
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
     let n_workers = std::cmp::max(2, std::cmp::min(cli.files.len() + 1, num_cpus::get() - 2));
+    let total_triples;
 
     if cli.infer_ns {
         info!("Getting namespaces");
@@ -115,6 +116,7 @@ fn main() {
         ns_trie.save(outf);
 
         infer_t.finish("Finished namespace inference");
+        total_triples = infer_t.triples;
         meta.inference = Some(infer_t);
     }
 
@@ -131,6 +133,7 @@ fn main() {
         &mut ns_trie,
         cli.ignore_unknown,
         outf,
+        total_triples,
     );
 
     norm_t.add_tasks(tasks);

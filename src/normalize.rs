@@ -156,6 +156,7 @@ pub fn normalize_triples(
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
     outf: &str,
+    total_triples: usize,
 ) -> (TripleFreq, Groups, BTreeMap<String, Task>) {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
@@ -207,6 +208,8 @@ pub fn normalize_triples(
             &mut used_groups,
             &mut tasks,
             &mut fd,
+            ignore_unknown,
+            total_triples,
         );
     });
 
@@ -220,6 +223,8 @@ fn handle_loop(
     used_groups: &mut Groups,
     tasks: &mut BTreeMap<String, Task>,
     fd: &mut File,
+    ignore_unknown: bool,
+    total_triples: usize,
 ) {
     let msg_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
@@ -228,7 +233,7 @@ fn handle_loop(
     loop {
         msg_c.inc();
         if msg_c.cur % 1_000_000 == 1 {
-            restart_timers(start, msg_c, trip_c);
+            restart_timers(start, msg_c, trip_c, ignore_unknown, total_triples);
         }
         if *running == 0 {
             info!("All threads finished");
@@ -279,15 +284,26 @@ fn handle_loop(
     }
 }
 
-fn restart_timers(start: &mut Instant, msg_c: &mut Counter, trip_c: &mut Counter) {
+fn restart_timers(
+    start: &mut Instant,
+    msg_c: &mut Counter,
+    trip_c: &mut Counter,
+    ignore_unknown: bool,
+    total_triples: usize,
+) {
     let elapsed = start.elapsed().as_millis();
     if elapsed != 0 {
         trace!(
-            "Received {} messages ({}/s), {} triples ({}/s) so far",
+            "Received {} messages ({}/s), {} triples ({}/s) so far{})",
             msg_c.cur,
             (msg_c.delta() as u128 / elapsed) * 1000,
             trip_c.cur,
             (trip_c.delta() as u128 / elapsed) * 1000,
+            if ignore_unknown {
+                format!(" ({}%)", trip_c.cur * 100 / total_triples)
+            } else {
+                format!("{}", trip_c.cur)
+            }
         );
     }
 
