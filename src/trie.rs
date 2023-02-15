@@ -237,17 +237,12 @@ impl<T: Debug + Clone> Node<T> {
         self.find(s, true).is_some()
     }
 
-    pub fn find(&self, s: &str, must_be_terminal: bool) -> Option<&Node<T>> {
+    pub fn find(&self, s: &str, must_be_terminal: bool) -> Option<(&Node<T>, String)> {
         let lpo = LongestPrefOpts {
             must_be_terminal,
             must_match_fully: true,
         };
-        let res = self.longest_prefix_aux(s, lpo);
-        return if let Some((node, _)) = res {
-            Some(node)
-        } else {
-            None
-        };
+        self.longest_prefix_aux(s, lpo)
     }
 
     /// Returns the node corresponding to the longest prefix and the longest prefix String
@@ -292,7 +287,7 @@ impl<T: Debug + Clone> Node<T> {
             }
 
             if cur_node.is_terminal {
-                last_term = Some((cur_node, format!("{str_acc}{first_char}")));
+                last_term = Some((cur_node, format!("{str_acc}")));
             }
 
             cur_node = next_node.unwrap();
@@ -632,6 +627,7 @@ mod tests {
         assert!(t.children.contains_key(&'a'));
         assert_eq!(t.children.get(&'a').unwrap().value, Some(1));
     }
+
     #[test]
     fn remove_subtree() {
         let mut t = Node::new();
@@ -643,6 +639,7 @@ mod tests {
         assert!(t.children.contains_key(&'a'));
         assert_eq!(t.children.get(&'a').unwrap().value, Some(1));
     }
+
     #[test]
     fn remove_non_existing() {
         let mut t = Node::new();
@@ -652,6 +649,7 @@ mod tests {
         t.remove("xyz", true);
         assert_eq!(t.pp(false), expected);
     }
+
     #[test]
     fn contains_key() {
         let mut t = Node::new();
@@ -662,6 +660,7 @@ mod tests {
         assert!(!t.contains_key("b"));
         assert!(t.contains_key("abc"));
     }
+
     #[test]
     fn longest_prefix() {
         let mut t = Node::new();
@@ -675,6 +674,7 @@ mod tests {
         let expected: Vec<char> = "this is more wo".chars().collect();
         assert_eq!(res.chars().collect::<Vec<_>>(), expected);
     }
+
     #[test]
     fn longest_prefix_no_full_match() {
         let mut t = Node::new();
@@ -695,9 +695,9 @@ mod tests {
         t.insert("this is more words", 3);
         let must_be_terminal = true;
         let res = t.longest_prefix("this is more wo", must_be_terminal);
-        let expected: Vec<char> = "this is more ".chars().collect();
+        let expected = "this is more";
         let (_, s) = res.unwrap();
-        assert_eq!(s.chars().collect::<Vec<_>>(), expected);
+        assert_eq!(s, expected);
     }
 
     #[test]
@@ -717,9 +717,23 @@ mod tests {
         t.insert("this is words", 1);
         t.insert("this is more", 2);
         t.insert("this is even more", 3);
+        let must_be_terminal = true;
+        let (n, s) = t.find("this is more", must_be_terminal).unwrap();
+        assert_eq!(s, "this is more");
+        assert_eq!(n.value.unwrap(), 2);
+    }
+
+    #[test]
+    fn find_non_terminal() {
+        let mut t = Node::new();
+        t.insert("this is words", 1);
+        t.insert("this is more", 2);
+        t.insert("this is even more", 3);
         let must_be_terminal = false;
-        let res = t.find("this is more", must_be_terminal);
-        assert_eq!(res.unwrap().value.unwrap(), 2)
+        let (n, s) = t.find("this is m", must_be_terminal).unwrap();
+        assert_eq!(s, "this is m");
+        assert!(n.value.is_none());
+        assert!(!n.is_terminal);
     }
 
     #[test]
@@ -740,8 +754,10 @@ mod tests {
         t.insert("this is more", 2);
         t.insert("this is even more", 3);
         let must_be_terminal = true;
-        let res = t.find("this is more", must_be_terminal);
-        assert_eq!(res.unwrap().value.unwrap(), 2);
+        let (node, s) = t.find("this is more", must_be_terminal).unwrap();
+        assert_eq!(s, "this is more");
+        assert!(node.is_terminal);
+        assert_eq!(node.value.unwrap(), 2);
     }
 
     #[test]
