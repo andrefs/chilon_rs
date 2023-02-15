@@ -299,7 +299,7 @@ fn restart_timers(
             (msg_c.delta() as u128 / elapsed) * 1000,
             trip_c.cur,
             (trip_c.delta() as u128 / elapsed) * 1000,
-            if ignore_unknown {
+            if ignore_unknown && total_triples > 0 {
                 format!(" ({}%)", trip_c.cur * 100 / total_triples)
             } else {
                 format!("{}", trip_c.cur)

@@ -20,8 +20,18 @@ impl<T: Debug> Node<T> {
         let mut res = "".to_string();
         // print value
         //if print_value && self.value.is_some() {
+        if self.is_terminal {
+            res.push('·');
+        }
         if self.value.is_some() && print_value {
-            res.push_str(format!("  {:?}", self.value.as_ref().unwrap()).as_str());
+            res.push_str(
+                format!(
+                    "{}{:?}",
+                    if self.is_terminal { " " } else { "  " },
+                    self.value.as_ref().unwrap()
+                )
+                .as_str(),
+            );
         }
         let count = self.children.len();
         if self.children.is_empty() || self.is_terminal || count > 1 || self.value.is_some() {
@@ -369,6 +379,23 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
+    #[test]
+    fn pp() {
+        let mut t = Node::new();
+        t.insert("abc", 1);
+        t.insert("de", 2);
+        t.insert("df", 3);
+        t.insert("abcxy", 3);
+        assert_eq!(t.pp(false), "abc·\n   xy·\nd\n e·\n f·\n")
+    }
+    #[test]
+    fn pp_print_value() {
+        let mut t = Node::new();
+        t.insert("abc", 1);
+        t.insert("ade", 2);
+
+        assert_eq!(t.pp(true), "a\n bc· 1\n de· 2\n");
+    }
 
     #[test]
     fn pretty_print() {
@@ -416,7 +443,7 @@ mod tests {
                 ),
             ]),
         };
-        assert_eq!(t.pp(false), "a\n bc\nd\ne\n")
+        assert_eq!(t.pp(false), "a·\n bc·\nd·\ne·\n")
     }
 
     #[test]
@@ -438,7 +465,8 @@ mod tests {
         t.insert("ab", 2);
         t.insert("c", 3);
         t.insert("de", 4);
-        assert_eq!(t.pp(false), "a\n b\nc\nde\n")
+        t.insert("df", 4);
+        assert_eq!(t.pp(false), "a·\n b·\nc·\nd\n e·\n f·\n");
     }
 
     #[test]
@@ -569,9 +597,9 @@ mod tests {
         t.insert("this is words", 1);
         t.insert("this is more", 2);
         t.insert("this is even more", 3);
-        let must_be_terminal = true;
+        let must_be_terminal = false;
         let res = t.find("this is more rabelz", must_be_terminal);
-        assert_eq!(res.unwrap().value.unwrap(), 2)
+        assert!(res.is_none());
     }
 
     #[test]

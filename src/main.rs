@@ -82,7 +82,7 @@ fn main() {
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
     let n_workers = std::cmp::max(2, std::cmp::min(cli.files.len() + 1, num_cpus::get() - 2));
-    let total_triples;
+    let mut total_triples = 0;
 
     if cli.infer_ns {
         info!("Getting namespaces");
