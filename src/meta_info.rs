@@ -122,7 +122,7 @@ pub struct InferHKTask {
 
 impl InferHK {
     pub fn add(&mut self, task: InferHKTask) {
-        self.rounds += task.rounds;
+        self.rounds += 1;
         self.duration += task.duration;
         self.discarded_ns += task.discarded_ns;
         self.added_ns += task.added_ns;
