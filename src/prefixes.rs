@@ -7,7 +7,7 @@ use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::{InsertFnVisitors, Node};
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;

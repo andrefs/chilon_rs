@@ -24,7 +24,7 @@ use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
 use chrono::Utc;
 use clap::Parser;
-use log::info;
+use log::{info, warn};
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::community;
@@ -92,7 +92,7 @@ fn main() {
             build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns);
 
         infer_t.add_tasks(tasks);
-        infer_t.housekeeping = hk;
+        infer_t.housekeeping = hk.clone();
 
         info!("Inferring namespaces from IRIs left");
         let seg_tree = SegTree::from(&iri_trie);
@@ -127,6 +127,7 @@ fn main() {
     let mut norm_t = MetaInfoNormalization::new();
 
     info!("Normalizing triples");
+    println!("TOTAL_TRIPLES {total_triples}");
     let (nts, used_groups, tasks) = normalize_triples(
         cli.files.clone(),
         n_workers,

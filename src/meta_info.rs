@@ -101,7 +101,7 @@ impl MetaInfoInference {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct InferHK {
     pub rounds: usize, // number of rounds of housekeeping performed on the iri trie
     pub duration: Duration, // total duration of housekeeping (maintenance) performed on the iri trie
@@ -121,14 +121,12 @@ pub struct InferHKTask {
 }
 
 impl InferHK {
-    pub fn add(&mut self, task: InferHKTask) -> Self {
-        InferHK {
-            rounds: self.rounds + task.rounds,
-            duration: self.duration + task.duration,
-            discarded_ns: self.discarded_ns + task.discarded_ns,
-            added_ns: self.added_ns + task.added_ns,
-            inferred_ns: self.inferred_ns + task.inferred_ns,
-        }
+    pub fn add(&mut self, task: InferHKTask) {
+        self.rounds += task.rounds;
+        self.duration += task.duration;
+        self.discarded_ns += task.discarded_ns;
+        self.added_ns += task.added_ns;
+        self.inferred_ns += task.inferred_ns;
     }
 
     pub fn new() -> InferHK {
@@ -154,14 +152,8 @@ impl InferHKTask {
         }
     }
 
-    pub fn finish(self) -> InferHK {
-        InferHK {
-            rounds: self.rounds,
-            duration: self.start.elapsed(),
-            discarded_ns: self.discarded_ns,
-            added_ns: self.added_ns,
-            inferred_ns: self.inferred_ns,
-        }
+    pub fn finish(&mut self) {
+        self.duration = self.start.elapsed();
     }
 }
 
