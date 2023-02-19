@@ -182,6 +182,7 @@ fn handle_loop(
                     trace!("Running: {running}");
                 }
                 Message::FatalError { err } => {
+                    error!("Fatal error: {err}");
                     *running -= 1;
                 }
             }

@@ -177,6 +177,10 @@ fn init_log(outf: &str) {
         .set_time_format_rfc3339()
         .set_target_level(LevelFilter::Error)
         .build();
+    let error_log_config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .set_target_level(LevelFilter::Error)
+        .build();
 
     CombinedLogger::init(vec![
         TermLogger::new(
@@ -189,6 +193,11 @@ fn init_log(outf: &str) {
             LevelFilter::Trace,
             file_log_config,
             File::create(file_path).unwrap(),
+        ),
+        WriteLogger::new(
+            LevelFilter::Error,
+            error_log_config,
+            File::create("chilon_error.log").unwrap(),
         ),
     ])
     .unwrap();
