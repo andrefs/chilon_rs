@@ -277,6 +277,7 @@ fn handle_loop(
                     *running -= 1;
                 }
                 Message::FatalError { err } => {
+                    error!("Fatal error: {err}");
                     *running -= 1;
                 }
             }
