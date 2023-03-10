@@ -69,11 +69,11 @@ fn vec_to_trie<'a>(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
                     continue;
                 }
                 if !allow_subns {
-                    warn!(
-                        "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
-                        existing_alias,
-                        ns
-                    );
+                    //warn!(
+                    //    "Won't insert namespace {namespace} (alias {alias}) because shorter namespace {} (alias {}) already exists",
+                    //    existing_alias,
+                    //    ns
+                    //);
                     continue;
                 }
             }

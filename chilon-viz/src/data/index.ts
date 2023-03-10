@@ -1,4 +1,5 @@
-import { SliderValues } from '../events/sliders';
+import { scaleLog } from 'd3-scale';
+import { ConfigValues } from '../events/sliders';
 import { initData, SimData } from './raw-data';
 
 
@@ -22,25 +23,42 @@ const truncateData = (data: SimData, maxNodes = 50, maxEdges = 50) => {
   return res;
 }
 
-const filterData = (data: SimData, values: SliderValues) => {
-  let newNodes = data.nodes.filter((n) => n.count >= values.minNodeOccurs && n.count <= values.maxNodeOccurs);
+const filterData = (initData: SimData, values: ConfigValues) => {
+  let lowestNodeOccurs = initData.nodes.slice(-1)[0].count;
+  let highestNodeOccurs = initData.nodes[0].count;
+  let lowestEdgeOccurs = initData.edges.slice(-1)[0].count;
+  let highestEdgeOccurs = initData.edges[0].count;
+
+  const scaleNode = scaleLog()
+    .domain([lowestNodeOccurs, highestNodeOccurs])
+    .range([0, 100]);
+  const scaleEdge = scaleLog()
+    .domain([lowestEdgeOccurs, highestEdgeOccurs])
+    .range([0, 100]);
+
+  let minNodeOccurs = scaleNode.invert(values.minNodeOccurs);
+  let maxNodeOccurs = scaleNode.invert(values.maxNodeOccurs);
+  let minEdgeOccurs = scaleEdge.invert(values.minEdgeOccurs);
+  let maxEdgeOccurs = scaleEdge.invert(values.maxEdgeOccurs);
+
+  let newNodes = initData.nodes.filter((n) => n.count >= minNodeOccurs && n.count <= maxNodeOccurs);
 
   let namesToNodes: { [name: string]: boolean } = {};
   for (const node of newNodes) {
     namesToNodes[node.name] = true;
   }
 
-  const newEdges = data.edges.filter(e =>
-    e.count >= values.minEdgeOccurs &&
-    e.count <= values.maxEdgeOccurs &&
+  const newEdges = initData.edges.filter(e =>
+    e.count >= minEdgeOccurs &&
+    e.count <= maxEdgeOccurs &&
     (e as any).source.name in namesToNodes &&
     (e as any).target.name in namesToNodes
   );
 
-  console.log('XXXXXXXX 5', { data, newNodes, newEdges })
+  console.log('XXXXXXXX 5', { data: initData, newNodes, newEdges })
 
   return {
-    ...data,
+    ...initData,
     nodes: newNodes,
     edges: newEdges
   }

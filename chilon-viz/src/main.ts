@@ -1,7 +1,7 @@
 import './style.css'
 import { initData, truncateData } from './data';
 import { select, selectAll } from 'd3-selection';
-import { initSliders } from './events/sliders';
+import { initConfig } from './events/sliders';
 import { forceSimulation } from 'd3-force';
 import { RawNode } from './data/raw-data';
 import { initSimulation, update } from './simulation';
@@ -10,6 +10,11 @@ import { handleZoom, initZoom } from './zoom';
 import { createTooltip } from './tooltip';
 
 
+declare global {
+  interface Window { ChilonViz: any; }
+}
+
+window.ChilonViz = window.ChilonViz || {};
 
 const start = () => {
   const data = truncateData(initData, 50, 50);
@@ -28,7 +33,7 @@ const start = () => {
   const tooltip = createTooltip();
 
   initSimulation(sim, data, width, height);
-  initSliders(initData, sim, svg, tooltip);
+  initConfig(initData, sim, svg, tooltip);
 
 
   update(data, sim, svg, tooltip);

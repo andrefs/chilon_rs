@@ -6,6 +6,17 @@ import { update } from "../simulation";
 import { Simulation } from "d3-force";
 import { Selection } from "d3-selection";
 import { scaleLog } from "d3-scale";
+import { CheckboxValues, getCheckboxValues } from "./checkboxes";
+
+
+export type ConfigValues = SliderValues & CheckboxValues;
+
+export const getConfigValues = () => {
+  return {
+    ...getSliderValues(),
+    ...getCheckboxValues(),
+  }
+}
 
 export const getSliderElems = () => {
   return {
@@ -26,12 +37,14 @@ export type SliderValues = {
   maxEdgeOccurs: number,
 };
 
-export const getSliderValues = () => {
+export const getSliderValues = (): SliderValues => {
   const elems = getSliderElems();
 
   return {
-    nodeOccurs: Number(elems.nodeOccursIn.value),
-    edgeOccurs: Number(elems.edgeOccursIn.value),
+    minNodeOccurs: Number(elems.nodeOccursIn.querySelector('[data-lower]')!.getAttribute('aria-valuenow')),
+    maxNodeOccurs: Number(elems.nodeOccursIn.querySelector('[data-upper]')!.getAttribute('aria-valuenow')),
+    minEdgeOccurs: Number(elems.edgeOccursIn.querySelector('[data-lower]')!.getAttribute('aria-valuenow')),
+    maxEdgeOccurs: Number(elems.edgeOccursIn.querySelector('[data-upper]')!.getAttribute('aria-valuenow')),
   };
 }
 
@@ -48,16 +61,13 @@ const debounce = (func: Function, timeout = 100) => {
 }
 
 
-
-export const initSliders = (
+export const initConfig = (
   initData: SimData,
   sim: Simulation<RawNode, RawEdge>,
   svg: Selection<SVGSVGElement, any, HTMLElement, any>,
   tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
 ) => {
-  let elems = getSliderElems();
 
-  const data = truncateData(initData, 50, 50);
 
   let minNodeOccurs = initData.nodes.slice(-1)[0].count;
   let maxNodeOccurs = initData.nodes[0].count;
@@ -72,17 +82,25 @@ export const initSliders = (
     .range([0, 100]);
 
 
+  let elems = getSliderElems();
+  console.log('XXXXXXXXX', { elems })
+
   elems.minNodeOccursOut.value = minNodeOccurs.toString();
   elems.maxNodeOccursOut.value = maxNodeOccurs.toString();
   elems.minEdgeOccursOut.value = minEdgeOccurs.toString();
   elems.maxEdgeOccursOut.value = maxEdgeOccurs.toString();
 
 
+  const data = truncateData(initData, 50, 50);
+
   let nodeSlider = rangeSlider(elems.nodeOccursIn, {
     min: 0,
     max: 100,
     value: [scaleNode(data.nodes.slice(-1)[0].count), scaleNode(data.nodes[0].count)],
     onInput: debounce(([_minNO, _maxNO]: [number, number]) => {
+
+      let values = getConfigValues();
+
       const minNO = scaleNode.invert(_minNO);
       const maxNO = scaleNode.invert(_maxNO);
       minNodeOccurs = minNO;
@@ -90,12 +108,7 @@ export const initSliders = (
       elems.minNodeOccursOut.value = Math.floor(minNO).toString();
       elems.maxNodeOccursOut.value = Math.floor(maxNO).toString();
 
-      const newData = filterData(initData, {
-        minNodeOccurs,
-        maxNodeOccurs,
-        minEdgeOccurs,
-        maxEdgeOccurs
-      });
+      const newData = filterData(initData, values);
 
       update(newData, sim, svg, tooltip);
 
@@ -107,27 +120,29 @@ export const initSliders = (
     max: 100,
     value: [scaleEdge(data.edges.slice(-1)[0].count), scaleEdge(data.edges[0].count)],
     onInput: debounce(([_minEO, _maxEO]: [number, number]) => {
+
+      let values = getConfigValues();
+      console.log('XXXXXXXX edge', { values })
       const minEO = scaleEdge.invert(_minEO);
       const maxEO = scaleEdge.invert(_maxEO);
       elems.minEdgeOccursOut.value = Math.floor(minEO).toString();
       elems.maxEdgeOccursOut.value = Math.floor(maxEO).toString().toString();
 
-      minEdgeOccurs = minEO;
-      maxEdgeOccurs = maxEO;
+      const _minEdgeOccurs = minEO;
+      const _maxEdgeOccurs = maxEO;
 
-      const newData = filterData(initData, {
-        minNodeOccurs,
-        maxNodeOccurs,
-        minEdgeOccurs,
-        maxEdgeOccurs
-      });
+      const newData = filterData(initData, values);
 
       update(newData, sim, svg, tooltip);
     }, 100)
   });
 
+  window.ChilonViz.sliders = { nodeSlider, edgeSlider };
+
+
   return { nodeSlider, edgeSlider };
 }
+
 
 
 

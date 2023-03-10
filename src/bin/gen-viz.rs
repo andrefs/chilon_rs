@@ -1,4 +1,7 @@
-use chilon_rs::{util::gen_file_name, visualization::render_vis};
+use chilon_rs::{
+    util::gen_file_name,
+    visualization::{render_vis, vis_dev_server},
+};
 use chrono::Utc;
 use log::info;
 
@@ -54,5 +57,6 @@ fn main() {
 
     let vis_data = serde_json::from_reader(buf_reader).unwrap();
 
-    render_vis(&vis_data, outf);
+    let render_dir = render_vis(&vis_data, outf);
+    vis_dev_server(render_dir);
 }

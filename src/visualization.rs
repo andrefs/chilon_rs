@@ -6,6 +6,8 @@ use oxigraph::{
     store::{StorageError, Store},
 };
 
+use fs_extra::dir::copy;
+
 use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -261,7 +263,8 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
         src.to_string_lossy(),
         dst.to_string_lossy()
     );
-    rename(src, dst).unwrap();
+    //rename(src, dst).unwrap();
+    copy(src, outf, &Default::default()).unwrap();
 
     return RENDER_DIR;
 }

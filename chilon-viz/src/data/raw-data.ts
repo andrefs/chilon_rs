@@ -82,458 +82,166 @@ export class SimData {
 export const initData = new SimData({
   "edges": [
     {
-      "count": 4308772,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "yago"
-    },
-    {
-      "count": 776980,
-      "is_datatype": false,
-      "label": "schema",
-      "link_num": 1,
-      "source": "db",
-      "target": "viaf"
-    },
-    {
-      "count": 596134,
+      "count": 366287,
       "is_datatype": false,
       "label": "rdf",
-      "link_num": 1,
-      "source": "db",
-      "target": "umbelrc"
-    },
-    {
-      "count": 430839,
-      "is_datatype": false,
-      "label": "db",
-      "link_num": 1,
-      "source": "db",
-      "target": "wn20"
-    },
-    {
-      "count": 233106,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "gnd"
-    },
-    {
-      "count": 173942,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 2,
-      "source": "db",
-      "target": "viaf"
-    },
-    {
-      "count": 106498,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "lgd"
-    },
-    {
-      "count": 95721,
-      "is_datatype": false,
-      "label": "owl",
       "link_num": -1,
-      "source": "db",
-      "target": "data4"
+      "source": "wordnet-rdf",
+      "target": "ontolex"
     },
     {
-      "count": 86498,
+      "count": 285668,
       "is_datatype": false,
-      "label": "owl",
+      "label": "wordnet",
       "link_num": 1,
-      "source": "db",
-      "target": "geodata"
+      "source": "wordn2",
+      "target": "wordn2"
     },
     {
-      "count": 38786,
+      "count": 207272,
       "is_datatype": false,
-      "label": "owl",
+      "label": "ontolex",
       "link_num": 1,
-      "source": "db",
-      "target": "gadm2"
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
     },
     {
-      "count": 30426,
+      "count": 207272,
       "is_datatype": false,
-      "label": "skos",
-      "link_num": 1,
-      "source": "db",
-      "target": "www2"
-    },
-    {
-      "count": 27504,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "linkedmdb"
-    },
-    {
-      "count": 26940,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "sworg"
-    },
-    {
-      "count": 24990,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "www4"
-    },
-    {
-      "count": 17742,
-      "is_datatype": false,
-      "label": "owl",
+      "label": "ontolex",
       "link_num": -1,
-      "source": "db",
-      "target": "apiorg"
+      "source": "wordnet-rdf",
+      "target": "wordn2"
     },
     {
-      "count": 12864,
-      "is_datatype": false,
-      "label": "owl",
+      "count": 207272,
+      "is_datatype": true,
+      "label": "ontolex",
       "link_num": 1,
-      "source": "db",
-      "target": "lod"
+      "source": "BLANK",
+      "target": "rdf"
     },
     {
-      "count": 12592,
+      "count": 207272,
       "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "govtrackus"
+      "label": "ontolex",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "BLANK"
     },
     {
-      "count": 11198,
+      "count": 159015,
       "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "eunis2"
+      "label": "wordnet",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "wordnet"
     },
     {
-      "count": 10089,
-      "is_datatype": false,
+      "count": 117791,
+      "is_datatype": true,
       "label": "dcterms",
-      "link_num": -1,
-      "source": "db",
-      "target": "data3"
-    },
-    {
-      "count": 7687,
-      "is_datatype": false,
-      "label": "skos",
       "link_num": 1,
-      "source": "db",
-      "target": "globalwordnet"
+      "source": "wordn2",
+      "target": "xsd"
     },
     {
-      "count": 6861,
+      "count": 117791,
+      "is_datatype": false,
+      "label": "wordnet",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "wordnet"
+    },
+    {
+      "count": 117791,
       "is_datatype": false,
       "label": "owl",
       "link_num": -1,
-      "source": "db",
-      "target": "dati"
+      "source": "wordn2",
+      "target": "ili"
     },
     {
-      "count": 5822,
+      "count": 117791,
+      "is_datatype": true,
+      "label": "rdf",
+      "link_num": 2,
+      "source": "BLANK",
+      "target": "rdf"
+    },
+    {
+      "count": 117791,
       "is_datatype": false,
-      "label": "owl",
+      "label": "rdf",
       "link_num": -1,
-      "source": "db",
-      "target": "data2"
+      "source": "wordn2",
+      "target": "ontolex"
     },
     {
-      "count": 5793,
+      "count": 117791,
       "is_datatype": false,
+      "label": "wordnet",
+      "link_num": -1,
+      "source": "wordn2",
+      "target": "BLANK"
+    },
+    {
+      "count": 98923,
+      "is_datatype": true,
       "label": "rdfs",
-      "link_num": 1,
-      "source": "db",
-      "target": "lobid"
-    },
-    {
-      "count": 5793,
-      "is_datatype": false,
-      "label": "rdrel",
-      "link_num": 2,
-      "source": "db",
-      "target": "lobid"
-    },
-    {
-      "count": 4998,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "wwwcom"
-    },
-    {
-      "count": 4297,
-      "is_datatype": false,
-      "label": "rdf",
-      "link_num": 1,
-      "source": "db",
-      "target": "db"
-    },
-    {
-      "count": 3506,
-      "is_datatype": false,
-      "label": "umbel",
       "link_num": 3,
-      "source": "db",
-      "target": "lobid"
+      "source": "BLANK",
+      "target": "rdf"
     },
     {
-      "count": 3486,
+      "count": 98923,
       "is_datatype": false,
-      "label": "rdf",
-      "link_num": 1,
-      "source": "db",
-      "target": "foaf"
-    },
-    {
-      "count": 3099,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "ecowlim"
-    },
-    {
-      "count": 3048,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": -1,
-      "source": "db",
-      "target": "UNKNOWN"
-    },
-    {
-      "count": 2867,
-      "is_datatype": false,
-      "label": "skos",
-      "link_num": 1,
-      "source": "db",
-      "target": "www"
-    },
-    {
-      "count": 2612,
-      "is_datatype": false,
-      "label": "skos",
-      "link_num": 1,
-      "source": "db",
-      "target": "zbw"
-    },
-    {
-      "count": 2446,
-      "is_datatype": false,
-      "label": "dcterms",
-      "link_num": 2,
-      "source": "db",
-      "target": "zbw"
-    },
-    {
-      "count": 2339,
-      "is_datatype": false,
-      "label": "rdf",
-      "link_num": 1,
-      "source": "db",
-      "target": "vocabcom"
-    },
-    {
-      "count": 1521,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "purl2"
-    },
-    {
-      "count": 1482,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": -1,
-      "source": "db",
-      "target": "datatw"
-    },
-    {
-      "count": 519,
-      "is_datatype": false,
-      "label": "skos",
+      "label": "www",
       "link_num": -2,
-      "source": "db",
-      "target": "apiorg"
+      "source": "wordnet-rdf",
+      "target": "BLANK"
     },
     {
-      "count": 312,
+      "count": 92518,
       "is_datatype": false,
-      "label": "db",
+      "label": "wordnet",
       "link_num": 2,
-      "source": "db",
-      "target": "www4"
-    },
-    {
-      "count": 307,
-      "is_datatype": false,
-      "label": "skos",
-      "link_num": -2,
-      "source": "db",
-      "target": "UNKNOWN"
-    },
-    {
-      "count": 214,
-      "is_datatype": false,
-      "label": "owl",
-      "link_num": 1,
-      "source": "db",
-      "target": "wbc"
+      "source": "wordnet-rdf",
+      "target": "wordnet-rdf"
     }
   ],
   "nodes": [
     {
-      "count": 7094927,
-      "name": "db"
+      "count": 1638349,
+      "name": "wordnet-rdf"
     },
     {
-      "count": 4308772,
-      "name": "yago"
+      "count": 1367563,
+      "name": "wordn2"
     },
     {
-      "count": 950922,
-      "name": "viaf"
+      "count": 847972,
+      "name": "BLANK"
     },
     {
-      "count": 596134,
-      "name": "umbelrc"
+      "count": 484078,
+      "name": "ontolex"
     },
     {
-      "count": 430839,
-      "name": "wn20"
+      "count": 423986,
+      "name": "rdf"
     },
     {
-      "count": 233106,
-      "name": "gnd"
+      "count": 276806,
+      "name": "wordnet"
     },
     {
-      "count": 106498,
-      "name": "lgd"
+      "count": 117791,
+      "name": "ili"
     },
     {
-      "count": 95721,
-      "name": "data4"
-    },
-    {
-      "count": 86498,
-      "name": "geodata"
-    },
-    {
-      "count": 38786,
-      "name": "gadm2"
-    },
-    {
-      "count": 30426,
-      "name": "www2"
-    },
-    {
-      "count": 27504,
-      "name": "linkedmdb"
-    },
-    {
-      "count": 26940,
-      "name": "sworg"
-    },
-    {
-      "count": 25302,
-      "name": "www4"
-    },
-    {
-      "count": 18261,
-      "name": "apiorg"
-    },
-    {
-      "count": 15092,
-      "name": "lobid"
-    },
-    {
-      "count": 12864,
-      "name": "lod"
-    },
-    {
-      "count": 12592,
-      "name": "govtrackus"
-    },
-    {
-      "count": 11198,
-      "name": "eunis2"
-    },
-    {
-      "count": 10089,
-      "name": "data3"
-    },
-    {
-      "count": 7687,
-      "name": "globalwordnet"
-    },
-    {
-      "count": 6861,
-      "name": "dati"
-    },
-    {
-      "count": 5822,
-      "name": "data2"
-    },
-    {
-      "count": 5058,
-      "name": "zbw"
-    },
-    {
-      "count": 4998,
-      "name": "wwwcom"
-    },
-    {
-      "count": 3486,
-      "name": "foaf"
-    },
-    {
-      "count": 3355,
-      "name": "UNKNOWN"
-    },
-    {
-      "count": 3099,
-      "name": "ecowlim"
-    },
-    {
-      "count": 2867,
-      "name": "www"
-    },
-    {
-      "count": 2339,
-      "name": "vocabcom"
-    },
-    {
-      "count": 1521,
-      "name": "purl2"
-    },
-    {
-      "count": 1482,
-      "name": "datatw"
-    },
-    {
-      "count": 214,
-      "name": "wbc"
+      "count": 117791,
+      "name": "xsd"
     }
   ]
 });

@@ -26,6 +26,7 @@
     "d3-selection": "3.0.0",
     "d3-zoom": "3.0.0",
     "human-format": "1.0.0",
-    "range-slider-input": "2.4.3"
+    "range-slider-input": "2.4.3",
+    "rxjs": "7.8.0"
   }
 }
