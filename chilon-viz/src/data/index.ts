@@ -1,5 +1,5 @@
 import { scaleLog } from 'd3-scale';
-import { ConfigValues } from '../events/sliders';
+import { ConfigValues } from '../events/config';
 import { initData, SimData } from './raw-data';
 
 
@@ -48,12 +48,16 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     namesToNodes[node.name] = true;
   }
 
-  const newEdges = initData.edges.filter(e =>
+  let newEdges = initData.edges.filter(e =>
     e.count >= minEdgeOccurs &&
     e.count <= maxEdgeOccurs &&
     (e as any).source.name in namesToNodes &&
     (e as any).target.name in namesToNodes
   );
+
+  if (!values.loops) {
+    newEdges = newEdges.filter((e) => e.source.name !== e.target.name);
+  }
 
   console.log('XXXXXXXX 5', { data: initData, newNodes, newEdges })
 
