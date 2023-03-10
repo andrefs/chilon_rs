@@ -1,3 +1,9 @@
+import { Simulation } from "d3-force";
+import { Selection } from "d3-selection";
+import { filterData } from "../data";
+import { RawEdge, RawNode, SimData } from "../data/raw-data";
+import { update } from "../simulation";
+import { getConfigValues } from "./config";
 
 export const getCheckboxElems = () => {
   return {
@@ -20,7 +26,6 @@ export type CheckboxValues = {
 
 export const getCheckboxValues = () => {
   const elems = getCheckboxElems();
-  console.log('XXXXXXX checkboxes', { elems })
 
   return {
     logarithm: elems.logarithm.checked,
@@ -31,4 +36,21 @@ export const getCheckboxValues = () => {
   }
 }
 
+
+export const initCheckboxes = (
+  initData: SimData,
+  sim: Simulation<RawNode, RawEdge>,
+  svg: Selection<SVGSVGElement, any, HTMLElement, any>,
+  tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
+) => {
+  const elems = getCheckboxElems();
+
+  for (const [_, elem] of Object.entries(elems)) {
+    elem.addEventListener('change', () => {
+      const config = getConfigValues();
+      const data = filterData(initData, config);
+      update(data, sim, svg, tooltip);
+    })
+  }
+}
 

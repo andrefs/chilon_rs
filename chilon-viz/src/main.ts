@@ -1,13 +1,13 @@
 import './style.css'
 import { initData, truncateData } from './data';
 import { select, selectAll } from 'd3-selection';
-import { initConfig } from './events/sliders';
 import { forceSimulation } from 'd3-force';
 import { RawNode } from './data/raw-data';
 import { initSimulation, update } from './simulation';
 import * as d3Zoom from 'd3-zoom';
 import { handleZoom, initZoom } from './zoom';
 import { createTooltip } from './tooltip';
+import { initConfig } from './events/config';
 
 
 declare global {

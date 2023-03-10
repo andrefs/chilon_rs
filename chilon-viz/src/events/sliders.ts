@@ -6,17 +6,8 @@ import { update } from "../simulation";
 import { Simulation } from "d3-force";
 import { Selection } from "d3-selection";
 import { scaleLog } from "d3-scale";
-import { CheckboxValues, getCheckboxValues } from "./checkboxes";
+import { debounce, getConfigValues } from "./config";
 
-
-export type ConfigValues = SliderValues & CheckboxValues;
-
-export const getConfigValues = () => {
-  return {
-    ...getSliderValues(),
-    ...getCheckboxValues(),
-  }
-}
 
 export const getSliderElems = () => {
   return {
@@ -49,19 +40,8 @@ export const getSliderValues = (): SliderValues => {
 }
 
 
-const debounce = (func: Function, timeout = 100) => {
-  let timer: number;
-  return (...args: any[]) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      func.apply(this, args);
 
-    }, timeout);
-  }
-}
-
-
-export const initConfig = (
+export const initSliders = (
   initData: SimData,
   sim: Simulation<RawNode, RawEdge>,
   svg: Selection<SVGSVGElement, any, HTMLElement, any>,
@@ -83,7 +63,6 @@ export const initConfig = (
 
 
   let elems = getSliderElems();
-  console.log('XXXXXXXXX', { elems })
 
   elems.minNodeOccursOut.value = minNodeOccurs.toString();
   elems.maxNodeOccursOut.value = maxNodeOccurs.toString();
@@ -93,56 +72,37 @@ export const initConfig = (
 
   const data = truncateData(initData, 50, 50);
 
-  let nodeSlider = rangeSlider(elems.nodeOccursIn, {
+  // node slider
+  rangeSlider(elems.nodeOccursIn, {
     min: 0,
     max: 100,
     value: [scaleNode(data.nodes.slice(-1)[0].count), scaleNode(data.nodes[0].count)],
-    onInput: debounce(([_minNO, _maxNO]: [number, number]) => {
-
+    onInput: debounce(() => {
       let values = getConfigValues();
-
-      const minNO = scaleNode.invert(_minNO);
-      const maxNO = scaleNode.invert(_maxNO);
-      minNodeOccurs = minNO;
-      maxNodeOccurs = maxNO;
-      elems.minNodeOccursOut.value = Math.floor(minNO).toString();
-      elems.maxNodeOccursOut.value = Math.floor(maxNO).toString();
-
       const newData = filterData(initData, values);
-
       update(newData, sim, svg, tooltip);
-
     }, 100)
   });
 
-  let edgeSlider = rangeSlider(elems.edgeOccursIn, {
+  // edge slider
+  rangeSlider(elems.edgeOccursIn, {
     min: 0,
     max: 100,
     value: [scaleEdge(data.edges.slice(-1)[0].count), scaleEdge(data.edges[0].count)],
-    onInput: debounce(([_minEO, _maxEO]: [number, number]) => {
-
+    onInput: debounce(() => {
       let values = getConfigValues();
-      console.log('XXXXXXXX edge', { values })
-      const minEO = scaleEdge.invert(_minEO);
-      const maxEO = scaleEdge.invert(_maxEO);
-      elems.minEdgeOccursOut.value = Math.floor(minEO).toString();
-      elems.maxEdgeOccursOut.value = Math.floor(maxEO).toString().toString();
-
-      const _minEdgeOccurs = minEO;
-      const _maxEdgeOccurs = maxEO;
-
       const newData = filterData(initData, values);
-
       update(newData, sim, svg, tooltip);
     }, 100)
   });
-
-  window.ChilonViz.sliders = { nodeSlider, edgeSlider };
-
-
-  return { nodeSlider, edgeSlider };
 }
 
+
+export const updateData = (initData: SimData) => {
+  let values = getConfigValues();
+  const newData = filterData(initData, values);
+  return newData;
+}
 
 
 
