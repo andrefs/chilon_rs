@@ -42,6 +42,9 @@ const filterData = (initData: SimData, values: ConfigValues) => {
   let maxEdgeOccurs = scaleEdge.invert(values.maxEdgeOccurs);
 
   let newNodes = initData.nodes.filter((n) => n.count >= minNodeOccurs && n.count <= maxNodeOccurs);
+  if (!values.bau) {
+    newNodes = newNodes.filter((n) => n.name !== 'BLANK' && n.name !== 'UNKNOWN');
+  }
 
   let namesToNodes: { [name: string]: boolean } = {};
   for (const node of newNodes) {
