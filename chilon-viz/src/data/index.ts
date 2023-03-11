@@ -41,13 +41,40 @@ const filterData = (initData: SimData, values: ConfigValues) => {
   let minEdgeOccurs = scaleEdge.invert(values.minEdgeOccurs);
   let maxEdgeOccurs = scaleEdge.invert(values.maxEdgeOccurs);
 
+
+  // filter nodes
   let newNodes = initData.nodes.filter((n) => n.count >= minNodeOccurs && n.count <= maxNodeOccurs);
+
+  // filter blank or unknown
   if (!values.bau) {
     newNodes = newNodes.filter((n) => n.name !== 'BLANK' && n.name !== 'UNKNOWN');
   }
 
+  // log vs linear scale
+  newNodes = newNodes.map((n) => {
+    n.normCount = values.logarithm ? n.logScaleCount : n.linScaleCount;
+    return n;
+  });
 
 
+
+
+  // filter outer nodes
+  //let edgesCount: { [nodeName: string]: number } = {};
+  //for (const node of initData.nodes) {
+  //  edgesCount[node.name] = 0;
+  //}
+  //for (const edge of initData.edges) {
+  //  edgesCount[edge.source.name] += 1;
+  //  edgesCount[edge.target.name] += 1;
+  //}
+
+  //if (!values.outer) {
+  //  newNodes = newNodes.filter((n) => edgesCount[n.name] > 1);
+  //}
+
+
+  // filter edges
   let namesToNodes: { [name: string]: boolean } = {};
   for (const node of newNodes) {
     namesToNodes[node.name] = true;
@@ -60,14 +87,16 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     (e as any).target.name in namesToNodes
   );
 
+
+  // filter loops
   if (!values.loops) {
     newEdges = newEdges.filter((e) => e.source.name !== e.target.name);
   }
+
+  // filter datatype links
   if (!values.datatypes) {
     newEdges = newEdges.filter((e) => !e.is_datatype);
   }
-
-  console.log('XXXXXXXX 5', { data: initData, newNodes, newEdges })
 
   return {
     ...initData,

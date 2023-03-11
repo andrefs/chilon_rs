@@ -1,5 +1,5 @@
 import { SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
-import { scaleLinear } from 'd3-scale';
+import { scaleLinear, scaleLog } from 'd3-scale';
 import { genColorHash } from '../colors';
 
 export interface RawNode extends SimulationNodeDatum {
@@ -9,6 +9,8 @@ export interface RawNode extends SimulationNodeDatum {
 
 export type SimNode = RawNode & {
   normCount: number,
+  linScaleCount: number,
+  logScaleCount: number,
   occursPerc: number
 };
 
@@ -52,14 +54,17 @@ export class SimData {
     this.minEdgeCount = edges.slice(-1)[0].count;
     this.maxEdgeCount = edges[0].count;
 
-    const scaleNode = scaleLinear().domain([this.minNodeCount, this.maxNodeCount]).range([10, 100]);
+    const scaleNodeLinear = scaleLinear().domain([this.minNodeCount, this.maxNodeCount]).range([10, 100]);
+    const scaleNodeLog = scaleLog().domain([this.minNodeCount, this.maxNodeCount]).range([10, 100]);
     const scaleEdge = scaleLinear().domain([this.minEdgeCount, this.maxEdgeCount]).range([10, 100]);
 
 
     this.totalNodeCount = nodes.reduce((acc, cur) => acc + cur.count, 0);
     this.nodes = nodes.map((n) => ({
       ...n,
-      normCount: scaleNode(n.count),
+      normCount: scaleNodeLinear(n.count), // default
+      linScaleCount: scaleNodeLinear(n.count),
+      logScaleCount: scaleNodeLog(n.count),
       occursPerc: n.count / this.totalNodeCount
     }));
 
