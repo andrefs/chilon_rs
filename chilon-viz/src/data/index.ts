@@ -115,8 +115,6 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     newNodes = newNodes.filter((n) => newEdgesCount[n.name] !== 0 || n.name === largestNode.name);
   }
 
-
-
   return {
     ...initData,
     nodes: newNodes,

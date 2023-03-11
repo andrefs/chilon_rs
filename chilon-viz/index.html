@@ -12,7 +12,7 @@
   <div id="app">
     <div class="controls">
       <div class="force alpha">
-        <p><label>alpha</label> Simulation activity</p>
+        <p><label>Alpha</label> Simulation activity</p>
         <div class="alpha_bar" onclick="updateAll();">
           <div id="alpha_value"></div>
         </div>
@@ -21,7 +21,7 @@
       <div class="force">
         <p><label>Filter</label> Reduce the number of nodes and/or edges displayed</p>
         <div>
-          <p class="sub-cat">Node occurs:</p>
+          <p class="sub-cat">Node occurrences:</p>
           <div class="node-occurs-out">
             <div>
               <span>min:</span>
@@ -35,7 +35,7 @@
           <div class="range" id="nodeOccursInput"></div>
         </div>
         <div>
-          <p class="sub-cat">Predicate occurs:</p>
+          <p class="sub-cat">Predicate occurrences:</p>
           <div class="edge-occurs-out">
             <div>
               <span>min:</span>
@@ -51,12 +51,12 @@
       </div>
 
       <div class="force hide">
-        <p><label>Show</label></p>
+        <p><label>Display</label> Show or hide specific node and edge types and other options</p>
         <div>
           <label for="cb-logarithm"><input id="cb-logarithm" type="checkbox" checked> Logarithmic node sizes</label>
           <label for="cb-loops"><input id="cb-loops" type="checkbox" checked> Loops</label>
           <label for="cb-bau"><input id="cb-bau" type="checkbox" checked> Blank and unknown</label>
-          <label for="cb-outer"><input id="cb-outer" type="checkbox" checked> Outer nodes</label>
+          <label for="cb-outer"><input id="cb-outer" type="checkbox" checked disabled> Outer nodes</label>
           <label for="cb-datatypes"><input id="cb-datatypes" type="checkbox" checked> Datatype links</label>
           <label for="cb-disconnected"><input id="cb-disconnected" type="checkbox" checked> Disconnected nodes</label>
         </div>
