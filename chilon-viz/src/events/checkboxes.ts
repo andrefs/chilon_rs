@@ -12,6 +12,7 @@ export const getCheckboxElems = () => {
     bau: document.querySelector<HTMLInputElement>('#cb-bau')!,
     outer: document.querySelector<HTMLInputElement>('#cb-outer')!,
     datatypes: document.querySelector<HTMLInputElement>('#cb-datatypes')!,
+    disconnected: document.querySelector<HTMLInputElement>('#cb-disconnected')!,
   }
 }
 
@@ -22,6 +23,7 @@ export type CheckboxValues = {
   bau: boolean,
   outer: boolean,
   datatypes: boolean,
+  disconnected: boolean
 }
 
 export const getCheckboxValues = () => {
@@ -33,6 +35,7 @@ export const getCheckboxValues = () => {
     bau: elems.bau.checked,
     outer: elems.outer.checked,
     datatypes: elems.datatypes.checked,
+    disconnected: elems.disconnected.checked,
   }
 }
 

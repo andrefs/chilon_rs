@@ -57,20 +57,20 @@ const filterData = (initData: SimData, values: ConfigValues) => {
 
 
 
-
   // filter outer nodes
-  //let edgesCount: { [nodeName: string]: number } = {};
-  //for (const node of initData.nodes) {
-  //  edgesCount[node.name] = 0;
-  //}
+
+  //let origEdgesCount: { [nodeName: string]: number } = {};
   //for (const edge of initData.edges) {
-  //  edgesCount[edge.source.name] += 1;
-  //  edgesCount[edge.target.name] += 1;
+  //  origEdgesCount[edge.source.name] = origEdgesCount[edge.source.name] || 0;
+  //  origEdgesCount[edge.source.name] += 1;
+  //  origEdgesCount[edge.target.name] = origEdgesCount[edge.target.name] || 0;
+  //  origEdgesCount[edge.target.name] += 1;
   //}
 
   //if (!values.outer) {
   //  newNodes = newNodes.filter((n) => edgesCount[n.name] > 1);
   //}
+
 
 
   // filter edges
@@ -86,7 +86,6 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     (e as any).target.name in namesToNodes
   );
 
-
   // filter loops
   if (!values.loops) {
     newEdges = newEdges.filter((e) => e.source.name !== e.target.name);
@@ -96,6 +95,27 @@ const filterData = (initData: SimData, values: ConfigValues) => {
   if (!values.datatypes) {
     newEdges = newEdges.filter((e) => !e.is_datatype);
   }
+
+
+  let largestNode = newNodes[0];
+  let newEdgesCount: { [nodeName: string]: number } = {};
+
+  for (const node of newNodes) {
+    newEdgesCount[node.name] = 0;
+  }
+  for (const edge of newEdges) {
+    newEdgesCount[edge.source.name] = newEdgesCount[edge.source.name] || 0;
+    newEdgesCount[edge.source.name] += 1;
+    newEdgesCount[edge.target.name] = newEdgesCount[edge.target.name] || 0;
+    newEdgesCount[edge.target.name] += 1;
+  }
+
+  // filter disconnected nodes
+  if (!values.disconnected) {
+    newNodes = newNodes.filter((n) => newEdgesCount[n.name] !== 0 || n.name === largestNode.name);
+  }
+
+
 
   return {
     ...initData,
