@@ -46,6 +46,8 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     newNodes = newNodes.filter((n) => n.name !== 'BLANK' && n.name !== 'UNKNOWN');
   }
 
+
+
   let namesToNodes: { [name: string]: boolean } = {};
   for (const node of newNodes) {
     namesToNodes[node.name] = true;
@@ -60,6 +62,9 @@ const filterData = (initData: SimData, values: ConfigValues) => {
 
   if (!values.loops) {
     newEdges = newEdges.filter((e) => e.source.name !== e.target.name);
+  }
+  if (!values.datatypes) {
+    newEdges = newEdges.filter((e) => !e.is_datatype);
   }
 
   console.log('XXXXXXXX 5', { data: initData, newNodes, newEdges })
