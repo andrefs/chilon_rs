@@ -36,11 +36,10 @@ const filterData = (initData: SimData, values: ConfigValues) => {
     .domain([lowestEdgeOccurs, highestEdgeOccurs])
     .range([0, 100]);
 
-  let minNodeOccurs = scaleNode.invert(values.minNodeOccurs);
-  let maxNodeOccurs = scaleNode.invert(values.maxNodeOccurs);
-  let minEdgeOccurs = scaleEdge.invert(values.minEdgeOccurs);
-  let maxEdgeOccurs = scaleEdge.invert(values.maxEdgeOccurs);
-
+  let minNodeOccurs = Math.floor(scaleNode.invert(values.minNodeOccurs));
+  let maxNodeOccurs = Math.ceil(scaleNode.invert(values.maxNodeOccurs));
+  let minEdgeOccurs = Math.floor(scaleEdge.invert(values.minEdgeOccurs));
+  let maxEdgeOccurs = Math.ceil(scaleEdge.invert(values.maxEdgeOccurs));
 
   // filter nodes
   let newNodes = initData.nodes.filter((n) => n.count >= minNodeOccurs && n.count <= maxNodeOccurs);

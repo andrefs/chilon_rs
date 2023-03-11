@@ -9,7 +9,6 @@ import { handleZoom, initZoom } from './zoom';
 import { createTooltip } from './tooltip';
 import { initConfig } from './events/config';
 
-
 declare global {
   interface Window { ChilonViz: any; }
 }
@@ -42,7 +41,6 @@ const start = () => {
 
   //addMouseEventListeners(svg, tooltip);
 
-  console.log('XXXXXX end', { sim, initData, data, svg });
 }
 
 start();
