@@ -24,7 +24,7 @@ export const restartSimulation = (sim: Simulation<RawNode, RawEdge>, data: SimDa
     .force("linkForce", forceLink(data.edges).id((n: any) => n.name).distance(100).strength(2))
     .force("charge", forceManyBody().strength(-200000).distanceMax(1000))
     .force('collision', forceCollide().radius((d: any) => d.normCount + 4))
-    .alpha(1).restart()
+    .alpha(0.5).restart()
     .on('tick', ticked(sim));
 }
 
