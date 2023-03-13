@@ -10,6 +10,7 @@ export interface RawNode extends SimulationNodeDatum {
 
 export type SimNode = RawNode & {
   normCount: number,
+  namespace: string,
   linScaleCount: number,
   logScaleCount: number,
   occursPerc: number
@@ -27,6 +28,7 @@ export interface RawEdge extends SimulationLinkDatum<RawNode> {
 interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
   source: SimNode,
   target: SimNode,
+  namespace: string,
   normCount: number,
   colorHash: string
 };
@@ -34,11 +36,13 @@ interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
 interface RawData {
   edges: RawEdge[];
   nodes: RawNode[];
+  aliases: { [name: string]: string };
 }
 
 export class SimData {
   edges: SimEdge[];
   nodes: SimNode[];
+  aliases: { [name: string]: string };
 
   minNodeCount: number;
   maxNodeCount: number;
@@ -47,7 +51,9 @@ export class SimData {
 
   totalNodeCount: number;
 
-  constructor({ nodes, edges }: RawData) {
+  constructor({ nodes, edges, aliases }: RawData) {
+    this.aliases = aliases;
+
     const colorHash = genColorHash(edges);
 
     this.minNodeCount = nodes.slice(-1)[0].count;
@@ -63,6 +69,7 @@ export class SimData {
     this.totalNodeCount = nodes.reduce((acc, cur) => acc + cur.count, 0);
     this.nodes = nodes.map((n) => ({
       ...n,
+      namespace: aliases[n.name] || '',
       normCount: scaleNodeLinear(n.count), // default
       linScaleCount: scaleNodeLinear(n.count),
       logScaleCount: scaleNodeLog(n.count),
@@ -79,6 +86,7 @@ export class SimData {
       ...e,
       source: namesToNodes[e.source],
       target: namesToNodes[e.target],
+      namespace: aliases[e.label] || '',
       colorHash: colorHash[e.label.toString()],
       normCount: scaleEdge(e.count)
     }));

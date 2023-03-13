@@ -86,6 +86,7 @@ export const update = (
   svg: Selection<SVGSVGElement, any, HTMLElement, any>,
   tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>
 ) => {
+  console.log('update', data);
 
   let nodesParent = select("svg g.nodes");
   let edgesParent = select("svg g.edges");

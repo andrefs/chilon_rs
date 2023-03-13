@@ -116,7 +116,7 @@ fn proc_alias(sol: QuerySolution, aliases: &mut HashMap<String, String>) {
     }
     let mut namespace = None;
     if let oxigraph::model::Term::NamedNode(n) = sol.get("namespace").unwrap() {
-        namespace = Some(n.to_string());
+        namespace = Some(n.as_str().to_string());
     }
 
     if let (Some(alias_name), Some(namespace_name)) = (alias, namespace) {

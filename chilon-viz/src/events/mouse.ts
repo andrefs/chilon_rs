@@ -43,18 +43,20 @@ const addNodeEventListeners = (
             return hlNodes.has(n.name) ? nodeColors[n.node_type].highlight : nodeColors[n.node_type].muted;
           })
 
+        console.log('XXXXXXXX 399', { d })
 
         tooltip.transition()
           .duration(200)
           .style("opacity", 1) // show the tooltip
         tooltip.html(`<div>
                      <p class="node-name">${d.name}</p>
+                     <p class="node-namespace">${d.namespace}</p>
                      <p class="node-count">${humanFormat(d.count)}</p>
                      <p class="node-perc">${Number(d.occursPerc * 100).toFixed(2)}%</p>
                      <!--p class="node-desc">Namespace IRI or description (for BLANK and UNKNOWN)</p-->
                      </div>`)
-          .style("left", (event.clientX + 20) + "px")
-          .style("top", (event.clientY - 20) + "px");
+        //.style("left", (event.clientX + 20) + "px")
+        //.style("top", (event.clientY - 20) + "px");
 
       });
       //edges
@@ -110,7 +112,6 @@ const addEdgeEventListeners = (
           .style('stroke', label == d.label ? stroke : '#b8b8b8')
           .style('stroke-width', label == d.label ? strokeWidth : 1)
       });
-      console.log('XXXXXXX', { hlNodes })
 
       circle.each(function(n) {
         select(this)
@@ -125,9 +126,12 @@ const addEdgeEventListeners = (
       tooltip.transition()
         .duration(200)
         .style("opacity", 1) // show the tooltip
-      tooltip.html(d.label)
-        .style("left", (event.clientX + 20) + "px")
-        .style("top", (event.clientY - 20) + "px");
+      tooltip.html(`<div>
+                     <p class="edge-label">${d.label}</p>
+                     <p class="edge-namespace">${d.namespace}</p>
+                     </div>`)
+      //.style("left", (event.clientX + 20) + "px")
+      //.style("top", (event.clientY - 20) + "px");
     })
     .on('mouseout', function(event, d) {
       edgepaths.each(function(e) {

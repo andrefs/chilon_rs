@@ -16,7 +16,10 @@ div.tooltip {
 	background-color: lightblue;
 }
 div.tooltip {
-  position: absolute;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   text-align: center;
   padding: 5px;
   background: honeydew;
@@ -85,14 +88,14 @@ p.sub-cat {
   height: 15px;
 }
 
-.node-name, .node-count, .node-perc {
+.node-name, .node-count, .node-perc, .node-namespace, .edge-label, .edge-namespace {
  margin:0;
 }
 
-.node-name {
- font-size: 14px;
+.node-name, .edge-label {
+ font-size: 25px;
  }
 
-.node-count, .node-perc {
- font-size: 10px;
+.node-count, .node-perc, .node-namespace, .edge-namespace {
+ font-size: 14px;
 }

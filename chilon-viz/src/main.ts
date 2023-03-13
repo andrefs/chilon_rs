@@ -16,6 +16,7 @@ declare global {
 window.ChilonViz = window.ChilonViz || {};
 
 const start = () => {
+  console.log('XXXXXXX', { initData })
   const data = truncateData(initData, 50, 50);
 
   const svg = select<SVGSVGElement, any>("#app svg");
