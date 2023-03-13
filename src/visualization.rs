@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{debug, info, warn};
 use oxigraph::{
     io::GraphFormat,
     model::{GraphName, NamedNode},
@@ -12,7 +12,7 @@ use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
-    fs::{rename, File, OpenOptions},
+    fs::{self, remove_dir_all, rename, File, OpenOptions},
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::Command,
@@ -38,9 +38,17 @@ pub struct VisData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum VisNodeType {
+    Unknown,
+    Blank,
+    Datatype,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VisNode {
     name: String,
     count: usize,
+    node_type: VisNodeType,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -131,6 +139,11 @@ fn proc_solution(
             .or_insert_with(|| VisNode {
                 name: src_name.clone(),
                 count: 0,
+                node_type: match src_name.as_ref() {
+                    "UNKNOWN" => VisNodeType::Unknown,
+                    "BLANK" => VisNodeType::Blank,
+                    _ => VisNodeType::Datatype,
+                },
             })
             .count += occurs_val.parse::<usize>().unwrap();
         nodes
@@ -138,6 +151,11 @@ fn proc_solution(
             .or_insert_with(|| VisNode {
                 name: tgt_name.clone(),
                 count: 0,
+                node_type: match src_name.as_ref() {
+                    "UNKNOWN" => VisNodeType::Unknown,
+                    "BLANK" => VisNodeType::Blank,
+                    _ => VisNodeType::Datatype,
+                },
             })
             .count += occurs_val.parse::<usize>().unwrap();
 
@@ -264,6 +282,13 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
         dst.to_string_lossy()
     );
     //rename(src, dst).unwrap();
+    if dst.is_dir() {
+        warn!(
+            "Folder {} exists, removing before copying",
+            dst.to_string_lossy()
+        );
+        remove_dir_all(dst).unwrap();
+    }
     copy(src, outf, &Default::default()).unwrap();
 
     return RENDER_DIR;

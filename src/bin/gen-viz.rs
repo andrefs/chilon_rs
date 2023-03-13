@@ -3,7 +3,7 @@ use chilon_rs::{
     visualization::{render_vis, vis_dev_server},
 };
 use chrono::Utc;
-use log::info;
+use log::{info, warn};
 
 use clap::Parser;
 use std::{
@@ -41,14 +41,14 @@ fn main() {
     )
     .unwrap();
 
-    let out = gen_file_name(
-        format!("tmp/{}", Utc::now().format("%Y%m%d")),
-        "".to_string(),
-    );
-    let outf = out.as_str();
-
-    info!("Creating folder {outf} to store results");
-    fs::create_dir(outf).unwrap();
+    //let out = gen_file_name(
+    //    format!("tmp/{}", Utc::now().format("%Y%m%d")),
+    //    "".to_string(),
+    //);
+    //let outf = out.as_str();
+    let file = cli.file.clone();
+    let outf = file.parent().unwrap();
+    let outf_str = outf.to_str().unwrap();
 
     let data_path = cli.file;
 
@@ -57,6 +57,6 @@ fn main() {
 
     let vis_data = serde_json::from_reader(buf_reader).unwrap();
 
-    let render_dir = render_vis(&vis_data, outf);
+    let render_dir = render_vis(&vis_data, outf_str);
     vis_dev_server(render_dir);
 }

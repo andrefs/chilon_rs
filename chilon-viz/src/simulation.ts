@@ -1,5 +1,5 @@
 import { Simulation, forceLink, forceManyBody, forceCollide, forceCenter } from 'd3-force';
-import { RawEdge, RawNode, SimData } from './data/raw-data';
+import { RawEdge, RawNode, SimData, SimNode } from './data/raw-data';
 import { selectAll, select, Selection } from 'd3-selection';
 import { drag } from './events/drag';
 import { addMouseEventListeners } from './events/mouse';
@@ -158,7 +158,7 @@ export const update = (
           .attr("r", d => {
             return Math.ceil(d.normCount || 0);
           })
-          .style("fill", () => '#B3D9CB')
+          .style("fill", (d: SimNode) => '#B3D9CB')
           .attr('data-id', (n) => n.name)
           .attr('data-count', (n) => n.count)
           .attr("data-fill", () => '#B3D9CB')
@@ -181,11 +181,11 @@ export const update = (
       update => {
 
         update.selectAll('text')
-          .call(up =>
+          .call((up: any) =>
             up.transition(t)
-              .attr('font-size', d => Math.ceil(d.normCount / 2)));
+              .attr('font-size', (d: any) => Math.ceil(d.normCount / 2)));
         update.selectAll('circle')
-          .call(up =>
+          .call((up: any) =>
             up.transition(t)
               .attr("r", (d: any) => Math.ceil(d.normCount || 0)));
         return update;

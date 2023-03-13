@@ -5,6 +5,7 @@ import { genColorHash } from '../colors';
 export interface RawNode extends SimulationNodeDatum {
   name: string;
   count: number;
+  type: 'Namespace' | 'Unknown' | 'Blank'
 };
 
 export type SimNode = RawNode & {
