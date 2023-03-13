@@ -1,6 +1,6 @@
 use chilon_rs::{
     util::gen_file_name,
-    visualization::{render_vis, vis_dev_server},
+    visualization::{build_data, dump_json, render_vis, vis_dev_server},
 };
 use chrono::Utc;
 use log::{info, warn};
@@ -22,8 +22,8 @@ use simplelog::*;
     long_about = None
     )]
 pub struct Cli {
-    #[arg(required = true, value_name = "DATA.JSON")]
-    pub file: PathBuf,
+    #[arg(required = true, value_name = "FOLDER")]
+    pub folder: PathBuf,
 }
 
 fn main() {
@@ -41,22 +41,11 @@ fn main() {
     )
     .unwrap();
 
-    //let out = gen_file_name(
-    //    format!("tmp/{}", Utc::now().format("%Y%m%d")),
-    //    "".to_string(),
-    //);
-    //let outf = out.as_str();
-    let file = cli.file.clone();
-    let outf = file.parent().unwrap();
-    let outf_str = outf.to_str().unwrap();
+    let folder_str = cli.folder.to_str().unwrap();
 
-    let data_path = cli.file;
+    let vis_data = build_data(folder_str);
+    dump_json(&vis_data, folder_str);
 
-    let file = File::open(data_path).unwrap();
-    let buf_reader = BufReader::new(file);
-
-    let vis_data = serde_json::from_reader(buf_reader).unwrap();
-
-    let render_dir = render_vis(&vis_data, outf_str);
+    let render_dir = render_vis(&vis_data, folder_str);
     vis_dev_server(render_dir);
 }
