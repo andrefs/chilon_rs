@@ -89,7 +89,7 @@ p.sub-cat {
 }
 
 .node-name, .node-count, .node-perc, .node-namespace, .edge-label, .edge-namespace {
- margin:0;
+ margin: 0 10px 0 10px;
 }
 
 .node-name, .edge-label {

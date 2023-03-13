@@ -91,6 +91,7 @@ export const update = (
   let nodesParent = select("svg g.nodes");
   let edgesParent = select("svg g.edges");
 
+  const t = svg.transition().duration(700);
 
   edgesParent
     .selectAll("g")
@@ -99,7 +100,10 @@ export const update = (
       enter => {
         const edgeGroups = enter.append('g').attr('class', 'edge-g');
 
+
         edgeGroups
+          .attr('opacity', 0)
+          .call((enter: any) => enter.transition(t).attr('opacity', 0.3))
           .append('path')
           //.attr('d',linkArc)
           //.attr('d', d => {
@@ -110,7 +114,6 @@ export const update = (
           .attr('fill-opacity', 0)
           .attr('id', (e, _) => `edgepath-${e.label}-${e.source.name}-${e.target.name}`)
           .attr("stroke-width", (d: any) => Math.ceil(d.normCount / 3))
-          .attr('opacity', 0.3)
           .attr("data-stroke-width", (d: any) => Math.ceil(d.normCount / 3))
           .attr("data-source", (d: any) => d.source.name)
           .attr("data-target", (d: any) => d.target.name)
@@ -145,7 +148,6 @@ export const update = (
       exit => exit.remove()
     );
 
-  const t = svg.transition().duration(700);
 
   nodesParent
     .selectAll("g")
@@ -156,26 +158,26 @@ export const update = (
 
         nodeGroups
           .append("circle")
-          .attr("r", d => {
-            return Math.ceil(d.normCount || 0);
-          })
+          .attr("r", 0)
           .style("fill", (d: SimNode) => nodeColors[d.node_type].default)
           .attr('data-id', (n) => n.name)
           .attr('data-count', (n) => n.count)
           .attr("data-fill", () => '#B3D9CB')
           .style("pointer-events", "visiblePainted")
           .style('cursor', 'pointer')
+          .call((enter: any) => enter.transition(t).attr("r", (d: any) => d.normCount || 0))
 
         nodeGroups
           .append("text")
+          .attr('font-size', d => 0)
           .attr("x", (d: any) => d.x)
           .attr("y", (d: any) => d.y)
-          .attr('font-size', d => Math.ceil(d.normCount / 2))
           .attr('class', "nodelabel")
           .text((d: any) => d.name)
           .attr('dominant-baseline', 'middle')
           .style("pointer-events", "none")
           .style('cursor', 'pointer')
+          .call((enter: any) => enter.transition(t).attr('font-size', d => Math.ceil(d.normCount / 2)))
 
         return nodeGroups;
       },
@@ -191,7 +193,17 @@ export const update = (
               .attr("r", (d: any) => Math.ceil(d.normCount || 0)));
         return update;
       },
-      exit => exit.remove()
+      exit => {
+        exit.selectAll('text')
+          .call((ex: any) =>
+            ex.transition(t)
+              .attr('font-size', 0));
+        exit.selectAll('circle')
+          .call((ex: any) =>
+            ex.transition(t)
+              .attr("r", 0));
+        return exit;
+      }
     );
 
 
