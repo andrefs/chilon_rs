@@ -179,6 +179,11 @@ export const update = (
         return nodeGroups;
       },
       update => {
+
+        update.selectAll('text')
+          .call(up =>
+            up.transition(t)
+              .attr('font-size', d => Math.ceil(d.normCount / 2)));
         update.selectAll('circle')
           .call(up =>
             up.transition(t)
