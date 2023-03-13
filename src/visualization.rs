@@ -12,7 +12,7 @@ use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
-    fs::{self, remove_dir_all, rename, File, OpenOptions},
+    fs::{remove_dir_all, rename, File, OpenOptions},
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::Command,
@@ -35,6 +35,7 @@ pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
 pub struct VisData {
     nodes: Vec<VisNode>,
     edges: Vec<VisEdge>,
+    aliases: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,17 +64,27 @@ pub struct VisEdge {
 
 pub fn build_data(outf: &str) -> VisData {
     let store = load_store(outf);
-    let qres = query_graph(store);
+    let qres1 = query_norm_triples(store.clone());
+    let qres2 = query_aliases(store);
 
     let mut nodes = BTreeMap::<String, VisNode>::new();
     let mut edges = HashMap::<(String, String), Vec<VisEdge>>::new();
+    let mut aliases = HashMap::<String, String>::new();
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres {
+    if let Ok(QueryResults::Solutions(mut sols)) = qres1 {
         let mut id_count = 0;
 
         for s in sols {
             if let Ok(sol) = s {
-                proc_solution(sol, &mut nodes, &mut edges);
+                proc_norm_triples(sol, &mut nodes, &mut edges);
+            }
+        }
+    }
+
+    if let Ok(QueryResults::Solutions(mut sols)) = qres2 {
+        for s in sols {
+            if let Ok(sol) = s {
+                proc_alias(sol, &mut aliases);
             }
         }
     }
@@ -92,12 +103,28 @@ pub fn build_data(outf: &str) -> VisData {
     let data = VisData {
         edges: sorted_edges,
         nodes: sorted_nodes,
+        aliases,
     };
 
     return data;
 }
 
-fn proc_solution(
+fn proc_alias(sol: QuerySolution, aliases: &mut HashMap<String, String>) {
+    let mut alias = None;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("alias").unwrap() {
+        alias = get_fragment(n.clone());
+    }
+    let mut namespace = None;
+    if let oxigraph::model::Term::NamedNode(n) = sol.get("namespace").unwrap() {
+        namespace = Some(n.to_string());
+    }
+
+    if let (Some(alias_name), Some(namespace_name)) = (alias, namespace) {
+        aliases.insert(alias_name, namespace_name);
+    }
+}
+
+fn proc_norm_triples(
     sol: QuerySolution,
     nodes: &mut BTreeMap<String, VisNode>,
     edges: &mut HashMap<(String, String), Vec<VisEdge>>,
@@ -199,7 +226,7 @@ fn load_store(outf: &str) -> Store {
     store
 }
 
-fn query_graph(store: Store) -> Result<QueryResults, EvaluationError> {
+fn query_norm_triples(store: Store) -> Result<QueryResults, EvaluationError> {
     let q = r#"
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
@@ -213,6 +240,22 @@ fn query_graph(store: Store) -> Result<QueryResults, EvaluationError> {
             ?stmt_id afsgs:occurrences ?occurs .
         }
         ORDER BY DESC(?occurs)
+        "#;
+
+    let qres = store.query(q);
+    return qres;
+}
+
+fn query_aliases(store: Store) -> Result<QueryResults, EvaluationError> {
+    let q = r#"
+        BASE <http://andrefs.com/graph-summ/v1>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+        PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
+    
+        SELECT ?alias ?namespace WHERE {
+            ?alias <#namespacePrefix> ?namespace  .
+
+        }
         "#;
 
     let qres = store.query(q);

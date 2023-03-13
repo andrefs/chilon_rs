@@ -756,7 +756,7 @@ pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
             }
             .into(),
             predicate: NamedNode {
-                iri: "namespacePrefix",
+                iri: "#namespacePrefix",
             }
             .into(),
             object: NamedNode {
