@@ -292,7 +292,6 @@ fn restart_timers(
     ignore_unknown: bool,
     total_triples: usize,
 ) {
-    println!("RESTART TIMERS {ignore_unknown} {total_triples}");
     let elapsed = start.elapsed().as_millis();
     if elapsed != 0 {
         trace!(

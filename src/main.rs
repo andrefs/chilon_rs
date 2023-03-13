@@ -127,7 +127,6 @@ fn main() {
     let mut norm_t = MetaInfoNormalization::new();
 
     info!("Normalizing triples");
-    println!("TOTAL_TRIPLES {total_triples}");
     let (nts, used_groups, tasks) = normalize_triples(
         cli.files.clone(),
         n_workers,

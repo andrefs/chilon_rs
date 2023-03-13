@@ -161,7 +161,6 @@ fn proc_norm_triples(
     if let (Some(src_name), Some(tgt_name), Some(edge_label), Some(occurs_val)) =
         (src, tgt, label, occurs)
     {
-        println!("{} {} {} {}", src_name, tgt_name, edge_label, occurs_val);
         nodes
             .entry(src_name.clone())
             .or_insert_with(|| VisNode {
