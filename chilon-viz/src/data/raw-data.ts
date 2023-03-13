@@ -5,10 +5,12 @@ import { genColorHash } from '../colors';
 export interface RawNode extends SimulationNodeDatum {
   name: string;
   count: number;
+  node_type: 'Namespace' | 'Unknown' | 'Blank'
 };
 
 export type SimNode = RawNode & {
   normCount: number,
+  namespace: string,
   linScaleCount: number,
   logScaleCount: number,
   occursPerc: number
@@ -26,6 +28,7 @@ export interface RawEdge extends SimulationLinkDatum<RawNode> {
 interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
   source: SimNode,
   target: SimNode,
+  namespace: string,
   normCount: number,
   colorHash: string
 };
@@ -33,11 +36,13 @@ interface SimEdge extends Omit<RawEdge, 'source' | 'target'> {
 interface RawData {
   edges: RawEdge[];
   nodes: RawNode[];
+  aliases: { [name: string]: string };
 }
 
 export class SimData {
   edges: SimEdge[];
   nodes: SimNode[];
+  aliases: { [name: string]: string };
 
   minNodeCount: number;
   maxNodeCount: number;
@@ -46,7 +51,9 @@ export class SimData {
 
   totalNodeCount: number;
 
-  constructor({ nodes, edges }: RawData) {
+  constructor({ nodes, edges, aliases }: RawData) {
+    this.aliases = aliases;
+
     const colorHash = genColorHash(edges);
 
     this.minNodeCount = nodes.slice(-1)[0].count;
@@ -62,6 +69,7 @@ export class SimData {
     this.totalNodeCount = nodes.reduce((acc, cur) => acc + cur.count, 0);
     this.nodes = nodes.map((n) => ({
       ...n,
+      namespace: aliases[n.name] || '',
       normCount: scaleNodeLinear(n.count), // default
       linScaleCount: scaleNodeLinear(n.count),
       logScaleCount: scaleNodeLog(n.count),
@@ -78,6 +86,7 @@ export class SimData {
       ...e,
       source: namesToNodes[e.source],
       target: namesToNodes[e.target],
+      namespace: aliases[e.label] || '',
       colorHash: colorHash[e.label.toString()],
       normCount: scaleEdge(e.count)
     }));
@@ -85,6 +94,19 @@ export class SimData {
 }
 
 export const initData = new SimData({
+  "aliases": {
+    "dcterms": "http://purl.org/dc/terms/",
+    "ili": "http://ili.globalwordnet.org/ili/",
+    "ontolex": "http://www.w3.org/ns/lemon/ontolex#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "wordn2": "http://wordnet-rdf.princeton.edu/id/",
+    "wordnet": "http://wordnet-rdf.princeton.edu/ontology#",
+    "wordnet-rdf": "http://wordnet-rdf.princeton.edu/rdf/lemma/",
+    "www": "http://www.w3.org/ns/lemon/synsem#",
+    "xsd": "http://www.w3.org/TR/xmlschema11-2/"
+  },
   "edges": [
     {
       "count": 366287,
@@ -106,6 +128,22 @@ export const initData = new SimData({
       "count": 207272,
       "is_datatype": false,
       "label": "ontolex",
+      "link_num": -1,
+      "source": "wordnet-rdf",
+      "target": "BLANK"
+    },
+    {
+      "count": 207272,
+      "is_datatype": true,
+      "label": "ontolex",
+      "link_num": 1,
+      "source": "BLANK",
+      "target": "rdf"
+    },
+    {
+      "count": 207272,
+      "is_datatype": false,
+      "label": "ontolex",
       "link_num": 1,
       "source": "wordnet-rdf",
       "target": "wordnet-rdf"
@@ -119,22 +157,6 @@ export const initData = new SimData({
       "target": "wordn2"
     },
     {
-      "count": 207272,
-      "is_datatype": true,
-      "label": "ontolex",
-      "link_num": 1,
-      "source": "BLANK",
-      "target": "rdf"
-    },
-    {
-      "count": 207272,
-      "is_datatype": false,
-      "label": "ontolex",
-      "link_num": -1,
-      "source": "wordnet-rdf",
-      "target": "BLANK"
-    },
-    {
       "count": 159015,
       "is_datatype": false,
       "label": "wordnet",
@@ -144,27 +166,19 @@ export const initData = new SimData({
     },
     {
       "count": 117791,
-      "is_datatype": true,
-      "label": "dcterms",
-      "link_num": 1,
-      "source": "wordn2",
-      "target": "xsd"
-    },
-    {
-      "count": 117791,
       "is_datatype": false,
       "label": "wordnet",
-      "link_num": 1,
+      "link_num": -1,
       "source": "wordn2",
-      "target": "wordnet"
+      "target": "BLANK"
     },
     {
       "count": 117791,
       "is_datatype": false,
-      "label": "owl",
+      "label": "rdf",
       "link_num": -1,
       "source": "wordn2",
-      "target": "ili"
+      "target": "ontolex"
     },
     {
       "count": 117791,
@@ -177,17 +191,33 @@ export const initData = new SimData({
     {
       "count": 117791,
       "is_datatype": false,
-      "label": "rdf",
+      "label": "owl",
       "link_num": -1,
       "source": "wordn2",
-      "target": "ontolex"
+      "target": "ili"
     },
     {
       "count": 117791,
       "is_datatype": false,
       "label": "wordnet",
-      "link_num": -1,
+      "link_num": 1,
       "source": "wordn2",
+      "target": "wordnet"
+    },
+    {
+      "count": 117791,
+      "is_datatype": true,
+      "label": "dcterms",
+      "link_num": 1,
+      "source": "wordn2",
+      "target": "xsd"
+    },
+    {
+      "count": 98923,
+      "is_datatype": false,
+      "label": "www",
+      "link_num": -2,
+      "source": "wordnet-rdf",
       "target": "BLANK"
     },
     {
@@ -197,14 +227,6 @@ export const initData = new SimData({
       "link_num": 3,
       "source": "BLANK",
       "target": "rdf"
-    },
-    {
-      "count": 98923,
-      "is_datatype": false,
-      "label": "www",
-      "link_num": -2,
-      "source": "wordnet-rdf",
-      "target": "BLANK"
     },
     {
       "count": 92518,
@@ -218,35 +240,43 @@ export const initData = new SimData({
   "nodes": [
     {
       "count": 1638349,
-      "name": "wordnet-rdf"
+      "name": "wordnet-rdf",
+      "node_type": "Namespace"
     },
     {
       "count": 1367563,
-      "name": "wordn2"
+      "name": "wordn2",
+      "node_type": "Namespace"
     },
     {
       "count": 847972,
-      "name": "BLANK"
+      "name": "BLANK",
+      "node_type": "Blank"
     },
     {
       "count": 484078,
-      "name": "ontolex"
+      "name": "ontolex",
+      "node_type": "Namespace"
     },
     {
       "count": 423986,
-      "name": "rdf"
+      "name": "rdf",
+      "node_type": "Namespace"
     },
     {
       "count": 276806,
-      "name": "wordnet"
+      "name": "wordnet",
+      "node_type": "Namespace"
     },
     {
       "count": 117791,
-      "name": "ili"
+      "name": "ili",
+      "node_type": "Namespace"
     },
     {
       "count": 117791,
-      "name": "xsd"
+      "name": "xsd",
+      "node_type": "Namespace"
     }
   ]
 });
