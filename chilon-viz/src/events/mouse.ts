@@ -1,5 +1,6 @@
 import { BaseType, select, Selection } from "d3-selection";
 import humanFormat from 'human-format';
+import { nodeColors } from "../simulation";
 
 export const addMouseEventListeners = (svg: Selection<SVGSVGElement, any, HTMLElement, any>, tooltip: Selection<HTMLDivElement, unknown, HTMLElement, any>) => {
   const circle = svg.selectAll('g.nodes g.node-g circle');
@@ -39,7 +40,7 @@ const addNodeEventListeners = (
           .transition()
           .duration(200)
           .style('fill', (n: any) => {
-            return hlNodes.has(n.name) ? this.getAttribute('data-fill') : '#b8b8b8'
+            return hlNodes.has(n.name) ? nodeColors[n.node_type].highlight : nodeColors[n.node_type].muted;
           })
 
 
@@ -65,7 +66,7 @@ const addNodeEventListeners = (
         select(this)
           .transition()
           .duration(200)
-          .style('fill', this.getAttribute('data-fill'))
+          .style('fill', nodeColors[c.node_type].default)
       });
       edgepaths.each(function(e) {
         select(this)
@@ -114,7 +115,7 @@ const addEdgeEventListeners = (
           .transition()
           .duration(200)
           .style('fill', n => {
-            return hlNodes.has(String(n.id)) ? this.getAttribute('data-fill') : '#b8b8b8'
+            return hlNodes.has(String(n.id)) ? nodeColors[n.node_type].highlight : nodeColors[n.node_type].muted
           })
       });
 
@@ -141,7 +142,7 @@ const addEdgeEventListeners = (
         select(this)
           .transition()
           .duration(200)
-          .style('fill', this.getAttribute('data-fill'))
+          .style('fill', nodeColors[c.node_type].default)
       });
 
       tooltip.transition()

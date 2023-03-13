@@ -158,7 +158,7 @@ export const update = (
           .attr("r", d => {
             return Math.ceil(d.normCount || 0);
           })
-          .style("fill", (d: SimNode) => '#B3D9CB')
+          .style("fill", (d: SimNode) => nodeColors[d.node_type].default)
           .attr('data-id', (n) => n.name)
           .attr('data-count', (n) => n.count)
           .attr("data-fill", () => '#B3D9CB')
@@ -207,17 +207,17 @@ interface NodeColors {
 }
 
 export const nodeColors: { [type: string]: NodeColors } = {
-  namespace: {
+  Namespace: {
     default: '#B3D9CB',
     muted: '#b8b8b8',
     highlight: '#92d6bd'
   },
-  blank: {
+  Blank: {
     default: '#b3bcd9',
     muted: '#b8b8b8',
     highlight: '#90a4e3',
   },
-  unknown: {
+  Unknown: {
     default: '#dfb6bc',
     muted: '#b8b8b8',
     highlight: '#f5a9b5',
