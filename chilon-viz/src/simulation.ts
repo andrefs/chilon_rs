@@ -90,6 +90,7 @@ export const update = (
   let nodesParent = select("svg g.nodes");
   let edgesParent = select("svg g.edges");
 
+
   edgesParent
     .selectAll("g")
     .data(data.edges, (e: any) => `edgepath-${e.label}-${e.source.name}-${e.target.name}`)
@@ -152,7 +153,9 @@ export const update = (
 
         nodeGroups
           .append("circle")
-          .attr("r", d => Math.ceil(d.normCount || 0))
+          .attr("r", d => {
+            return Math.ceil(d.normCount || 0);
+          })
           .style("fill", () => '#B3D9CB')
           .attr('data-id', (n) => n.name)
           .attr('data-count', (n) => n.count)
@@ -173,7 +176,10 @@ export const update = (
 
         return nodeGroups;
       },
-      update => update,
+      update => {
+        update.selectAll('circle').attr("r", (d: any) => Math.ceil(d.normCount || 0));
+        return update;
+      },
       exit => exit.remove()
     );
 
