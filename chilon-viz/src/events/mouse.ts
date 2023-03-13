@@ -98,9 +98,10 @@ const addEdgeEventListeners = (
         const strokeWidth = this.getAttribute('data-stroke-width')
         const stroke = this.getAttribute('data-stroke')
 
-        if (d.label == label) {
-          hlNodes.add(String(source.id));
-          hlNodes.add(String(target.id));
+        if (d.label === label) {
+          console.log('XXXXXXX', { label, source, target })
+          hlNodes.add(String(source.name));
+          hlNodes.add(String(target.name));
         }
         select(this)
           .transition()
@@ -109,13 +110,14 @@ const addEdgeEventListeners = (
           .style('stroke', label == d.label ? stroke : '#b8b8b8')
           .style('stroke-width', label == d.label ? strokeWidth : 1)
       });
+      console.log('XXXXXXX', { hlNodes })
 
       circle.each(function(n) {
         select(this)
           .transition()
           .duration(200)
           .style('fill', n => {
-            return hlNodes.has(String(n.id)) ? nodeColors[n.node_type].highlight : nodeColors[n.node_type].muted
+            return hlNodes.has(String(n.name)) ? nodeColors[n.node_type].highlight : nodeColors[n.node_type].muted
           })
       });
 
