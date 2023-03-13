@@ -144,6 +144,8 @@ export const update = (
       exit => exit.remove()
     );
 
+  const t = svg.transition().duration(700);
+
   nodesParent
     .selectAll("g")
     .data(data.nodes, (n: any) => n.name)
@@ -177,7 +179,10 @@ export const update = (
         return nodeGroups;
       },
       update => {
-        update.selectAll('circle').attr("r", (d: any) => Math.ceil(d.normCount || 0));
+        update.selectAll('circle')
+          .call(up =>
+            up.transition(t)
+              .attr("r", (d: any) => Math.ceil(d.normCount || 0)));
         return update;
       },
       exit => exit.remove()
