@@ -1,9 +1,12 @@
-body{ 
+body {
   overflow: hidden;
-  width: 100%; 
-  margin: 0; padding: 0; 
-  display: flex; 
-  font-family: sans-serif; font-size: 75%; }
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  font-family: sans-serif;
+  font-size: 75%;
+}
 
 .active {
   stroke: #000;
@@ -13,7 +16,7 @@ text {
   text-anchor: middle;
 }
 div.tooltip {
-	background-color: lightblue;
+  background-color: lightblue;
 }
 div.tooltip {
   position: fixed;
@@ -40,7 +43,7 @@ div.tooltip {
 }
 
 svg {
-  width:100vw;
+  width: 100vw;
   height: 100vh;
 }
 
@@ -50,29 +53,54 @@ svg {
   padding: 0 5px;
 }
 .controls .force {
-  background-color:#eee;
+  background-color: #eee;
   border-radius: 3px;
   padding: 5px;
   margin: 5px 0;
   width: 200px;
 }
-.controls .force p label { margin-right: .5em; font-size: 120%; font-weight: bold;}
-.controls .force p { margin-top: 0;}
-.controls .force label { display: inline-block; }
+.controls .force p label {
+  margin-right: 0.5em;
+  font-size: 120%;
+  font-weight: bold;
+}
+.controls .force p {
+  margin-top: 0;
+}
+.controls .force label {
+  display: inline-block;
+}
 
 /* alpha viewer */
-.controls .alpha p { margin-bottom: .25em; }
-.controls .alpha .alpha_bar { height: .5em; border: 1px #777 solid; border-radius: 2px; padding: 1px; display: flex; }
-.controls .alpha .alpha_bar #alpha_value { background-color: #555; border-radius: 1px; flex-basis: 100% }
-.controls .alpha .alpha_bar:hover { border-width: 2px; margin:-1px; }
-.controls .alpha .alpha_bar:active #alpha_value { background-color: #222 }
-
+.controls .alpha p {
+  margin-bottom: 0.25em;
+}
+.controls .alpha .alpha_bar {
+  height: 0.5em;
+  border: 1px #777 solid;
+  border-radius: 2px;
+  padding: 1px;
+  display: flex;
+}
+.controls .alpha .alpha_bar #alpha_value {
+  background-color: #555;
+  border-radius: 1px;
+  flex-basis: 100%;
+}
+.controls .alpha .alpha_bar:hover {
+  border-width: 2px;
+  margin: -1px;
+}
+.controls .alpha .alpha_bar:active #alpha_value {
+  background-color: #222;
+}
 
 .range {
   margin: 5px 0 10px;
 }
 
-.node-occurs-out, .edge-occurs-out {
+.node-occurs-out,
+.edge-occurs-out {
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -83,19 +111,38 @@ p.sub-cat {
   margin-bottom: 2px;
 }
 
-#nodeOccursInput .range-slider__thumb, #edgeOccursInput .range-slider__thumb {
+#nodeOccursInput .range-slider__thumb,
+#edgeOccursInput .range-slider__thumb {
   width: 15px;
   height: 15px;
 }
 
-.node-name, .node-count, .node-perc, .node-namespace, .edge-label, .edge-namespace {
- margin: 0 10px 0 10px;
+.node-name,
+.node-count,
+.node-perc,
+.node-namespace,
+.edge-label,
+.edge-namespace {
+  margin: 0 10px 0 10px;
 }
 
-.node-name, .edge-label {
- font-size: 25px;
- }
+.node-name,
+.edge-label {
+  font-size: 25px;
+}
 
-.node-count, .node-perc, .node-namespace, .edge-namespace {
- font-size: 14px;
+.node-count,
+.node-perc,
+.node-namespace,
+.edge-namespace {
+  font-size: 14px;
+}
+
+.controls .force p.cb {
+  margin-block-end: 0;
+}
+
+.controls .force p.cb label {
+  font-weight: normal;
+  font-size: 100%;
 }
