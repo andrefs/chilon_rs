@@ -1,0 +1,37 @@
+@base <http://a52c.github.com/chilon/ns-graph-summ/> .
+
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+<#Namespace>
+  a rdfs:Class ;
+  rdfs:label "a namespace" .
+
+<#UserNamespace>
+  a <#Namespace> ;
+  rdfs:label "a namespace defined by the user" .
+
+<#CommunityNamespace>
+  a <#Namespace> ; 
+  rdfs:label "a namespace defined by the community" .
+
+<#GraphFileNamespace>
+  a <#Namespace> ; 
+  rdfs:label "a namespace explicitly defined on the knowledge graph's files" .
+
+<#InferredNamespace> 
+  a <#Namespace> ;
+  rdfs:label "a namespace inferred by chilon_rs" .
+
+<#namespacePrefix>
+  a rdf:Property ;
+  rdfs:label "the IRI prefix of the namespace" .
+  rdfs:domain <#Namespace> .
+
+<#NamespaceLink> 
+  a rdfs:Class ;
+  rdfs:label "a normalized triple" .
+
+<#DataTypeLink> 
+  a rdfs:Class ;
+  rdfs:label "a normalized triple for a datatype edge" .
