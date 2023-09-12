@@ -22,16 +22,17 @@ Run `chilon_rs --help` to view available options.
 
 `chilon` has been validated by applying it to 11 RDF graphs, with sizes ranging from a few megabytes and less that 1 million triples, to over 90 gigabytes and thousands of millions of triples:
 
-* WordNet
-* KBpedia
-* LinkedMDB
-* OpenCyc
-* ClaimsKG
-* DBLP
-* CrunchBase
-* DBKwik
-* Yago
-* Wikidata
+ 1. ClaimsKG
+ 1. CrunchBase
+ 1. DbKwik
+ 1. DBLP
+ 1. DBpedia
+ 1. KBpedia
+ 1. LinkedMDB
+ 1. OpenCyc
+ 1. Wikidata
+ 1. WordNet
+ 1. Yago
 
 The resulting summaries and visualizations can be explored here: https://andrefs.github.io/chilon_rs
 
