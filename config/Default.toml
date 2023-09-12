@@ -1,0 +1,27 @@
+
+
+[infer]
+min_domain_occurs = 100
+max_ns = 5
+iri_max_length = 200
+min_ns_size = 1000
+iri_trie_size = 1_000_000
+#     2 MIN_DOMAIN_OCCURS
+#     4 MAX_NS
+#     3 IRI_MAX_LENGTH
+#     8 MIN_NS_SIZE
+#     3 IRI_TRIE_SIZE
+
+
+[community]
+url = "https://raw.githubusercontent.com/linkml/prefixmaps/main/src/prefixmaps/data/merged.csv"
+dir = "cache"
+path = "cache/prefixmap.json"
+#     4 PV_PATH
+#     2 PV_URL
+#     2 PV_DIR
+
+    
+[visulization]
+render_dir = "chilon-viz"
+#     5 RENDER_DIR
