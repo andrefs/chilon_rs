@@ -1,4 +1,4 @@
-#![feature(btree_drain_filter)]
+#![feature(btree_extract_if)]
 
 mod args;
 mod counter;

@@ -113,7 +113,7 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
         let mut found = false;
 
         match h
-            .drain_filter(|item| {
+            .extract_if(|item| {
                 if !found {
                     let suitable = item
                         .node
