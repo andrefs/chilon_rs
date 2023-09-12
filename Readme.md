@@ -6,11 +6,17 @@ Namespace-based summarization of RDF graphs.
 
 ## Installation
 
-TBD
+```
+cargo build --release
+```
 
 ## Running
 
-TBD
+```
+target/release/chilon_rs [OPTIONS] <RDF_FILE(S)>
+```
+
+Run `chilon_rs --help` to view available options.
 
 ## Validation
 
