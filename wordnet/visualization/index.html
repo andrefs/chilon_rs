@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8" />
+	<link rel="icon" type="image/svg+xml" href="/vite.svg" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Chilon-viz</title>
+	<script type="module" crossorigin src="./assets/index-e71b2812.js"></script>
+	<link rel="stylesheet" href="./assets/index-83dd3f0a.css">
+</head>
+
+<body marginwidth="0" marginheight="0">
+	<div id="app">
+		<div class="controls">
+			<div class="force alpha">
+				<p><label>Alpha</label> Simulation activity</p>
+				<div class="alpha_bar" onclick="updateAll();">
+					<div id="alpha_value"></div>
+				</div>
+			</div>
+
+			<div class="force">
+				<p><label>Filter</label> Reduce the number of nodes and/or edges displayed</p>
+				<div>
+					<p class="sub-cat">Node occurrences:</p>
+					<div class="node-occurs-out">
+						<div>
+							<span>min:</span>
+							<output id="minNodeOccurs"></output>
+						</div>
+						<div>
+							<span>max:</span>
+							<output id="maxNodeOccurs"></output>
+						</div>
+					</div>
+					<div class="range" id="nodeOccursInput"></div>
+				</div>
+				<div>
+					<p class="sub-cat">Predicate occurrences:</p>
+					<div class="edge-occurs-out">
+						<div>
+							<span>min:</span>
+							<output id="minEdgeOccurs"></output>
+						</div>
+						<div>
+							<span>max:</span>
+							<output id="maxEdgeOccurs"></output>
+						</div>
+					</div>
+					<div class="range" id="edgeOccursInput"></div>
+				</div>
+			</div>
+
+			<div class="force hide">
+				<p><label>Display</label> Show or hide specific node and edge types and other options
+				</p>
+				<div>
+					<label for="cb-logarithm"><input id="cb-logarithm" type="checkbox"> Logarithmic
+						node sizes</label>
+					<label for="cb-loops"><input id="cb-loops" type="checkbox" checked>
+						Loops</label>
+					<label for="cb-bau"><input id="cb-bau" type="checkbox" checked> Blank and
+						unknown</label>
+					<label for="cb-outer"><input id="cb-outer" type="checkbox" checked disabled>
+						Outer nodes</label>
+					<label for="cb-datatypes"><input id="cb-datatypes" type="checkbox" checked>
+						Datatype links</label>
+					<label for="cb-disconnected"><input id="cb-disconnected" type="checkbox"
+							checked> Disconnected nodes</label>
+				</div>
+			</div>
+
+			<div class="force hide">
+				<p><label>Legend</label></p>
+				<div>
+				</div>
+			</div>
+		</div>
+
+		<svg></svg>
+
+</body>
+
+</html>

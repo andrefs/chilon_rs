@@ -1,0 +1,96 @@
+@base <http://andrefs.com/graph-summ/v1> .
+@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
+@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+
+<#dcterms> <namespacePrefix> <http://purl.org/dc/terms/> .
+<#ili> <namespacePrefix> <http://ili.globalwordnet.org/ili/> .
+<#ontolex> <namespacePrefix> <http://www.w3.org/ns/lemon/ontolex#> .
+<#owl> <namespacePrefix> <http://www.w3.org/2002/07/owl#> .
+<#rdf> <namespacePrefix> <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<#rdfs> <namespacePrefix> <http://www.w3.org/2000/01/rdf-schema#> .
+<#wordn2> <namespacePrefix> <http://wordnet-rdf.princeton.edu/id/> .
+<#wordnet> <namespacePrefix> <http://wordnet-rdf.princeton.edu/ontology#> .
+<#wordnet-rdf> <namespacePrefix> <http://wordnet-rdf.princeton.edu/rdf/lemma/> .
+<#www> <namespacePrefix> <http://www.w3.org/ns/lemon/synsem#> .
+<#xsd> <namespacePrefix> <http://www.w3.org/TR/xmlschema11-2/> .
+
+<#t0001> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#DatatypeLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#BLANK> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#ontolex> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#rdf> ;
+	<#occurrences> "207272"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0002> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#DatatypeLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#BLANK> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#rdf> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0003> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#DatatypeLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#BLANK> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#rdfs> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#rdf> ;
+	<#occurrences> "98923"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0004> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#DatatypeLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#dcterms> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#xsd> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0005> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#owl> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#ili> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0006> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#ontolex> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0007> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#wordnet> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#BLANK> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0008> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#wordnet> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordn2> ;
+	<#occurrences> "285668"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0009> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordn2> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#wordnet> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordnet> ;
+	<#occurrences> "117791"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0010> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#ontolex> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#BLANK> ;
+	<#occurrences> "207272"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0011> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#ontolex> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordn2> ;
+	<#occurrences> "207272"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0012> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#ontolex> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordnet-rdf> ;
+	<#occurrences> "207272"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0013> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#ontolex> ;
+	<#occurrences> "366287"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0014> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#wordnet> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordnet> ;
+	<#occurrences> "159015"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0015> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#wordnet> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#wordnet-rdf> ;
+	<#occurrences> "92518"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<#t0016> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <#GroupsLink> , <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <#wordnet-rdf> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <#www> ;
+	<http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <#BLANK> ;
+	<#occurrences> "98923"^^<http://www.w3.org/2001/XMLSchema#integer> .
