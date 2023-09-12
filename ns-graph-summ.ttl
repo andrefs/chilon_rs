@@ -1,4 +1,4 @@
-@base <http://a52c.github.com/chilon/ns-graph-summ/> .
+@base <https://andrefs.github.io/chilon_rs/ns-graph-summ.ttl> .
 
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>

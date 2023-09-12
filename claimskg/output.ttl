@@ -1,6 +1,4 @@
-@base <http://andrefs.com/graph-summ/v1> .
-@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
-@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+@base <https://andrefs.github.io/chilon_rs/ns-graph-summ.ttl> .
 
 <#adms> <#namespacePrefix> <http://www.w3.org/ns/adms#> .
 <#africacheck> <#namespacePrefix> <https://africacheck.org/> .

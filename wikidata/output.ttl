@@ -1,6 +1,4 @@
-@base <http://andrefs.com/graph-summ/v1> .
-@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
-@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+@base <https://andrefs.github.io/chilon_rs/ns-graph-summ.ttl> .
 
 <#1> <#namespacePrefix> <https://1.api.artsmia.org/> .
 <#212> <#namespacePrefix> <http://212.122.187.196:84/> .

@@ -1,6 +1,4 @@
-@base <http://andrefs.com/graph-summ/v1> .
-@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
-@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+@base <https://andrefs.github.io/chilon_rs/ns-graph-summ.ttl> .
 
 <#164> <#namespacePrefix> <http://164.100.47.194/> .
 <#2009-2017> <#namespacePrefix> <https://2009-2017.state.gov/> .

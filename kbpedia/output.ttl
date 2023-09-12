@@ -1,6 +1,4 @@
-@base <http://andrefs.com/graph-summ/v1> .
-@prefix ngont: <http://andrefs.com/graph-summ/v1/ontology> .
-@prefix ngns: <http://andrefs.com/graph-summ/v1/instance> .
+@base <https://andrefs.github.io/chilon_rs/ns-graph-summ.ttl> .
 
 <#FRBR> <#namespacePrefix> <http://purl.org/vocab/frbr/core#> .
 <#bibo> <#namespacePrefix> <http://purl.org/ontology/bibo/> .
