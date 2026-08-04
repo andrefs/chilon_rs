@@ -461,28 +461,26 @@ fn proc_triple<E>(
     let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
 
     if ignore_unknown {
-        for res in vec![&subject, &predicate, &object] {
-            if let Err(_UnknownNamespaceError) = res {
-                return (iris, blanks, literals);
+        for res in [&subject, &predicate, &object] {
+            if let Err(e) = res {
+                error!("Skipping triple, unknown namespace: {e}");
             }
+        }
+        if subject.is_err() || predicate.is_err() || object.is_err() {
+            return (iris, blanks, literals);
         }
     }
 
     let mut unknown_ns = Vec::new();
 
-    if let Err(UnknownNamespaceError { iri: _ }) = subject {
-        if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-            unknown_ns.push(iri.to_string());
-        }
+    if let Err(e) = &subject {
+        unknown_ns.push(e.iri.clone());
     }
-    if let Err(UnknownNamespaceError { iri: _ }) = predicate {
-        unknown_ns.push(t.predicate.to_string());
+    if let Err(e) = &predicate {
+        unknown_ns.push(e.iri.clone());
     }
-
-    if let Err(UnknownNamespaceError { iri: _ }) = object {
-        if let Term::NamedNode(NamedNode { iri }) = t.object {
-            unknown_ns.push(iri.to_string());
-        }
+    if let Err(e) = &object {
+        unknown_ns.push(e.iri.clone());
     }
 
     if !unknown_ns.is_empty() {
@@ -542,6 +540,12 @@ fn handle_object(
 #[derive(Debug, Clone)]
 pub struct UnknownNamespaceError {
     iri: String,
+}
+
+impl std::fmt::Display for UnknownNamespaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown namespace for IRI {}", self.iri)
+    }
 }
 
 fn handle_named_node(

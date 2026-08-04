@@ -22,7 +22,6 @@ pub type PrefixVec = Vec<(String, String)>;
 
 #[derive(Deserialize)]
 struct Record {
-    context: String,
     prefix: String,
     namespace: String,
     status: String,
