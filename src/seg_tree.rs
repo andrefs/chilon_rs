@@ -110,28 +110,21 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
         //while h.len() < MAX_NS {
         added = false;
         let h_len = h.len();
-        let mut found = false;
 
-        match h
-            .extract_if(|item| {
-                if !found {
-                    let suitable = item
-                        .node
-                        .children
-                        .iter()
-                        .filter(|(_, n)| n.could_be_ns(MIN_NS_SIZE))
-                        .collect::<Vec<_>>();
-                    if !suitable.is_empty() && ((suitable.len() + h_len) <= MAX_NS) {
-                        found = true;
-                        return true;
-                    }
-                }
-                return false;
+        let parent = h
+            .iter()
+            .find(|item| {
+                let suitable = item
+                    .node
+                    .children
+                    .iter()
+                    .filter(|(_, n)| n.could_be_ns(MIN_NS_SIZE))
+                    .count();
+                suitable > 0 && (suitable + h_len) <= MAX_NS
             })
-            .collect::<Vec<_>>()
-            .first()
-            .cloned()
-        {
+            .cloned();
+
+        match parent {
             Some(parent) => {
                 h.remove(&parent);
                 expanded -= 1;
