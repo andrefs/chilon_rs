@@ -7,7 +7,7 @@ use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::{InsertFnVisitors, Node};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
@@ -74,7 +74,7 @@ pub fn build_iri_trie(
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
 
-    let mut total_triples = 0;
+    let _total_triples = 0;
 
     let mut tasks = BTreeMap::<String, Task>::new();
     let mut hk = InferHK::new();
@@ -170,7 +170,7 @@ fn handle_loop(
                     blanks,
                     literals,
                 } => {
-                    let mut t = tasks.get_mut(&path).unwrap();
+                    let t = tasks.get_mut(&path).unwrap();
                     t.triples = triples;
                     t.blanks = blanks;
                     t.iris = iris;

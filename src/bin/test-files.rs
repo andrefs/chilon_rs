@@ -3,7 +3,7 @@ use rio_api::parser::TriplesParser;
 use rio_turtle::TurtleError;
 
 use clap::Parser;
-use log::{debug, error, info};
+use log::{debug, info};
 use simplelog::*;
 use std::path::PathBuf;
 
