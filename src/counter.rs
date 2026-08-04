@@ -6,7 +6,7 @@ pub struct Counter {
 
 impl Counter {
     pub fn delta(&self) -> usize {
-        self.cur - self.prev
+        self.cur.saturating_sub(self.prev)
     }
 
     pub fn inc(&mut self) {

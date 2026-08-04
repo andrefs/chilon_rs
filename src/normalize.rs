@@ -406,7 +406,7 @@ fn proc_triples(
             let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
             error!("{}", msg);
             tx.send(Message::FatalError { err }).unwrap();
-            panic!("{}", msg);
+            return;
         }
     }
     tx.send(Message::Finished {

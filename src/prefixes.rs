@@ -339,21 +339,19 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             start = Instant::now();
         }
 
-        graph
-            .parse_step(&mut |t| {
-                let (blanks, literals, iris) = proc_triple(t, &tx);
-                iri_c += iris;
-                blank_c += blanks;
-                literal_c += literals;
+        if let Err(err) = graph.parse_step(&mut |t| {
+            let (blanks, literals, iris) = proc_triple(t, &tx);
+            iri_c += iris;
+            blank_c += blanks;
+            literal_c += literals;
 
-                Ok(())
-            })
-            .unwrap_or_else(|err| {
-                let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
-                error!("{}", msg);
-                tx.send(Message::FatalError { err }).unwrap();
-                panic!("{}", msg)
-            });
+            Ok(())
+        }) {
+            let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
+            error!("{}", msg);
+            tx.send(Message::FatalError { err }).unwrap();
+            return 0;
+        }
     }
 
     for (alias, namespace) in graph.prefixes().iter() {

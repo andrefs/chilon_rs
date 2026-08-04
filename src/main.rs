@@ -79,7 +79,10 @@ fn main() {
     info!("Loading community namespaces");
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
-    let n_workers = std::cmp::max(2, std::cmp::min(cli.files.len() + 1, num_cpus::get() - 2));
+    let n_workers = std::cmp::max(
+        2,
+        std::cmp::min(cli.files.len() + 1, num_cpus::get().saturating_sub(2)),
+    );
     let mut total_triples = 0;
 
     if cli.infer_ns {
