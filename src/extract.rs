@@ -62,7 +62,7 @@ pub fn extract(path: &PathBuf) -> (ReaderWrapper, &OsStr) {
     } else {
         debug!("extracting plain file {:?}", path);
         let stream = ReaderWrapper::Plain(buf_reader);
-        (stream, path.as_os_str())
+        (stream, file_stem.unwrap_or(path.as_os_str()))
     }
 }
 
@@ -74,25 +74,45 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_extract_plain_file() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
+    fn test_extract_plain() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.txt");
         let mut file = File::create(&file_path).unwrap();
-        writeln!(file, "test content").unwrap();
+        writeln!(file, "hello world").unwrap();
 
         let (reader, stem) = extract(&file_path);
-        assert_eq!(stem.as_encoded_bytes(), b"test");
-        // Verify it's a Plain variant by trying to read
-        // (would need to add a method to ReaderWrapper to inspect variant)
+        assert_eq!(stem, std::ffi::OsStr::new("test"));
+        assert!(matches!(reader, ReaderWrapper::Plain(_)));
     }
 
     #[test]
-    fn test_extract_gz_file() {
-        // Similar pattern for .gz files
+    fn test_extract_gz() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.txt.gz");
+        let mut file = File::create(&file_path).unwrap();
+        write!(file, "H4sIAAAAAAAAA0wtSgBAAPQBvVCEAAAA").unwrap();
+
+        let (reader, stem) = extract(&file_path);
+        assert_eq!(stem, std::ffi::OsStr::new("test.txt"));
+        assert!(matches!(reader, ReaderWrapper::Gz(_)));
     }
 
     #[test]
-    fn test_extract_bz2_file() {
-        // Similar pattern for .bz2 files
+    fn test_extract_bz2() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.txt.bz2");
+        let mut file = File::create(&file_path).unwrap();
+        write!(file, "QlpoOTFBWSZTWY/MlgAA/AFAgAKgRAAQ").unwrap();
+
+        let (reader, stem) = extract(&file_path);
+        assert_eq!(stem, std::ffi::OsStr::new("test.txt"));
+        assert!(matches!(reader, ReaderWrapper::Bz2(_)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Could not open file")]
+    fn test_extract_nonexistent() {
+        let nonexistent = std::path::PathBuf::from("/this/file/does/not/exist.txt");
+        extract(&nonexistent);
     }
 }
