@@ -466,3 +466,51 @@ fn normalize_iri(iri: &str) -> String {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_iri_unchanged() {
+        let iri = "https://example.com/short";
+        assert_eq!(normalize_iri(iri), iri);
+    }
+
+    #[test]
+    fn long_hierarchical_truncates_path() {
+        let iri = format!("https://example.com/{}", "a".repeat(250));
+        let res = normalize_iri(&iri);
+        assert_eq!(res.len(), 200);
+        assert!(res.starts_with("https://example.com"));
+    }
+
+    #[test]
+    fn userinfo_preserved() {
+        let iri = format!("http://user:pass@example.com/{}", "b".repeat(250));
+        let res = normalize_iri(&iri);
+        assert_eq!(res.len(), 200);
+        assert!(res.starts_with("http://user:pass@example.com"));
+    }
+
+    #[test]
+    fn non_hierarchical_falls_back_flat() {
+        let iri = format!("mailto:{}", "x".repeat(250));
+        let res = normalize_iri(&iri);
+        assert_eq!(res.len(), 200);
+    }
+
+    #[test]
+    fn unparseable_falls_back_flat() {
+        let iri = format!("http:// bad.com/{}", "c".repeat(250));
+        let res = normalize_iri(&iri);
+        assert_eq!(res.len(), 200);
+    }
+
+    #[test]
+    fn unicode_grapheme_safe() {
+        let iri = format!("https://example.com/{}", "é".repeat(250));
+        let res = normalize_iri(&iri);
+        assert_eq!(res.chars().count(), 200);
+    }
+}
