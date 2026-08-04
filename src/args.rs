@@ -12,10 +12,6 @@ pub struct Cli {
     #[arg(required = true, value_name = "RDF_FILE(S)")]
     pub files: Vec<PathBuf>,
 
-    ///// Sets a custom config file
-    //#[arg(short, long, value_name = "FILE")]
-    //pub config: Option<PathBuf>,
-    //
     /// Infer namespaces
     #[arg(long = "no-infer-ns", action = clap::ArgAction::SetFalse, default_value_t = true)]
     pub infer_ns: bool,

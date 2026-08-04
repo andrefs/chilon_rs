@@ -430,17 +430,48 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
     (blanks, literals, iris)
 }
 
-// TODO: improve IRI normalization
 fn normalize_iri(iri: &str) -> String {
     const IRI_MAX_LENGTH: usize = 200;
 
-    if iri.len() > IRI_MAX_LENGTH {
-        UnicodeSegmentation::graphemes(iri, true)
-            .map(|x| x.to_string())
-            .take(IRI_MAX_LENGTH)
-            .collect::<Vec<String>>()
-            .join("")
-    } else {
-        iri.to_string()
+    if iri.len() <= IRI_MAX_LENGTH {
+        return iri.to_string();
+    }
+
+    // Preserve scheme + authority; truncate only the path/query/fragment.
+    match Url::parse(iri) {
+        Ok(url) => {
+            let authority = match url.host_str() {
+                Some(host) => {
+                    let port = url.port().map_or_else(String::new, |p| format!(":{p}"));
+                    Some(format!("{}://{host}{port}", url.scheme()))
+                }
+                None => None,
+            };
+            match authority {
+                Some(prefix) => {
+                    if prefix.len() >= IRI_MAX_LENGTH {
+                        prefix[..IRI_MAX_LENGTH].to_string()
+                    } else {
+                        let budget = IRI_MAX_LENGTH - prefix.len();
+                        let rest = url.as_str();
+                        let truncated: String =
+                            UnicodeSegmentation::graphemes(&rest[prefix.len()..], true)
+                                .take(budget)
+                                .collect();
+                        format!("{prefix}{truncated}")
+                    }
+                }
+                None => UnicodeSegmentation::graphemes(iri, true)
+                    .take(IRI_MAX_LENGTH)
+                    .collect(),
+            }
+        }
+        Err(_) => {
+            // flat fallback for unparseable IRIs (previous behavior)
+            UnicodeSegmentation::graphemes(iri, true)
+                .map(String::from)
+                .take(IRI_MAX_LENGTH)
+                .collect()
+        }
     }
 }
