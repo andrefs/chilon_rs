@@ -1,7 +1,6 @@
 use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug};
 
 use crate::trie::Node;
-use itertools::Itertools;
 use log::{info, warn};
 
 // Represents occurrences as subject, predicate or object

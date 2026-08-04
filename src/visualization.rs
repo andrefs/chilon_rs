@@ -288,12 +288,12 @@ pub fn dump_json(data: &VisData, outf: &str) {
 }
 
 pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
-    let RENDER_DIR = Path::new(".").join("chilon-viz");
+    let render_dir = Path::new(".").join("chilon-viz");
     let tera = Tera::new("templates/**/*").unwrap();
     let mut ctx = Context::new();
     ctx.insert("data", &data);
 
-    let data_path = RENDER_DIR.join("src").join("data").join("raw-data.ts");
+    let data_path = render_dir.join("src").join("data").join("raw-data.ts");
 
     info!("Copying data to {}", data_path.to_string_lossy());
 
@@ -310,14 +310,14 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     let output = Command::new("sh")
         .arg("-c")
         .arg("yarn build-no-tsc")
-        .current_dir(RENDER_DIR.clone())
+        .current_dir(render_dir.clone())
         .output()
         .expect("Failed to execute vite build");
 
     io::stdout().write_all(&output.stdout).unwrap();
     io::stderr().write_all(&output.stderr).unwrap();
 
-    let src = RENDER_DIR.join("dist");
+    let src = render_dir.join("dist");
     let dst = Path::new(outf).join("dist");
     info!(
         "Copying {} to {}",
@@ -334,7 +334,7 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     }
     copy(src, outf, &Default::default()).unwrap();
 
-    return RENDER_DIR;
+    return render_dir;
 }
 
 pub fn vis_dev_server(dir: PathBuf) {

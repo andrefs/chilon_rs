@@ -66,8 +66,8 @@ impl SegTree {
     pub fn infer_namespaces(&self) -> (Vec<(String, usize, NamespaceSource)>, Vec<String>) {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
         let mut gbg_collected: Vec<String> = Vec::new();
-        let MIN_NS_SIZE = 1000;
-        let MIN_DOMAIN_OCCURS = 100;
+        const MIN_NS_SIZE: usize = 1000;
+        const MIN_DOMAIN_OCCURS: usize = 100;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
@@ -93,16 +93,16 @@ impl SegTree {
             .map(|ns| (ns.namespace.clone(), ns.size, NamespaceSource::Inference))
             .collect();
 
-        return (inferred, gbg_collected);
+        (inferred, gbg_collected)
     }
 
-    pub fn could_be_ns(&self, MIN_NS_SIZE: usize) -> bool {
-        self.value >= MIN_NS_SIZE
+    pub fn could_be_ns(&self, min_ns_size: usize) -> bool {
+        self.value >= min_ns_size
     }
 }
 
-fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize) {
-    let MAX_NS = 5;
+fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, min_ns_size: usize) {
+    const MAX_NS: usize = 5;
     let mut expanded = 0;
     let mut added = true;
 
@@ -118,7 +118,7 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
                     .node
                     .children
                     .iter()
-                    .filter(|(_, n)| n.could_be_ns(MIN_NS_SIZE))
+                    .filter(|(_, n)| n.could_be_ns(min_ns_size))
                     .count();
                 suitable > 0 && (suitable + h_len) <= MAX_NS
             })
@@ -130,7 +130,7 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
                 expanded -= 1;
 
                 for (seg, node) in parent.node.children {
-                    if node.could_be_ns(MIN_NS_SIZE) {
+                    if node.could_be_ns(min_ns_size) {
                         expanded += 1;
                         added = true;
                         h.insert(NamespaceCandidate {

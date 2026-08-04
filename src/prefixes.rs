@@ -214,7 +214,7 @@ fn maintenance(
     let mut res = None::<InferHKTask>;
 
     if let Some(size) = iri_trie.value {
-        let IRI_TRIE_SIZE = 1_000_000;
+        const IRI_TRIE_SIZE: usize = 1_000_000;
 
         if size.desc > IRI_TRIE_SIZE {
             let mut t = InferHKTask::new();
@@ -430,7 +430,7 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
 
 // TODO: improve IRI normalization
 fn normalize_iri(iri: &str) -> String {
-    let IRI_MAX_LENGTH = 200;
+    const IRI_MAX_LENGTH: usize = 200;
 
     if iri.len() > IRI_MAX_LENGTH {
         UnicodeSegmentation::graphemes(iri, true)

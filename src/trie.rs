@@ -343,19 +343,11 @@ pub struct InsertFnVisitors<'a, T: Debug + Clone> {
     pub node: Option<&'a dyn Fn(&mut Node<T>)>,
     pub terminal: Option<&'a dyn Fn(&mut Node<T>)>,
 }
-enum MatchType {
-    FullQuery,
-    FullPath,
-    Exact,
-    Loose,
-}
 
 struct LongestPrefOpts {
     must_be_terminal: bool,
     must_match_fully: bool,
 }
-
-type FindResults<'a, T> = Option<(&'a Node<T>, String)>;
 
 #[derive(Copy, Clone)]
 pub enum TraverseDirection {
