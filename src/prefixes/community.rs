@@ -139,3 +139,80 @@ fn fix_pv(pv: Vec<Record>) -> PrefixVec {
 //
 //    return false;
 //}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fix_pv_filters_non_canonical() {
+        let pv = vec![
+            Record {
+                prefix: "good".into(),
+                namespace: "http://good.org/".into(),
+                status: "canonical".into(),
+            },
+            Record {
+                prefix: "bad".into(),
+                namespace: "http://bad.org/".into(),
+                status: "deprecated".into(),
+            },
+        ];
+        let fixed = fix_pv(pv);
+        assert_eq!(fixed.len(), 1);
+        assert_eq!(fixed[0].0, "good");
+    }
+
+    #[test]
+    fn test_fix_pv_filters_walmart_amazon() {
+        let pv = vec![Record {
+            prefix: "walmart".into(),
+            namespace: "https://www.amazon.de/".into(),
+            status: "canonical".into(),
+        }];
+        let fixed = fix_pv(pv);
+        assert!(fixed.is_empty());
+    }
+
+    #[test]
+    fn test_fix_pv_filters_double_hash() {
+        let pv = vec![Record {
+            prefix: "bad".into(),
+            namespace: "http://example.org/#foo#bar".into(),
+            status: "canonical".into(),
+        }];
+        let fixed = fix_pv(pv);
+        assert!(fixed.is_empty());
+    }
+
+    #[test]
+    fn test_vec_to_trie_basic() {
+        let v = vec![("ex".into(), "http://example.org/".into())];
+        let trie = vec_to_trie(v, false);
+        let res = trie.longest_prefix("http://example.org/foo", true);
+        assert!(res.is_some());
+        if let Some((node, _)) = res {
+            assert_eq!(node.value.as_ref().unwrap().0, "ex");
+        }
+    }
+
+    #[test]
+    fn test_vec_to_trie_sort_by_length() {
+        let v = vec![
+            ("long".into(), "http://long.org/very/long/path/".into()),
+            ("short".into(), "http://s.org/".into()),
+        ];
+        let trie = vec_to_trie(v, false);
+        // Shorter namespace inserted first, but both are non-overlapping
+        let res = trie.longest_prefix("http://s.org/x", true);
+        assert!(res.is_some());
+        if let Some((node, _)) = res {
+            assert_eq!(node.value.as_ref().unwrap().0, "short");
+        }
+        let res2 = trie.longest_prefix("http://long.org/very/long/path/y", true);
+        assert!(res2.is_some());
+        if let Some((node, _)) = res2 {
+            assert_eq!(node.value.as_ref().unwrap().0, "long");
+        }
+    }
+}
