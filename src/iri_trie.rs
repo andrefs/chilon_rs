@@ -131,7 +131,7 @@ pub trait IriTrieExt {
     fn count(&self) -> usize;
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>);
+    fn remove_prefixes(&mut self, ns_vec: &[String]);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> Option<NodeStats>;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
 }
@@ -204,7 +204,7 @@ impl IriTrieExt for IriTrie {
         deleted
     }
 
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>) {
+    fn remove_prefixes(&mut self, ns_vec: &[std::string::String]) {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }

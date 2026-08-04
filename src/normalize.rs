@@ -363,7 +363,7 @@ fn proc_message(
 
 fn proc_triples(
     graph: &mut ParserWrapper,
-    path: &PathBuf,
+    path: &Path,
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
