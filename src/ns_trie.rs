@@ -205,3 +205,59 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
 
     Some(alias)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gen_alias_fresh_host() {
+        let url = Url::parse("http://www.example.com/x").unwrap();
+        assert_eq!(
+            gen_alias(url, &NamespaceMap::new()),
+            Some("www".to_string())
+        );
+    }
+
+    #[test]
+    fn gen_alias_same_url_conflict() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "www".to_string(),
+            (
+                "http://www.example.com/x".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://www.example.com/x").unwrap();
+        assert_eq!(gen_alias(url, &m), None);
+    }
+
+    #[test]
+    fn gen_alias_different_last_segment() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "www".to_string(),
+            (
+                "http://www.example.com/foo/bbb".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://www.example.com/foo/aaa").unwrap();
+        assert_eq!(gen_alias(url, &m), Some("wwwaaa".to_string()));
+    }
+
+    #[test]
+    fn gen_alias_different_tld() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "foo".to_string(),
+            (
+                "http://foo.example.org/".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://foo.example.com/").unwrap();
+        assert_eq!(gen_alias(url, &m), Some("fooorg".to_string()));
+    }
+}

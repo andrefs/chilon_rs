@@ -255,4 +255,49 @@ mod tests {
         assert!(v.contains("2"));
         assert!(v.contains("more"));
     }
+
+    #[test]
+    fn infer_namespaces_orders_by_size_then_children() {
+        fn leaf(value: usize) -> SegTree {
+            SegTree {
+                value,
+                children: BTreeMap::new(),
+            }
+        }
+
+        let mut root = SegTree {
+            value: 0,
+            children: BTreeMap::new(),
+        };
+
+        // value 1000, no children (order: smallest size first)
+        root.children.insert("http://a/".to_string(), leaf(1000));
+
+        // value 3000, 1 non-worthy child (children = 1)
+        let mut x = SegTree {
+            value: 3000,
+            children: BTreeMap::new(),
+        };
+        x.children.insert("x/".to_string(), leaf(500));
+        root.children.insert("http://x/".to_string(), x);
+
+        // value 3000, 3 non-worthy children (children = 3)
+        let mut y = SegTree {
+            value: 3000,
+            children: BTreeMap::new(),
+        };
+        y.children.insert("y1/".to_string(), leaf(500));
+        y.children.insert("y2/".to_string(), leaf(500));
+        y.children.insert("y3/".to_string(), leaf(500));
+        root.children.insert("http://y/".to_string(), y);
+
+        let (inferred, gbg) = root.infer_namespaces();
+
+        assert!(gbg.is_empty());
+        let ns: Vec<&str> = inferred.iter().map(|(n, _, _)| n.as_str()).collect();
+        // size ascending; on the 3000 tie, more children (y=3 > x=1) sorts first
+        assert_eq!(ns, vec!["http://a/", "http://y/", "http://x/"]);
+        assert_eq!(inferred[1].1, 3000);
+        assert_eq!(inferred[2].1, 3000);
+    }
 }
