@@ -1,5 +1,3 @@
-#![feature(btree_extract_if)]
-
 mod args;
 mod counter;
 mod extract;
@@ -21,10 +19,10 @@ use crate::prefixes::build_iri_trie;
 use crate::seg_tree::SegTree;
 use args::Cli;
 use chilon_rs::util::gen_file_name;
-use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
+use chilon_rs::visualization::{build_data, dump_json, render_vis};
 use chrono::Utc;
 use clap::Parser;
-use log::{info, warn};
+use log::info;
 use normalize::normalize_triples;
 use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use prefixes::community;
@@ -156,7 +154,7 @@ fn main() {
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
 
-    let render_dir = render_vis(&vis_data, outf);
+    let _render_dir = render_vis(&vis_data, outf);
 
     vis_t.finish("Finished generating visualization");
     meta.visualization = Some(vis_t);

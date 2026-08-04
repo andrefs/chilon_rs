@@ -2,7 +2,6 @@
 /Cargo.lock
 *.bz2
 cache
-output*.ttl
 all-prefixes*.json
 results/
 _*
@@ -10,3 +9,5 @@ tmp/*
 old/*
 *.dat
 flamegraph.svg
+benchmarks/*
+visualizations/*

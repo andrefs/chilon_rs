@@ -1,16 +1,7 @@
-use chilon_rs::{
-    util::gen_file_name,
-    visualization::{build_data, dump_json, render_vis, vis_dev_server},
-};
-use chrono::Utc;
-use log::{info, warn};
+use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
 
 use clap::Parser;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use simplelog::*;
 

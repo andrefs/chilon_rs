@@ -122,9 +122,9 @@ impl From<NormalizedResource> for String {
                 Some(_) => "rdf".into(),
             },
             NormalizedResource::TypedLiteral(TypedLit {
-                namespace,
+                namespace: _,
                 alias,
-                iri,
+                iri: _,
             }) => {
                 alias
                 //format!("{}:{}", alias, &iri[namespace.len()..])
@@ -172,7 +172,7 @@ pub fn normalize_triples(
         .build()
         .unwrap();
 
-    let mut trip_c = 0;
+    let _trip_c = 0;
 
     let mut tasks = BTreeMap::<String, Task>::new();
 
@@ -222,7 +222,7 @@ fn handle_loop(
     triples: &mut TripleFreq,
     used_groups: &mut Groups,
     tasks: &mut BTreeMap<String, Task>,
-    fd: &mut File,
+    _fd: &mut File,
     ignore_unknown: bool,
     total_triples: usize,
 ) {
@@ -255,7 +255,7 @@ fn handle_loop(
                     proc_message(subject, predicate, object, triples, used_groups);
                 }
                 Message::NamespacesUnknown { iris } => {
-                    for iri in iris.iter() {
+                    for _iri in iris.iter() {
                         //let msg = format!("Unknown namespace for resource '{iri}'");
                         //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
                     }
@@ -267,7 +267,7 @@ fn handle_loop(
                     blanks,
                     literals,
                 } => {
-                    let mut t = tasks.get_mut(&path).unwrap();
+                    let t = tasks.get_mut(&path).unwrap();
                     t.triples = triples;
                     t.iris = iris;
                     t.blanks = blanks;
@@ -462,7 +462,7 @@ fn proc_triple<E>(
 
     if ignore_unknown {
         for res in vec![&subject, &predicate, &object] {
-            if let Err(UnknownNamespaceError) = res {
+            if let Err(_UnknownNamespaceError) = res {
                 return (iris, blanks, literals);
             }
         }
@@ -550,7 +550,7 @@ fn handle_named_node(
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     let res = ns_trie.longest_prefix(n.iri, true);
     if let Some((node, ns)) = res {
-        if let Some((alias, source)) = &node.value {
+        if let Some((alias, _source)) = &node.value {
             return Ok(NormalizedResource::NamedNode(NNode {
                 alias: alias.clone(),
                 namespace: ns,
@@ -736,7 +736,7 @@ pub fn save_normalized_triples(
 
 pub fn format_groups(groups: Groups, formatter: &mut TurtleFormatter<File>) {
     if groups.blank {
-        let blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
+        let _blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
     }
 
     for group in groups.namespaces {
@@ -745,8 +745,8 @@ pub fn format_groups(groups: Groups, formatter: &mut TurtleFormatter<File>) {
 }
 
 pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
-    let unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
-    let ns = "http://andrefs.com/graph-summ/v1/ontology#Namespace";
+    let _unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
+    let _ns = "http://andrefs.com/graph-summ/v1/ontology#Namespace";
 
     formatter
         .format(&Triple {
@@ -845,7 +845,7 @@ mod tests {
     #[test]
     fn handle_literal_typed_unknown() {
         let dt_iri = "http://example.org/#my-datatype";
-        let alias = "mydt";
+        let _alias = "mydt";
 
         let dt = NamedNode { iri: dt_iri };
         let lit = Literal::Typed {

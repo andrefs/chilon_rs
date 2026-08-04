@@ -1,9 +1,9 @@
-use log::{debug, info, warn};
+use log::{info, warn};
 use oxigraph::{
-    io::GraphFormat,
-    model::{GraphName, NamedNode},
-    sparql::{EvaluationError, QueryResults, QuerySolution},
-    store::{StorageError, Store},
+    io::RdfFormat,
+    model::NamedNode,
+    sparql::{QueryEvaluationError, QueryResults, QuerySolution, SparqlEvaluator},
+    store::Store,
 };
 
 use fs_extra::dir::copy;
@@ -12,7 +12,7 @@ use rio_turtle::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
-    fs::{remove_dir_all, rename, File, OpenOptions},
+    fs::{remove_dir_all, File, OpenOptions},
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::Command,
@@ -71,8 +71,8 @@ pub fn build_data(outf: &str) -> VisData {
     let mut edges = HashMap::<(String, String), Vec<VisEdge>>::new();
     let mut aliases = HashMap::<String, String>::new();
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres1 {
-        let mut id_count = 0;
+    if let Ok(QueryResults::Solutions(sols)) = qres1 {
+        let _id_count = 0;
 
         for s in sols {
             if let Ok(sol) = s {
@@ -81,7 +81,7 @@ pub fn build_data(outf: &str) -> VisData {
         }
     }
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres2 {
+    if let Ok(QueryResults::Solutions(sols)) = qres2 {
         for s in sols {
             if let Ok(sol) = s {
                 proc_alias(sol, &mut aliases);
@@ -217,15 +217,11 @@ fn load_store(outf: &str) -> Store {
     let stream = BufReader::new(buf_reader);
 
     let store = Store::new().unwrap();
-
-    store
-        .bulk_loader()
-        .load_graph(stream, GraphFormat::Turtle, &GraphName::DefaultGraph, None)
-        .unwrap();
+    store.load_from_reader(RdfFormat::Turtle, stream).unwrap();
     store
 }
 
-fn query_norm_triples(store: Store) -> Result<QueryResults, EvaluationError> {
+fn query_norm_triples(store: Store) -> Result<QueryResults<'static>, QueryEvaluationError> {
     let q = r#"
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
@@ -241,11 +237,13 @@ fn query_norm_triples(store: Store) -> Result<QueryResults, EvaluationError> {
         ORDER BY DESC(?occurs)
         "#;
 
-    let qres = store.query(q);
-    return qres;
+    SparqlEvaluator::new()
+        .parse_query(q)?
+        .on_store(&store)
+        .execute()
 }
 
-fn query_aliases(store: Store) -> Result<QueryResults, EvaluationError> {
+fn query_aliases(store: Store) -> Result<QueryResults<'static>, QueryEvaluationError> {
     let q = r#"
         BASE <http://andrefs.com/graph-summ/v1>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
@@ -257,8 +255,10 @@ fn query_aliases(store: Store) -> Result<QueryResults, EvaluationError> {
         }
         "#;
 
-    let qres = store.query(q);
-    return qres;
+    SparqlEvaluator::new()
+        .parse_query(q)?
+        .on_store(&store)
+        .execute()
 }
 
 fn get_fragment(n: NamedNode) -> Option<String> {
@@ -339,7 +339,7 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
 
 pub fn vis_dev_server(dir: PathBuf) {
     info!("Opening dev env");
-    let output = Command::new("sh")
+    let _output = Command::new("sh")
         .arg("-c")
         .arg("yarn dev")
         .current_dir(dir)
