@@ -63,7 +63,7 @@ impl ParserWrapper {
 pub fn parse(path: &PathBuf) -> ParserWrapper {
     let (stream, file_stem) = extract(path);
     let path_stem = Path::new(file_stem);
-    let ext = path_stem.extension();
+    let ext = path_stem.extension().or_else(|| path.extension());
 
     if let Some(ext) = ext {
         if ext == "nt" {
@@ -83,4 +83,68 @@ pub fn parse(path: &PathBuf) -> ParserWrapper {
     }
     let parser = TurtleParser::new(stream, None);
     ParserWrapper::Turtle(parser)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn make_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
+        let path = dir.path().join(name);
+        let mut f = File::create(&path).unwrap();
+        write!(f, "{}", content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_parse_turtle() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.ttl",
+            "@prefix ex: <http://ex.org/> .\nex:s ex:p ex:o .\n",
+        );
+        let parser = parse(&path);
+        assert!(matches!(parser, ParserWrapper::Turtle(_)));
+    }
+
+    #[test]
+    fn test_parse_ntriples() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.nt",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
+        );
+        let parser = parse(&path);
+        assert!(matches!(parser, ParserWrapper::NTriples(_)));
+    }
+
+    #[test]
+    fn test_parse_nquads() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.nq",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> <http://ex.org/g> .\n",
+        );
+        let parser = parse(&path);
+        assert!(matches!(parser, ParserWrapper::NQuads(_)));
+    }
+
+    #[test]
+    fn test_parse_unknown_extension_defaults_to_turtle() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.xyz",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
+        );
+        let parser = parse(&path);
+        assert!(matches!(parser, ParserWrapper::Turtle(_)));
+    }
 }
