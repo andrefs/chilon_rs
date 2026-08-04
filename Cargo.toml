@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 rio_turtle = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
 rio_api = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
-bzip2 = "0.4.3"
+bzip2 = "0.6.1"
 clap = { version = "4.1", features = ["derive"] }
 num_cpus = "1.13.1"
 rayon = "1.6.0"
