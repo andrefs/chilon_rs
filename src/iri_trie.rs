@@ -204,7 +204,7 @@ impl IriTrieExt for IriTrie {
         deleted
     }
 
-    fn remove_prefixes(&mut self, ns_vec: &[std::string::String]) {
+    fn remove_prefixes(&mut self, ns_vec: &[String]) {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }

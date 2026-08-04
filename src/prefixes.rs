@@ -1,17 +1,20 @@
 pub mod community;
 
-use crate::counter::Counter;
-use crate::iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats};
 use crate::meta_info::{InferHK, InferHKTask, Task, TaskType};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::{InsertFnVisitors, Node};
+use crate::{
+    counter::Counter,
+    iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats},
+};
 use log::{debug, error, info, trace};
 use rio_api::model::{NamedNode, Subject, Term, Triple};
 use rio_turtle::TurtleError;
 use std::collections::BTreeMap;
 use std::fs::metadata;
+use std::path::Path;
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::Instant;
 use std::{path::PathBuf, sync::mpsc::sync_channel};
@@ -307,7 +310,7 @@ fn restart_timers(
     *start = Instant::now();
 }
 
-fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Message>) -> usize {
+fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>) -> usize {
     let tx = tx.clone();
 
     let tid = if let Some(id) = rayon::current_thread_index() {

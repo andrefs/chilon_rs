@@ -172,8 +172,6 @@ pub fn normalize_triples(
         .build()
         .unwrap();
 
-    let _trip_c = 0;
-
     let mut tasks = BTreeMap::<String, Task>::new();
 
     pool.scope_fifo(|s| {
