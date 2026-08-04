@@ -17,7 +17,7 @@ pub struct Cli {
     //pub config: Option<PathBuf>,
     //
     /// Infer namespaces
-    #[arg(short, long, default_value_t = true, action = clap::ArgAction::Set)]
+    #[arg(long = "no-infer-ns", action = clap::ArgAction::SetFalse, default_value_t = true)]
     pub infer_ns: bool,
 
     /// Ignore triples with unknown namespaces
