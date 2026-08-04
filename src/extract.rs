@@ -7,6 +7,7 @@ use std::io::{BufRead, Error};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
+#[allow(clippy::large_enum_variant)]
 pub enum ReaderWrapper {
     Plain(BufReader<File>),
     Gz(BufReader<GzDecoder<BufReader<File>>>),

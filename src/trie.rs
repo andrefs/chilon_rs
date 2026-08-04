@@ -96,9 +96,9 @@ impl<T: Debug + Clone> Node<T> {
         self.children.get_mut(&ch)
     }
 
-    pub fn insert<S: ?Sized>(&mut self, key: &S, value: T)
+    pub fn insert<S>(&mut self, key: &S, value: T)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.insert_fn(
             key,
@@ -110,9 +110,9 @@ impl<T: Debug + Clone> Node<T> {
         )
     }
 
-    pub fn insert_fn<S: ?Sized>(&mut self, key: &S, value: T, visitors: &InsertFnVisitors<T>)
+    pub fn insert_fn<S>(&mut self, key: &S, value: T, visitors: &InsertFnVisitors<T>)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         let k: &str = key.borrow();
 
@@ -150,9 +150,9 @@ impl<T: Debug + Clone> Node<T> {
         }
     }
 
-    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool) -> Option<T>
+    pub fn remove<S>(&mut self, key: &S, remove_subtree: bool) -> Option<T>
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.remove_fn(
             key,
@@ -160,26 +160,26 @@ impl<T: Debug + Clone> Node<T> {
             None::<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> u32>,
         )
     }
-    pub fn remove_fn<U, S: ?Sized>(
+    pub fn remove_fn<U, S>(
         &mut self,
         str_left: &S,
         remove_subtree: bool,
         cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
     ) -> Option<T>
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.remove_fn_aux(str_left, remove_subtree, cb).0
     }
 
-    pub fn remove_fn_aux<U, S: ?Sized>(
+    pub fn remove_fn_aux<U, S>(
         &mut self,
         str_left: &S,
         remove_subtree: bool,
         cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
     ) -> (Option<T>, bool)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         let sl: &str = str_left.borrow();
         let first_char = sl.chars().next().unwrap();
