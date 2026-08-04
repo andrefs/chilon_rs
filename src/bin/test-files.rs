@@ -46,7 +46,7 @@ fn main() {
             }
             graph
                 .parse_step(&mut |t| {
-                    println!("{}", t.to_string());
+                    println!("{}", t);
                     Ok(())
                 })
                 .unwrap_or_else(|err: TurtleError| {
