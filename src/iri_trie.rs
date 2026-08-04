@@ -143,14 +143,11 @@ impl IriTrieExt for IriTrie {
         str_acc: String,
         v: &mut Vec<(String, String)>,
     ) {
-        v.push((
-            str_acc.clone(),
-            if self.value.is_some() {
-                self.value.unwrap().desc.to_string()
-            } else {
-                "".to_string()
-            },
-        ));
+        let desc = match &self.value {
+            Some(val) => val.desc.to_string(),
+            None => "".to_string(),
+        };
+        v.push((str_acc.clone(), desc));
         if str_left.is_empty() {
             return;
         }

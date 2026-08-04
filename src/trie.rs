@@ -4,6 +4,8 @@ use std::{
     fmt::Debug,
 };
 
+type RemoveCb<'a, T, U> = Option<&'a dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T: Clone + Debug> {
     pub value: Option<T>,
@@ -41,14 +43,15 @@ impl<T: Debug + Clone> Node<T> {
                 res.push('·');
             }
             if print_value && node.value.is_some() {
-                res.push_str(
-                    format!(
-                        "{}{:?}",
-                        if node.is_terminal { " " } else { "  " },
-                        node.value.as_ref().unwrap()
-                    )
-                    .as_str(),
-                );
+                let value_str = match &node.value {
+                    Some(val) => format!("{:?}", val),
+                    None => String::new(),
+                };
+                res.push_str(&format!(
+                    "{}{}",
+                    if node.is_terminal { " " } else { "  " },
+                    value_str
+                ));
             }
 
             let child_new_line = (print_value && node.value.is_some())
@@ -164,7 +167,7 @@ impl<T: Debug + Clone> Node<T> {
         &mut self,
         str_left: &S,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
+        cb: RemoveCb<'_, T, U>,
     ) -> Option<T>
     where
         S: Borrow<str> + ?Sized,
@@ -176,7 +179,7 @@ impl<T: Debug + Clone> Node<T> {
         &mut self,
         str_left: &S,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
+        cb: RemoveCb<'_, T, U>,
     ) -> (Option<T>, bool)
     where
         S: Borrow<str> + ?Sized,

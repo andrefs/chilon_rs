@@ -1,31 +1,15 @@
-mod args;
-mod counter;
-mod extract;
-mod iri_trie;
-mod meta_info;
-mod normalize;
-mod ns_trie;
-mod parse;
-mod prefixes;
-mod seg_tree;
-mod trie;
-mod util;
-mod visualization;
-
-use crate::iri_trie::IriTrieExt;
-use crate::meta_info::{MetaInfo, MetaInfoNormalization, MetaInfoVisualization, StageTask};
-use crate::normalize::save_normalized_triples;
-use crate::prefixes::build_iri_trie;
-use crate::seg_tree::SegTree;
-use args::Cli;
+use chilon_rs::args::Cli;
+use chilon_rs::iri_trie::IriTrieExt;
+use chilon_rs::meta_info::{MetaInfo, MetaInfoInference, MetaInfoNormalization, MetaInfoVisualization, StageTask};
+use chilon_rs::normalize::{normalize_triples, save_normalized_triples};
+use chilon_rs::ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
+use chilon_rs::prefixes::{build_iri_trie, community};
+use chilon_rs::seg_tree::SegTree;
 use chilon_rs::util::gen_file_name;
 use chilon_rs::visualization::{build_data, dump_json, render_vis};
 use chrono::Utc;
 use clap::Parser;
 use log::info;
-use normalize::normalize_triples;
-use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
-use prefixes::community;
 use std::fs::{self, File};
 use std::path::Path;
 use std::process::Command;
@@ -88,7 +72,7 @@ fn main() {
     if cli.infer_ns {
         info!("Getting namespaces");
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
-        let mut infer_t = meta_info::MetaInfoInference::new();
+        let mut infer_t = MetaInfoInference::new();
         let (mut iri_trie, tasks, hk) =
             build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns);
 
