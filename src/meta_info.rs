@@ -2,7 +2,6 @@ use std::{
     collections::BTreeMap,
     fs::{metadata, File},
     io::Write,
-    ops::Add,
     path::PathBuf,
     time::{Duration, Instant},
 };
