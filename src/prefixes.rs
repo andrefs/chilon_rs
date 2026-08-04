@@ -114,6 +114,7 @@ pub fn build_iri_trie(
     (iri_trie, tasks, hk)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_loop(
     running: &mut usize,
     rx: Receiver<Message>,

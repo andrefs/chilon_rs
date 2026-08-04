@@ -340,6 +340,7 @@ impl<T: Debug + Clone> Node<T> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct InsertFnVisitors<'a, T: Debug + Clone> {
     pub node: Option<&'a dyn Fn(&mut Node<T>)>,
     pub terminal: Option<&'a dyn Fn(&mut Node<T>)>,

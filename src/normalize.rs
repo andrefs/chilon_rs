@@ -215,6 +215,7 @@ pub fn normalize_triples(
     (triples, used_groups, tasks)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_loop(
     running: &mut usize,
     rx: Receiver<Message>,
