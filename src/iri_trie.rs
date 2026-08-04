@@ -349,7 +349,7 @@ mod tests {
         trie.insert_fn("http://example.org/path3/a", Default::default(), &visitors);
         trie.insert_fn("http://example.org/path3/b", Default::default(), &visitors);
 
-        trie.remove_prefixes(&vec![
+        trie.remove_prefixes(&[
             "http://example.org/path1".to_string(),
             "http://example.org/path2".to_string(),
         ]);

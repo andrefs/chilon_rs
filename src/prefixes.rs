@@ -77,8 +77,6 @@ pub fn build_iri_trie(
     let mut iri_trie = IriTrie::new();
     let mut local_ns = BTreeMap::<String, String>::new();
 
-    let _total_triples = 0;
-
     let mut tasks = BTreeMap::<String, Task>::new();
     let mut hk = InferHK::new();
 
@@ -256,15 +254,15 @@ fn handle_pref_decls(
 ) {
     // message with local file prefix decls is only sent in the end
     // remove the prefix from iri trie and add to namespace trie
-    iri_trie.remove_prefixes(&local_ns.keys().cloned().collect());
+    iri_trie.remove_prefixes(&local_ns.keys().cloned().collect::<Vec<String>>());
 
     let ns_map = ns_trie.to_map();
     for (namespace, alias) in local_ns.iter() {
         let mut new_alias = alias.to_string();
         if new_alias.is_empty() {
             let url_obj = Url::parse(namespace.as_str());
-            if url_obj.is_ok() {
-                let alias_cand = gen_alias(url_obj.unwrap(), &ns_map);
+            if let Ok(url_obj1) = url_obj {
+                let alias_cand = gen_alias(url_obj1, &ns_map);
                 if alias_cand.is_some() {
                     new_alias = alias_cand.clone().unwrap();
                 }
