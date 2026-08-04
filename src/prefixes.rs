@@ -432,46 +432,39 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
 
 fn normalize_iri(iri: &str) -> String {
     const IRI_MAX_LENGTH: usize = 200;
-
     if iri.len() <= IRI_MAX_LENGTH {
         return iri.to_string();
     }
-
-    // Preserve scheme + authority; truncate only the path/query/fragment.
     match Url::parse(iri) {
+        Err(_) => UnicodeSegmentation::graphemes(iri, true)
+            .take(IRI_MAX_LENGTH)
+            .collect(),
         Ok(url) => {
-            let authority = match url.host_str() {
-                Some(host) => {
-                    let port = url.port().map_or_else(String::new, |p| format!(":{p}"));
-                    Some(format!("{}://{host}{port}", url.scheme()))
+            let rest = url.as_str();
+            if rest.starts_with(&format!("{}://", url.scheme())) {
+                let auth_start = url.scheme().len() + 3; // "://"
+                let remainder = &rest[auth_start..];
+                let auth_len = remainder
+                    .find(['/', '?', '#'])
+                    .map_or(remainder.len(), |i| i);
+                let prefix_len = auth_start + auth_len;
+                if prefix_len >= IRI_MAX_LENGTH {
+                    UnicodeSegmentation::graphemes(rest, true)
+                        .take(IRI_MAX_LENGTH)
+                        .collect()
+                } else {
+                    let budget = IRI_MAX_LENGTH - prefix_len;
+                    let tail: String = UnicodeSegmentation::graphemes(&rest[prefix_len..], true)
+                        .take(budget)
+                        .collect();
+                    format!("{}{}", &rest[..prefix_len], tail)
                 }
-                None => None,
-            };
-            match authority {
-                Some(prefix) => {
-                    if prefix.len() >= IRI_MAX_LENGTH {
-                        prefix[..IRI_MAX_LENGTH].to_string()
-                    } else {
-                        let budget = IRI_MAX_LENGTH - prefix.len();
-                        let rest = url.as_str();
-                        let truncated: String =
-                            UnicodeSegmentation::graphemes(&rest[prefix.len()..], true)
-                                .take(budget)
-                                .collect();
-                        format!("{prefix}{truncated}")
-                    }
-                }
-                None => UnicodeSegmentation::graphemes(iri, true)
+            } else {
+                // non-hierarchical (e.g. mailto:, data:) — flat fallback
+                UnicodeSegmentation::graphemes(rest, true)
                     .take(IRI_MAX_LENGTH)
-                    .collect(),
+                    .collect()
             }
-        }
-        Err(_) => {
-            // flat fallback for unparseable IRIs (previous behavior)
-            UnicodeSegmentation::graphemes(iri, true)
-                .map(String::from)
-                .take(IRI_MAX_LENGTH)
-                .collect()
         }
     }
 }
