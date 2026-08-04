@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
-    usize,
 };
 use url::Url;
 
@@ -14,7 +13,7 @@ pub struct SegTree {
 }
 
 impl SegTree {
-    fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
+    fn build_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
         if iri_trie.children.is_empty() {
             if !word_acc.is_empty() {
                 self.children.insert(
@@ -38,7 +37,7 @@ impl SegTree {
 
                 // this is not a URL or the kind we want
                 if url_obj.is_err() || !url_obj.unwrap().has_host() {
-                    self.from_aux(node, format!("{word_acc}{c}"), prev_str);
+                    self.build_aux(node, format!("{word_acc}{c}"), prev_str);
                     continue;
                 }
 
@@ -52,13 +51,13 @@ impl SegTree {
                 self.children
                     .entry(format!("{word_acc}{c}"))
                     .or_insert(sub_tree)
-                    .from_aux(
+                    .build_aux(
                         node,
                         "".to_string(),
                         format!("{prev_str}{word_acc}{c}").as_str(),
                     );
             } else {
-                self.from_aux(node, format!("{word_acc}{c}"), prev_str);
+                self.build_aux(node, format!("{word_acc}{c}"), prev_str);
             }
         }
     }
@@ -154,7 +153,7 @@ impl From<&IriTrie> for SegTree {
             children: BTreeMap::new(),
         };
 
-        res.from_aux(iri_trie, "".to_string(), "");
+        res.build_aux(iri_trie, "".to_string(), "");
 
         res
     }

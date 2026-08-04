@@ -50,7 +50,7 @@ impl SaveTrie for NamespaceTrie {
 pub trait InferredNamespaces {
     fn add_namespaces(
         &mut self,
-        inferred: &Vec<(String, usize, NamespaceSource)>,
+        inferred: &[(String, usize, NamespaceSource)],
         allow_subns: bool,
     ) -> Vec<String>;
 
@@ -70,7 +70,7 @@ impl InferredNamespaces for NamespaceTrie {
 
     fn add_namespaces(
         &mut self,
-        inferred: &Vec<(String, usize, NamespaceSource)>,
+        inferred: &[(String, usize, NamespaceSource)],
         allow_subns: bool,
     ) -> Vec<String> {
         let mut aliases = self.to_map();
@@ -183,15 +183,15 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     }
 
     // check if last segment is different
-    let segs = url_obj.path_segments();
-    let confl_segs = confl_url_obj.path_segments();
-    if segs.is_some() && confl_segs.is_some() {
-        let last_seg = segs.unwrap().next_back();
-        let confl_last_seg = confl_segs.unwrap().next_back();
-        if last_seg.is_some() && confl_last_seg.is_some() && last_seg != confl_last_seg {
-            let alias_seg = format!("{}{}", alias_abbrv, last_seg.unwrap());
-            if !aliases.contains_key(&alias_seg) {
-                return Some(alias_seg);
+    if let (Some(mut segs), Some(mut confl_segs)) =
+        (url_obj.path_segments(), confl_url_obj.path_segments())
+    {
+        if let (Some(last_seg), Some(confl_last_seg)) = (segs.next_back(), confl_segs.next_back()) {
+            if last_seg != confl_last_seg {
+                let alias_seg = format!("{}{}", alias_abbrv, last_seg);
+                if !aliases.contains_key(&alias_seg) {
+                    return Some(alias_seg);
+                }
             }
         }
     }

@@ -586,11 +586,10 @@ fn handle_literal(
         Literal::Typed { value: _, datatype } => {
             let res = ns_trie.longest_prefix(datatype.iri, true);
             if let Some((node, ns)) = res {
-                if node.value.is_some() {
-                    let (alias, _) = node.value.as_ref().unwrap().clone();
+                if let Some((alias, _)) = &node.value {
                     return Ok(NormalizedResource::TypedLiteral(TypedLit {
                         namespace: ns,
-                        alias,
+                        alias: alias.clone(),
                         iri: datatype.iri.into(),
                     }));
                 }
@@ -862,11 +861,7 @@ mod tests {
 
         assert!(res.is_err());
 
-        match res.unwrap_err() {
-            UnknownNamespaceError { iri } => {
-                assert_eq!(iri, dt_iri)
-            }
-            _ => panic!("Result should be an UnknownNamespaceError"),
-        }
+        let UnknownNamespaceError { iri } = res.unwrap_err();
+        assert_eq!(iri, dt_iri)
     }
 }

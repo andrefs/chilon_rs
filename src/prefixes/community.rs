@@ -37,14 +37,14 @@ pub fn download() {
     write(PV_PATH, serde_json::to_string_pretty(&fixed).unwrap()).unwrap();
 }
 
-fn parse<'a>(reader: impl Read) -> Vec<Record> {
+fn parse(reader: impl Read) -> Vec<Record> {
     csv::Reader::from_reader(reader)
         .into_deserialize()
         .filter_map(|res| res.unwrap())
         .collect()
 }
 
-fn vec_to_trie<'a>(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
+fn vec_to_trie(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
     let mut t = NamespaceTrie::new();
     for (alias, namespace) in v.into_iter().sorted_by(|(_, ns1), (_, ns2)| {
         let len1 = ns1.len();
@@ -60,9 +60,7 @@ fn vec_to_trie<'a>(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
     }) {
         let res = t.longest_prefix(namespace.as_str(), true);
         if let Some((node, ns)) = res {
-            if node.value.is_some() {
-                let (existing_alias, _) = node.value.as_ref().unwrap().clone();
-
+            if let Some((existing_alias, _)) = &node.value {
                 if namespace.eq(&ns) {
                     warn!("Namespace {namespace} (alias {alias}) is already in trie with alias {existing_alias}");
                     continue;
