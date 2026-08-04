@@ -32,13 +32,13 @@ impl SegTree {
         }
 
         for (c, node) in &iri_trie.children {
-            if ['/', '#'].contains(&c) {
+            if ['/', '#'].contains(c) {
                 let ns_cand = format!("{prev_str}{word_acc}{c}");
                 let url_obj = Url::parse(ns_cand.as_str());
 
                 // this is not a URL or the kind we want
                 if url_obj.is_err() || !url_obj.unwrap().has_host() {
-                    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                    self.from_aux(node, format!("{word_acc}{c}"), prev_str);
                     return;
                 }
 
@@ -53,12 +53,12 @@ impl SegTree {
                     .entry(format!("{word_acc}{c}"))
                     .or_insert(sub_tree)
                     .from_aux(
-                        &node,
+                        node,
                         "".to_string(),
                         format!("{prev_str}{word_acc}{c}").as_str(),
                     );
             } else {
-                self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                self.from_aux(node, format!("{word_acc}{c}"), prev_str);
             }
         }
     }
@@ -156,7 +156,7 @@ impl From<&IriTrie> for SegTree {
 
         res.from_aux(iri_trie, "".to_string(), "");
 
-        return res;
+        res
     }
 }
 
@@ -182,7 +182,7 @@ impl Ord for NamespaceCandidate {
         if self.children < other.size {
             return Ordering::Greater;
         }
-        return Ordering::Equal;
+        Ordering::Equal
     }
 }
 
@@ -219,9 +219,9 @@ impl<'a> Iterator for NodeIter<'a> {
         }
         let (s, n) = self.queue.pop_front().unwrap();
         for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{k}"), &v));
+            self.queue.push_front((k.to_string(), v));
         }
-        return Some((s, n));
+        Some((s, n))
     }
 }
 

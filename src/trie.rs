@@ -11,6 +11,12 @@ pub struct Node<T: Clone + Debug> {
     pub children: BTreeMap<char, Node<T>>,
 }
 
+impl<T: Debug + Clone> Default for Node<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Debug + Clone> Node<T> {
     pub fn pp(&self, print_value: bool) -> String {
         let mut res = "".to_string();
@@ -18,17 +24,15 @@ impl<T: Debug + Clone> Node<T> {
         let mut root_children = self.children.iter().collect::<Vec<_>>();
         root_children.sort_by(|(ch1, _), (ch2, _)| ch1.cmp(ch2));
 
-        let mut stack = Vec::from(
-            root_children
+        let mut stack = root_children
                 .iter()
                 .enumerate()
                 .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
                 .rev()
-                .collect::<Vec<_>>(),
-        );
+                .collect::<Vec<_>>();
 
-        while stack.len() > 0 {
-            let (ch, node, indent, new_line) = stack.pop().unwrap();
+        while let Some((ch, node, indent, new_line)) = stack.pop() {
+            
 
             if new_line {
                 res.push('\n');
@@ -77,22 +81,22 @@ impl<T: Debug + Clone> Node<T> {
     }
 
     pub fn count_nodes(&self) -> u32 {
-        return self
+        self
             .children
             .iter()
             .fold(self.children.len() as u32, |acc, (_, v)| {
                 acc + v.count_nodes()
-            });
+            })
     }
 
     pub fn count_terminals(&self) -> u32 {
-        return self.children.iter().fold(0, |acc, (_, v)| {
+        self.children.iter().fold(0, |acc, (_, v)| {
             acc + if v.is_terminal { 1 } else { 0 } + v.count_terminals()
-        });
+        })
     }
 
     pub fn get_mut(&mut self, ch: char) -> Option<&mut Node<T>> {
-        return self.children.get_mut(&ch);
+        self.children.get_mut(&ch)
     }
 
     pub fn insert<S: ?Sized>(&mut self, key: &S, value: T)
@@ -230,7 +234,7 @@ impl<T: Debug + Clone> Node<T> {
         if let Some(f) = cb {
             f(self, first_char, None);
         }
-        return (res.0, false);
+        (res.0, false)
     }
 
     pub fn contains_key(&self, s: &str) -> bool {
@@ -287,7 +291,7 @@ impl<T: Debug + Clone> Node<T> {
             }
 
             if cur_node.is_terminal {
-                last_term = Some((cur_node, format!("{str_acc}")));
+                last_term = Some((cur_node, str_acc.to_string()));
             }
 
             cur_node = next_node.unwrap();
@@ -376,12 +380,12 @@ impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
         }
         let (s, n) = self.queue.pop_front().unwrap();
         for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{s}{k}"), &v));
+            self.queue.push_front((format!("{s}{k}"), v));
         }
         if n.is_terminal {
             return Some((s, n));
         }
-        return self.next();
+        self.next()
     }
 }
 
@@ -516,10 +520,10 @@ mod tests {
         t.insert("a", 1);
 
         assert_eq!(t.value, None);
-        assert_eq!(t.is_terminal, false);
+        assert!(!t.is_terminal);
         let subt = t.children.get(&'a').unwrap();
         assert_eq!(subt.value, Some(1));
-        assert_eq!(subt.is_terminal, true);
+        assert!(subt.is_terminal);
     }
 
     #[test]

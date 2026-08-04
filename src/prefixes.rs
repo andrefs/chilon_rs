@@ -91,8 +91,8 @@ pub fn build_iri_trie(
                 .unwrap();
 
                 info!("Parsing {:?} ({}/{running})", path, index + 1);
-                let mut graph = parse(&path);
-                proc_triples(&mut graph, &path, &tx);
+                let mut graph = parse(path);
+                proc_triples(&mut graph, path, &tx);
             });
         }
 
@@ -110,7 +110,7 @@ pub fn build_iri_trie(
 
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
-    return (iri_trie, tasks, hk);
+    (iri_trie, tasks, hk)
 }
 
 fn handle_loop(
@@ -253,7 +253,7 @@ fn handle_pref_decls(
 ) {
     // message with local file prefix decls is only sent in the end
     // remove the prefix from iri trie and add to namespace trie
-    iri_trie.remove_prefixes(&local_ns.iter().map(|(ns, _)| ns.clone()).collect());
+    iri_trie.remove_prefixes(&local_ns.keys().cloned().collect());
 
     let ns_map = ns_trie.to_map();
     for (namespace, alias) in local_ns.iter() {

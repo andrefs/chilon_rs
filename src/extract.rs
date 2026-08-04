@@ -57,10 +57,10 @@ pub fn extract(path: &PathBuf) -> (ReaderWrapper, &OsStr) {
     if extension.is_some() && extension.unwrap() == "gz" {
         debug!("extracting gz file {:?}", path);
         let stream = ReaderWrapper::Gz(BufReader::new(GzDecoder::new(buf_reader)));
-        return (stream, file_stem.unwrap_or(path.as_os_str()));
+        (stream, file_stem.unwrap_or(path.as_os_str()))
     } else {
         debug!("extracting plain file {:?}", path);
         let stream = ReaderWrapper::Plain(buf_reader);
-        return (stream, path.as_os_str());
+        (stream, path.as_os_str())
     }
 }

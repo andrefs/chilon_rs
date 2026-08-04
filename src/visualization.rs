@@ -27,8 +27,8 @@ pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let buf_reader = BufReader::new(file);
     info!("extracting {:?}", path);
     let stream = BufReader::new(buf_reader);
-    let parser = TurtleParser::new(stream, None);
-    return parser;
+    
+    TurtleParser::new(stream, None)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,24 +74,18 @@ pub fn build_data(outf: &str) -> VisData {
     if let Ok(QueryResults::Solutions(sols)) = qres1 {
         let _id_count = 0;
 
-        for s in sols {
-            if let Ok(sol) = s {
-                proc_norm_triples(sol, &mut nodes, &mut edges);
-            }
+        for sol in sols.flatten() {
+            proc_norm_triples(sol, &mut nodes, &mut edges);
         }
     }
 
     if let Ok(QueryResults::Solutions(sols)) = qres2 {
-        for s in sols {
-            if let Ok(sol) = s {
-                proc_alias(sol, &mut aliases);
-            }
+        for sol in sols.flatten() {
+            proc_alias(sol, &mut aliases);
         }
     }
 
-    let mut sorted_edges = edges
-        .into_iter()
-        .map(|(_, v)| v)
+    let mut sorted_edges = edges.into_values()
         .flatten()
         .collect::<Vec<VisEdge>>();
 
@@ -100,13 +94,13 @@ pub fn build_data(outf: &str) -> VisData {
     let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
     sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
 
-    let data = VisData {
+    
+
+    VisData {
         edges: sorted_edges,
         nodes: sorted_nodes,
         aliases,
-    };
-
-    return data;
+    }
 }
 
 fn proc_alias(sol: QuerySolution, aliases: &mut HashMap<String, String>) {
@@ -187,7 +181,7 @@ fn proc_norm_triples(
             .count += occurs_val.parse::<usize>().unwrap();
 
         let key = sort_pair(src_name.clone(), tgt_name.clone());
-        let colliding = edges.entry(key.clone()).or_insert_with(|| Vec::new());
+        let colliding = edges.entry(key.clone()).or_default();
         let signal = if src_name == key.0 { 1 } else { -1 };
 
         colliding.push(VisEdge {
@@ -335,7 +329,7 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     }
     copy(src, outf, &Default::default()).unwrap();
 
-    return render_dir;
+    render_dir
 }
 
 pub fn vis_dev_server(dir: PathBuf) {

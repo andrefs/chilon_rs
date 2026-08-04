@@ -65,7 +65,7 @@ impl InferredNamespaces for NamespaceTrie {
                 trie.insert(alias, (ns, source));
             }
         }
-        return trie;
+        trie
     }
 
     fn add_namespaces(
@@ -131,14 +131,14 @@ impl InferredNamespaces for NamespaceTrie {
                 }
             })
             .collect::<Vec<String>>();
-        return res;
+        res
     }
 }
 
 pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     let mut domains = url_obj
         .host_str()
-        .unwrap_or_else(|| panic!("Url {} has no host str", url_obj.to_string()))
+        .unwrap_or_else(|| panic!("Url {} has no host str", url_obj))
         .split('.');
 
     let alias_cand = domains.next().unwrap_or_else(|| {
@@ -149,14 +149,14 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
             domains
         )
     });
-    let tld = domains.last();
+    let tld = domains.next_back();
 
     let mut alias = alias_cand.to_string();
     let alias_abbrv = alias.chars().take(5).collect::<String>();
 
     // check if already exists
     let conflict = aliases.get(&alias);
-    if let None = conflict {
+    if conflict.is_none() {
         return Some(alias);
     }
 
@@ -186,8 +186,8 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     let segs = url_obj.path_segments();
     let confl_segs = confl_url_obj.path_segments();
     if segs.is_some() && confl_segs.is_some() {
-        let last_seg = segs.unwrap().last();
-        let confl_last_seg = confl_segs.unwrap().last();
+        let last_seg = segs.unwrap().next_back();
+        let confl_last_seg = confl_segs.unwrap().next_back();
         if last_seg.is_some() && confl_last_seg.is_some() && last_seg != confl_last_seg {
             let alias_seg = format!("{}{}", alias_abbrv, last_seg.unwrap());
             if !aliases.contains_key(&alias_seg) {
@@ -203,5 +203,5 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
         count += 1;
     }
 
-    return Some(alias);
+    Some(alias)
 }

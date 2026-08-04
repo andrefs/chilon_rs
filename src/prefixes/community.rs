@@ -28,7 +28,7 @@ struct Record {
 }
 
 pub fn download() {
-    let res = ureq::get(&PV_URL).call().unwrap();
+    let res = ureq::get(PV_URL).call().unwrap();
     let reader = res.into_reader();
     let v = parse(reader);
     let fixed = fix_pv(v);
@@ -79,7 +79,7 @@ fn vec_to_trie<'a>(v: PrefixVec, allow_subns: bool) -> NamespaceTrie {
         }
         t.insert(&namespace, (alias.clone(), NamespaceSource::Community));
     }
-    return t;
+    t
 }
 
 pub fn load(allow_subns: bool) -> NamespaceTrie {
@@ -92,7 +92,7 @@ pub fn load(allow_subns: bool) -> NamespaceTrie {
     buf_reader.read_to_string(&mut s).unwrap();
 
     let map: PrefixVec = serde_json::from_str(s.as_str()).unwrap();
-    return vec_to_trie(map, allow_subns);
+    vec_to_trie(map, allow_subns)
 }
 
 fn fix_pv(pv: Vec<Record>) -> PrefixVec {
@@ -115,7 +115,7 @@ fn fix_pv(pv: Vec<Record>) -> PrefixVec {
                 return false;
             }
 
-            return true;
+            true
         })
         .map(|r| (r.prefix.to_owned(), r.namespace.to_owned()))
         .collect();

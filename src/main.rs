@@ -128,7 +128,7 @@ fn main() {
     let (nts, used_groups, tasks) = normalize_triples(
         cli.files.clone(),
         n_workers,
-        &mut ns_trie,
+        &ns_trie,
         cli.ignore_unknown,
         outf,
         total_triples,

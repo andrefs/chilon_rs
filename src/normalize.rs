@@ -46,11 +46,11 @@ impl TripleFreqFns for TripleFreq {
     }
 
     fn iter_all(&self) -> Vec<(String, String, String, bool, i32)> {
-        self.into_iter()
+        self.iter()
             .flat_map(|(s, m)| {
-                m.into_iter().flat_map(|(p, m)| {
-                    m.into_iter().flat_map(|(o, m)| {
-                        m.into_iter()
+                m.iter().flat_map(|(p, m)| {
+                    m.iter().flat_map(|(o, m)| {
+                        m.iter()
                             .map(|(d, count)| (s.clone(), p.clone(), o.clone(), *d, *count))
                     })
                 })
@@ -323,7 +323,7 @@ fn proc_message(
 ) {
     let mut is_datatype = false;
 
-    for resource in vec![subject.clone(), predicate.clone(), object.clone()] {
+    for resource in [subject.clone(), predicate.clone(), object.clone()] {
         match resource {
             NormalizedResource::Unknown => {
                 used_groups.unknown = true;
@@ -562,9 +562,9 @@ fn handle_named_node(
             //return Ok(node.value.as_ref().unwrap().clone());
         }
     }
-    return Err(UnknownNamespaceError {
+    Err(UnknownNamespaceError {
         iri: n.iri.to_string(),
-    });
+    })
 }
 
 fn handle_literal(
@@ -596,9 +596,9 @@ fn handle_literal(
                     }));
                 }
             }
-            return Err(UnknownNamespaceError {
+            Err(UnknownNamespaceError {
                 iri: datatype.iri.to_string(),
-            });
+            })
         }
     }
 }
@@ -625,7 +625,7 @@ pub fn save_normalized_triples(
     writeln!(fd, "@base <{}> .", { base }).unwrap();
     writeln!(fd, "@prefix ngont: <{}/ontology> .", base).unwrap(); // ontology (data-types?, unknown, blank, classes and predicates, etc)
     writeln!(fd, "@prefix ngns: <{}/instance> .", base).unwrap(); // namespaces (kgs, data types?)
-    writeln!(fd, "").unwrap();
+    writeln!(fd).unwrap();
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
@@ -634,7 +634,7 @@ pub fn save_normalized_triples(
     format_groups(used_groups, &mut formatter);
 
     fd = formatter.finish().unwrap();
-    writeln!(fd, "").unwrap();
+    writeln!(fd).unwrap();
 
     formatter = TurtleFormatter::new(fd);
     for (s, p, o, is_datatype, occurs) in nts.iter_all() {
@@ -761,8 +761,7 @@ pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
             .into(),
             predicate: NamedNode {
                 iri: "#namespacePrefix",
-            }
-            .into(),
+            },
             object: NamedNode {
                 iri: group.namespace.as_str(),
             }

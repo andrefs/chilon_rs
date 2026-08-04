@@ -119,6 +119,12 @@ pub struct InferHKTask {
     pub added_ns: usize,
 }
 
+impl Default for InferHK {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InferHK {
     pub fn add(&mut self, task: InferHKTask) {
         self.rounds += 1;
@@ -136,6 +142,12 @@ impl InferHK {
             added_ns: 0,
             inferred_ns: 0,
         }
+    }
+}
+
+impl Default for InferHKTask {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -194,6 +206,12 @@ pub struct MetaInfoVisualization {
     pub size: usize,
     #[serde(skip)]
     start: Instant,
+}
+
+impl Default for MetaInfoVisualization {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetaInfoVisualization {

@@ -14,6 +14,7 @@ pub struct Stats {
 
 // Each node keeps its own stats (if terminal) and its descendants stats
 #[derive(Debug, Clone, Copy)]
+#[derive(Default)]
 pub struct NodeStats {
     pub own: usize,
     pub desc: usize,
@@ -53,15 +54,6 @@ impl IriTrieStatsExt for IriTrie {
     }
 }
 
-impl Default for NodeStats {
-    fn default() -> Self {
-        NodeStats {
-            desc: 0,
-            own: 0,
-            uniq_desc: 0,
-        }
-    }
-}
 
 pub fn init_stats(n: &mut IriTrie) {
     let new_stats = NodeStats::new();
@@ -80,9 +72,7 @@ pub fn inc_own(node: &mut IriTrie) {
 
 pub fn update_stats(node: &mut IriTrie) {
     let (desc, uniq_desc) = node
-        .children
-        .iter()
-        .map(|(_, child)| {
+        .children.values().map(|child| {
             let child_stats = child.stats();
             let desc = child_stats.own + child_stats.desc;
             let uniq_desc = if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
@@ -127,13 +117,13 @@ impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
         let mut sorted_children = n.children.iter().collect::<Vec<_>>();
         sorted_children.sort_by(|(k1, _), (k2, _)| (**k1).cmp(*k2));
         for (k, v) in sorted_children.iter().rev() {
-            self.queue.push((format!("{s}{k}"), &v));
+            self.queue.push((format!("{s}{k}"), v));
         }
 
         if n.children.is_empty() {
             return Some((s, n));
         }
-        return self.next();
+        self.next()
     }
 }
 
@@ -172,7 +162,7 @@ impl IriTrieExt for IriTrie {
             panic!("Something is wrong: {str_left} has no char {first_char} ");
         }
 
-        let _node = self
+        self
             .children
             .get_mut(&first_char)
             .unwrap()
@@ -183,7 +173,7 @@ impl IriTrieExt for IriTrie {
         let stats = self.stats();
         let mut total = 0;
         total += stats.desc + stats.own;
-        return total;
+        total
     }
 
     fn remove_leaves(&mut self) -> bool {
@@ -212,7 +202,7 @@ impl IriTrieExt for IriTrie {
             let sub_node = self.get_mut(*ch).unwrap();
             sub_node.children = BTreeMap::new();
         }
-        return deleted;
+        deleted
     }
 
     fn remove_prefixes(&mut self, ns_vec: &Vec<String>) {
@@ -222,7 +212,7 @@ impl IriTrieExt for IriTrie {
         warn!(
             "IRIs with unknown namespaces: {} ({} occurrences).",
             self.count(),
-            self.value.unwrap_or(Default::default()).desc,
+            self.value.unwrap_or_default().desc,
         );
         let examples = self.iter_leaves().take(10).map(|x| x.0).collect::<Vec<_>>();
         // 1 example is the root node

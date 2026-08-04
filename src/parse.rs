@@ -24,10 +24,10 @@ pub enum ParserWrapper {
 impl TriplesParser for ParserWrapper {
     type Error = TurtleError;
     fn is_end(&self) -> bool {
-        match &self {
-            &ParserWrapper::NQuads(w) => w.parser.is_end(),
-            &ParserWrapper::NTriples(w) => w.parser.is_end(),
-            &ParserWrapper::Turtle(p) => p.is_end(),
+        match self {
+            ParserWrapper::NQuads(w) => w.parser.is_end(),
+            ParserWrapper::NTriples(w) => w.parser.is_end(),
+            ParserWrapper::Turtle(p) => p.is_end(),
         }
     }
 
@@ -61,7 +61,7 @@ impl ParserWrapper {
 }
 
 pub fn parse(path: &PathBuf) -> ParserWrapper {
-    let (stream, file_stem) = extract(&path);
+    let (stream, file_stem) = extract(path);
     let path_stem = Path::new(file_stem);
     let ext = path_stem.extension();
 
@@ -82,5 +82,5 @@ pub fn parse(path: &PathBuf) -> ParserWrapper {
         }
     }
     let parser = TurtleParser::new(stream, None);
-    return ParserWrapper::Turtle(parser);
+    ParserWrapper::Turtle(parser)
 }
