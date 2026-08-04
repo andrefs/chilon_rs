@@ -364,13 +364,13 @@ fn proc_triples(graph: &mut ParserWrapper, path: &PathBuf, tx: &SyncSender<Messa
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
         triples: trip_c as usize,
-        iris: iri_c as usize,
-        blanks: blank_c as usize,
-        literals: literal_c as usize,
+        iris: iri_c,
+        blanks: blank_c,
+        literals: literal_c,
     })
     .unwrap();
 
-    return trip_c as usize;
+    trip_c as usize
 }
 
 fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {

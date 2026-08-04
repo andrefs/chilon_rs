@@ -198,6 +198,7 @@ pub fn normalize_triples(
         let mut fd = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(errors_path.clone())
             .unwrap();
 
@@ -213,7 +214,7 @@ pub fn normalize_triples(
         );
     });
 
-    return (triples, used_groups, tasks);
+    (triples, used_groups, tasks)
 }
 
 fn handle_loop(
@@ -395,8 +396,7 @@ fn proc_triples(
             start = Instant::now();
         }
         let res = graph.parse_step(&mut |t| {
-            let (iris, blanks, literals) =
-                proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown);
+            let (iris, blanks, literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
             iri_c += iris;
             blank_c += blanks;
             literal_c += literals;
@@ -448,7 +448,7 @@ fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
     (iris, blanks, literals)
 }
 
-fn proc_triple<E>(
+fn proc_triple(
     t: Triple,
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
@@ -617,6 +617,7 @@ pub fn save_normalized_triples(
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(file_path.clone())
         .unwrap();
 

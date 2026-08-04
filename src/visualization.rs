@@ -281,6 +281,7 @@ pub fn dump_json(data: &VisData, outf: &str) {
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(file_path.clone())
         .unwrap();
 
