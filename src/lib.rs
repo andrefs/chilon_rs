@@ -1,5 +1,3 @@
-#![feature(btree_extract_if)]
-
 pub mod args;
 pub mod counter;
 pub mod extract;

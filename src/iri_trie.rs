@@ -1,8 +1,4 @@
-use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, VecDeque},
-    fmt::Debug,
-};
+use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug};
 
 use crate::trie::Node;
 use itertools::Itertools;
@@ -177,7 +173,7 @@ impl IriTrieExt for IriTrie {
             panic!("Something is wrong: {str_left} has no char {first_char} ");
         }
 
-        let node = self
+        let _node = self
             .children
             .get_mut(&first_char)
             .unwrap()
@@ -203,7 +199,7 @@ impl IriTrieExt for IriTrie {
         let mut to_remove = Vec::<char>::new();
 
         for (&ch, node) in self.children.iter_mut() {
-            let node_had_children = !node.children.is_empty();
+            let _node_had_children = !node.children.is_empty();
             let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
             if !child_deleted && ['/', '#'].contains(&ch) {
                 to_remove.push(ch);

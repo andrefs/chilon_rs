@@ -118,7 +118,7 @@ fn fix_pv(pv: Vec<Record>) -> PrefixVec {
 
             return true;
         })
-        .map(|r| ((r.prefix.to_owned(), r.namespace.to_owned())))
+        .map(|r| (r.prefix.to_owned(), r.namespace.to_owned()))
         .collect();
     fixed
 }

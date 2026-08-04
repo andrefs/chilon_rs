@@ -578,7 +578,7 @@ mod tests {
         assert_eq!(t.pp(false), "a·\n bcde·\n");
     }
 
-    fn upd_stats_visitor(node: &mut Node<usize>, ch: char, _: Option<&Node<usize>>) {
+    fn upd_stats_visitor(node: &mut Node<usize>, _ch: char, _: Option<&Node<usize>>) {
         let visitors = ins_vis();
         visitors.node.unwrap()(node);
     }
