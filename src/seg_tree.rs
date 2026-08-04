@@ -39,7 +39,7 @@ impl SegTree {
                 // this is not a URL or the kind we want
                 if url_obj.is_err() || !url_obj.unwrap().has_host() {
                     self.from_aux(node, format!("{word_acc}{c}"), prev_str);
-                    return;
+                    continue;
                 }
 
                 let sub_tree = SegTree {
@@ -176,10 +176,10 @@ impl Ord for NamespaceCandidate {
         if self.size > other.size {
             return Ordering::Greater;
         }
-        if self.children > other.size {
+        if self.children > other.children {
             return Ordering::Less;
         }
-        if self.children < other.size {
+        if self.children < other.children {
             return Ordering::Greater;
         }
         Ordering::Equal
