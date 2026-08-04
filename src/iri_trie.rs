@@ -13,8 +13,7 @@ pub struct Stats {
 }
 
 // Each node keeps its own stats (if terminal) and its descendants stats
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct NodeStats {
     pub own: usize,
     pub desc: usize,
@@ -54,7 +53,6 @@ impl IriTrieStatsExt for IriTrie {
     }
 }
 
-
 pub fn init_stats(n: &mut IriTrie) {
     let new_stats = NodeStats::new();
     n.value = Some(new_stats);
@@ -72,7 +70,9 @@ pub fn inc_own(node: &mut IriTrie) {
 
 pub fn update_stats(node: &mut IriTrie) {
     let (desc, uniq_desc) = node
-        .children.values().map(|child| {
+        .children
+        .values()
+        .map(|child| {
             let child_stats = child.stats();
             let desc = child_stats.own + child_stats.desc;
             let uniq_desc = if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
@@ -162,8 +162,7 @@ impl IriTrieExt for IriTrie {
             panic!("Something is wrong: {str_left} has no char {first_char} ");
         }
 
-        self
-            .children
+        self.children
             .get_mut(&first_char)
             .unwrap()
             .value_along_path(rest.to_string(), format!("{str_acc}{first_char}"), v);

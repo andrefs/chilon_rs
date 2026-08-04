@@ -27,7 +27,7 @@ pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
     let buf_reader = BufReader::new(file);
     info!("extracting {:?}", path);
     let stream = BufReader::new(buf_reader);
-    
+
     TurtleParser::new(stream, None)
 }
 
@@ -85,16 +85,12 @@ pub fn build_data(outf: &str) -> VisData {
         }
     }
 
-    let mut sorted_edges = edges.into_values()
-        .flatten()
-        .collect::<Vec<VisEdge>>();
+    let mut sorted_edges = edges.into_values().flatten().collect::<Vec<VisEdge>>();
 
     sorted_edges.sort_by(|a, b| b.count.cmp(&a.count));
 
     let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
     sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
-
-    
 
     VisData {
         edges: sorted_edges,

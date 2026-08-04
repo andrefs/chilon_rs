@@ -25,15 +25,13 @@ impl<T: Debug + Clone> Node<T> {
         root_children.sort_by(|(ch1, _), (ch2, _)| ch1.cmp(ch2));
 
         let mut stack = root_children
-                .iter()
-                .enumerate()
-                .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
-                .rev()
-                .collect::<Vec<_>>();
+            .iter()
+            .enumerate()
+            .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
+            .rev()
+            .collect::<Vec<_>>();
 
         while let Some((ch, node, indent, new_line)) = stack.pop() {
-            
-
             if new_line {
                 res.push('\n');
                 res.push_str(&" ".repeat(indent));
@@ -81,8 +79,7 @@ impl<T: Debug + Clone> Node<T> {
     }
 
     pub fn count_nodes(&self) -> u32 {
-        self
-            .children
+        self.children
             .iter()
             .fold(self.children.len() as u32, |acc, (_, v)| {
                 acc + v.count_nodes()
