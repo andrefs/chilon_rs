@@ -34,3 +34,43 @@ pub enum Commands {
         list: bool,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_parsing() {
+        let args = vec!["chilon_rs", "file1.ttl", "file2.ttl"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert_eq!(cli.files.len(), 2);
+        assert_eq!(cli.files[0], PathBuf::from("file1.ttl"));
+        assert_eq!(cli.files[1], PathBuf::from("file2.ttl"));
+        assert!(cli.infer_ns); // default true
+        assert!(!cli.ignore_unknown); // default false
+    }
+
+    #[test]
+    fn test_no_infer_ns_flag() {
+        let args = vec!["chilon_rs", "--no-infer-ns", "file.ttl"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert!(!cli.infer_ns);
+    }
+
+    #[test]
+    fn test_ignore_unknown_flag() {
+        let args = vec!["chilon_rs", "--ignore-unknown", "file.ttl"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert!(cli.ignore_unknown);
+    }
+
+    #[test]
+    fn test_subcommand_test() {
+        let args = vec!["chilon_rs", "test", "--list"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        match cli.commands {
+            Some(Commands::Test { list }) => assert!(list),
+            _ => panic!("Expected Test subcommand"),
+        }
+    }
+}

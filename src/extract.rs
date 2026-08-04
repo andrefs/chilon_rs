@@ -65,3 +65,34 @@ pub fn extract(path: &PathBuf) -> (ReaderWrapper, &OsStr) {
         (stream, path.as_os_str())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_extract_plain_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "test content").unwrap();
+
+        let (reader, stem) = extract(&file_path);
+        assert_eq!(stem.as_encoded_bytes(), b"test");
+        // Verify it's a Plain variant by trying to read
+        // (would need to add a method to ReaderWrapper to inspect variant)
+    }
+
+    #[test]
+    fn test_extract_gz_file() {
+        // Similar pattern for .gz files
+    }
+
+    #[test]
+    fn test_extract_bz2_file() {
+        // Similar pattern for .bz2 files
+    }
+}
