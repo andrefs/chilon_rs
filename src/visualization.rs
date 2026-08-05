@@ -340,3 +340,56 @@ pub fn vis_dev_server(dir: PathBuf) {
     //io::stdout().write_all(&output.stdout).unwrap();
     //io::stderr().write_all(&output.stderr).unwrap();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_pair_already_sorted() {
+        assert_eq!(sort_pair("a".into(), "b".into()), ("a".into(), "b".into()));
+    }
+
+    #[test]
+    fn sort_pair_reversed() {
+        assert_eq!(sort_pair("b".into(), "a".into()), ("a".into(), "b".into()));
+    }
+
+    #[test]
+    fn sort_pair_equal() {
+        assert_eq!(
+            sort_pair("same".into(), "same".into()),
+            ("same".into(), "same".into())
+        );
+    }
+
+    #[test]
+    fn dump_json_writes_file() {
+        let data = VisData {
+            nodes: vec![VisNode {
+                name: "ex".into(),
+                count: 42,
+                node_type: VisNodeType::Namespace,
+            }],
+            edges: vec![VisEdge {
+                source: "ex".into(),
+                target: "nt".into(),
+                count: 10,
+                label: "p".into(),
+                is_datatype: false,
+                link_num: 1,
+            }],
+            aliases: [("ex".into(), "http://ex.org/".into())].into(),
+        };
+        let dir = tempfile::TempDir::new().unwrap();
+        dump_json(&data, dir.path().to_str().unwrap());
+
+        let json_path = dir.path().join("vis-data.json");
+        assert!(json_path.exists());
+
+        let content = std::fs::read_to_string(json_path).unwrap();
+        assert!(content.contains("ex"));
+        assert!(content.contains("42"));
+        assert!(content.contains("http://ex.org/"));
+    }
+}
