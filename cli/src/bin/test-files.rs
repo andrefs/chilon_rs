@@ -1,5 +1,4 @@
 use chilon_rs::parse::parse;
-use oxttl::TurtleParseError;
 
 use clap::Parser;
 use log::{debug, info};
