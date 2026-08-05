@@ -29,7 +29,7 @@ struct Record {
 
 pub fn download() {
     let res = ureq::get(PV_URL).call().unwrap();
-    let reader = res.into_reader();
+    let reader = res.into_body().into_reader();
     let v = parse(reader);
     let fixed = fix_pv(v);
 
