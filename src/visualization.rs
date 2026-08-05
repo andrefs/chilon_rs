@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     fs::{remove_dir_all, File, OpenOptions},
-    io::{self, BufRead, BufReader},
+    io::{self, BufReader},
     path::PathBuf,
     process::Command,
 };

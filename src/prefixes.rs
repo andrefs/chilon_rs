@@ -10,7 +10,7 @@ use crate::{
     iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats},
 };
 use log::{debug, error, info, trace};
-use oxrdf::{NamedNode, NamedOrBlankNode, Term, Triple};
+use oxrdf::{NamedOrBlankNode, Term, Triple};
 use oxttl::TurtleParseError;
 use std::collections::BTreeMap;
 use std::fs::metadata;

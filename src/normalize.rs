@@ -5,7 +5,6 @@ use crate::{
     parse::{parse, ParserWrapper},
 };
 use log::{error, info, trace};
-use oxrdf::vocab::xsd;
 use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
 use oxttl::{TurtleParseError, TurtleSerializer};
 use rayon::ThreadPoolBuilder;
@@ -379,9 +378,9 @@ fn proc_triples(
     let mut last_i = 0;
     let mut start = Instant::now();
 
-    let mut iri_c = 0;
-    let mut blank_c = 0;
-    let mut literal_c = 0;
+    let iri_c = 0;
+    let blank_c = 0;
+    let literal_c = 0;
 
     while let Some(result) = graph.next() {
         i += 1;
@@ -411,7 +410,7 @@ fn proc_triples(
             }
         };
 
-        let (iris, blanks, literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
+        let (_iris, _blanks, _literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
     }
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
@@ -613,14 +612,25 @@ pub fn save_normalized_triples(
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-    let mut formatter = TurtleFormatter::new(fd);
-    // print namespace alias
-    format_groups(used_groups, &mut formatter);
+    let mut serializer = TurtleSerializer::new()
+        .with_prefix("ngont", format!("{base}/ontology"))
+        .unwrap()
+        .with_prefix("ngns", format!("{base}/instance"))
+        .unwrap()
+        .for_writer(&mut fd);
 
-    fd = formatter.finish().unwrap();
+    format_groups(used_groups, &mut serializer);
+
+    serializer.finish().unwrap();
     writeln!(fd).unwrap();
 
-    formatter = TurtleFormatter::new(fd);
+    let mut serializer = TurtleSerializer::new()
+        .with_prefix("ngont", format!("{base}/ontology"))
+        .unwrap()
+        .with_prefix("ngns", format!("{base}/instance"))
+        .unwrap()
+        .for_writer(&mut fd);
+
     for (s, p, o, is_datatype, occurs) in nts.iter_all() {
         if min_occurs.is_some() && occurs < min_occurs.unwrap() {
             continue;
@@ -629,129 +639,59 @@ pub fn save_normalized_triples(
         id_count += 1;
         let t_id = format!("#t{:0width$}", id_count, width = 4);
 
-        // declare groups link
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}type").as_str(),
-                },
-                object: NamedNode {
-                    iri: if is_datatype {
-                        "#DatatypeLink"
-                    } else {
-                        "#GroupsLink"
-                    },
-                }
-                .into(),
-            })
-            .unwrap();
+        let type_link = if is_datatype {
+            "#DatatypeLink"
+        } else {
+            "#GroupsLink"
+        };
 
-        // declare statement id
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}type").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("{rdf}Statement").as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
+        for (pred, obj) in [
+            (&format!("{rdf}type"), type_link),
+            (&format!("{rdf}type"), &format!("{rdf}Statement")),
+            (&format!("{rdf}subject"), &format!("#{s}")),
+            (&format!("{rdf}predicate"), &format!("#{p}")),
+            (&format!("{rdf}object"), &format!("#{o}")),
+        ] {
+            let t = Triple::new(
+                NamedNode::new_unchecked(&t_id),
+                NamedNode::new_unchecked(pred),
+                NamedNode::new_unchecked(obj),
+            );
+            serializer.serialize_triple(&t).unwrap();
+        }
 
-        // declare statement subject
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}subject").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", s).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare statement predicate
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}predicate").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", p).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare statement object
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}object").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", o).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare number of occurrences
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: "#occurrences",
-                },
-                object: oxrdf::Literal::new_typed_literal(
-                    occurs.to_string().as_str(),
-                    NamedNode {
-                        iri: "http://www.w3.org/2001/XMLSchema#integer",
-                    },
-                )
-                .into(),
-            })
-            .unwrap();
+        let t = Triple::new(
+            NamedNode::new_unchecked(&t_id),
+            NamedNode::new_unchecked("#occurrences"),
+            Literal::new_typed_literal(
+                occurs.to_string(),
+                NamedNode::new_unchecked("http://www.w3.org/2001/XMLSchema#integer"),
+            ),
+        );
+        serializer.serialize_triple(&t).unwrap();
     }
-    formatter.finish().unwrap();
+    serializer.finish().unwrap();
 }
 
-pub fn format_groups(groups: Groups, formatter: &mut TurtleFormatter<File>) {
-    if groups.blank {
-        let _blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
-    }
-
+pub fn format_groups(
+    groups: Groups,
+    serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
+) {
     for group in groups.namespaces {
-        format_group(group, formatter);
+        format_group(group, serializer);
     }
 }
 
-pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
-    let _unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
-    let _ns = "http://andrefs.com/graph-summ/v1/ontology#Namespace";
-
-    formatter
-        .format(&Triple {
-            subject: NamedNode {
-                iri: format!("#{}", group.alias).as_str(),
-            }
-            .into(),
-            predicate: NamedNode {
-                iri: "#namespacePrefix",
-            },
-            object: NamedNode {
-                iri: group.namespace.as_str(),
-            }
-            .into(),
-        })
-        .unwrap();
+pub fn format_group(
+    group: GroupNS,
+    serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
+) {
+    let t = Triple::new(
+        NamedNode::new_unchecked(&format!("#{}", group.alias)),
+        NamedNode::new_unchecked("#namespacePrefix"),
+        NamedNode::new_unchecked(&group.namespace),
+    );
+    serializer.serialize_triple(&t).unwrap();
 }
 
 #[cfg(test)]
