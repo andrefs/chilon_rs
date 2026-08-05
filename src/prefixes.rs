@@ -462,6 +462,8 @@ fn normalize_iri(iri: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use oxrdf::{BlankNode, Literal, NamedNode};
+
     use super::*;
 
     #[test]
@@ -509,17 +511,11 @@ mod tests {
 
     #[test]
     fn proc_triple_all_named() {
-        let t = Triple {
-            subject: Subject::NamedNode(NamedNode {
-                iri: "http://ex.org/s",
-            }),
-            predicate: NamedNode {
-                iri: "http://ex.org/p",
-            },
-            object: Term::NamedNode(NamedNode {
-                iri: "http://ex.org/o",
-            }),
-        };
+        let t = Triple::new(
+            NamedNode::new_unchecked("http://ex.org/s"),
+            NamedNode::new_unchecked("http://ex.org/p"),
+            NamedNode::new_unchecked("http://ex.org/o"),
+        );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
         let (blanks, literals, iris) = proc_triple(t, &tx);
         assert_eq!(iris, 3);
@@ -530,13 +526,11 @@ mod tests {
 
     #[test]
     fn proc_triple_blank_literal() {
-        let t = Triple {
-            subject: Subject::BlankNode(rio_api::model::BlankNode { id: "b1" }),
-            predicate: NamedNode {
-                iri: "http://ex.org/p",
-            },
-            object: Term::Literal(rio_api::model::Literal::Simple { value: "hello" }),
-        };
+        let t = Triple::new(
+            BlankNode::new_unchecked("b1"),
+            NamedNode::new_unchecked("http://ex.org/p"),
+            Literal::new_simple_literal("hello"),
+        );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
         let (blanks, literals, iris) = proc_triple(t, &tx);
         assert_eq!(iris, 1);
@@ -547,15 +541,11 @@ mod tests {
 
     #[test]
     fn proc_triple_named_blank_mixed() {
-        let t = Triple {
-            subject: Subject::NamedNode(NamedNode {
-                iri: "http://ex.org/s",
-            }),
-            predicate: NamedNode {
-                iri: "http://ex.org/p",
-            },
-            object: Term::BlankNode(rio_api::model::BlankNode { id: "b2" }),
-        };
+        let t = Triple::new(
+            NamedNode::new_unchecked("http://ex.org/s"),
+            NamedNode::new_unchecked("http://ex.org/p"),
+            oxrdf::BlankNode::new_unchecked("b2"),
+        );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
         let (blanks, literals, iris) = proc_triple(t, &tx);
         assert_eq!(iris, 2);

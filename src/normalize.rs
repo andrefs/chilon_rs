@@ -697,13 +697,15 @@ pub fn format_group(
 #[cfg(test)]
 mod tests {
 
+    use oxrdf::BlankNode;
+
     use crate::ns_trie::NamespaceSource;
 
     use super::*;
 
     #[test]
     fn handle_literal_simple() {
-        let lit = Literal::Simple { value: "my-lit" };
+        let lit = Literal::new_simple_literal("my-lit");
         let ns_trie = NamespaceTrie::new();
 
         let res = handle_literal(lit, &ns_trie);
@@ -720,10 +722,7 @@ mod tests {
 
     #[test]
     fn handle_literal_lts() {
-        let lit = Literal::LanguageTaggedString {
-            value: "my-lit",
-            language: "pt-PT",
-        };
+        let lit = Literal::new_language_tagged_literal("my-lit", "pt-PT").unwrap();
         let ns_trie = NamespaceTrie::new();
 
         let res = handle_literal(lit, &ns_trie);
@@ -744,11 +743,8 @@ mod tests {
         let ns = "http://example.org/";
         let alias = "example";
 
-        let dt = NamedNode { iri };
-        let lit = Literal::Typed {
-            value: "my-lit",
-            datatype: dt,
-        };
+        let dt = NamedNode::new_unchecked(iri);
+        let lit = Literal::new_typed_literal("my-lit", dt);
 
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert(ns, (alias.into(), NamespaceSource::User));
@@ -775,11 +771,8 @@ mod tests {
         let dt_iri = "http://example.org/#my-datatype";
         let _alias = "mydt";
 
-        let dt = NamedNode { iri: dt_iri };
-        let lit = Literal::Typed {
-            value: "my-lit",
-            datatype: dt,
-        };
+        let dt = NamedNode::new_unchecked(dt_iri);
+        let lit = Literal::new_typed_literal("my-lit", dt);
 
         let ns_trie = NamespaceTrie::new();
 
@@ -795,9 +788,7 @@ mod tests {
     fn handle_named_node_known() {
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
-        let nn = NamedNode {
-            iri: "http://ex.org/foo",
-        };
+        let nn = NamedNode::new_unchecked("http://ex.org/foo");
         let res = handle_named_node(nn, &ns_trie).unwrap();
         assert_eq!(
             res,
@@ -811,9 +802,7 @@ mod tests {
     #[test]
     fn handle_named_node_unknown() {
         let ns_trie = NamespaceTrie::new();
-        let nn = NamedNode {
-            iri: "http://unknown.org/foo",
-        };
+        let nn = NamedNode::new_unchecked("http://unknown.org/foo");
         let res = handle_named_node(nn, &ns_trie);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().iri, "http://unknown.org/foo");
@@ -822,7 +811,7 @@ mod tests {
     #[test]
     fn handle_subject_blank() {
         let ns_trie = NamespaceTrie::new();
-        let sub = Subject::BlankNode(rio_api::model::BlankNode { id: "b1" });
+        let sub = NamedOrBlankNode::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
         let res = handle_subject(sub, &ns_trie).unwrap();
         assert_eq!(res, NormalizedResource::BlankNode);
     }
@@ -831,9 +820,7 @@ mod tests {
     fn handle_subject_named() {
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
-        let sub = Subject::NamedNode(NamedNode {
-            iri: "http://ex.org/s",
-        });
+        let sub = NamedOrBlankNode::NamedNode(NamedNode::new_unchecked("http://ex.org/s"));
         let res = handle_subject(sub, &ns_trie).unwrap();
         assert_eq!(
             res,
@@ -847,7 +834,7 @@ mod tests {
     #[test]
     fn handle_object_blank() {
         let ns_trie = NamespaceTrie::new();
-        let obj = Term::BlankNode(rio_api::model::BlankNode { id: "b1" });
+        let obj = Term::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
         let res = handle_object(obj, &ns_trie).unwrap();
         assert_eq!(res, NormalizedResource::BlankNode);
     }
@@ -855,7 +842,7 @@ mod tests {
     #[test]
     fn handle_object_literal_simple() {
         let ns_trie = NamespaceTrie::new();
-        let obj = Term::Literal(Literal::Simple { value: "hello" });
+        let obj = Term::Literal(Literal::new_simple_literal("hello"));
         let res = handle_object(obj, &ns_trie).unwrap();
         assert_eq!(res, NormalizedResource::Literal(Lit { lang: None }));
     }
@@ -864,17 +851,11 @@ mod tests {
     fn proc_triple_all_known() {
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
-        let triple = Triple {
-            subject: Subject::NamedNode(NamedNode {
-                iri: "http://ex.org/s",
-            }),
-            predicate: NamedNode {
-                iri: "http://ex.org/p",
-            },
-            object: Term::NamedNode(NamedNode {
-                iri: "http://ex.org/o",
-            }),
-        };
+        let triple = Triple::new(
+            NamedNode::new_unchecked("http://ex.org/s"),
+            NamedNode::new_unchecked("http://ex.org/p"),
+            NamedNode::new_unchecked("http://ex.org/o"),
+        );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
         let (iris, blanks, literals) = proc_triple(triple, &tx, &ns_trie, false);
 
@@ -917,12 +898,8 @@ mod tests {
 
     #[test]
     fn count_resources_all_iris() {
-        let sub = Subject::NamedNode(NamedNode {
-            iri: "http://ex.org/s",
-        });
-        let obj = Term::NamedNode(NamedNode {
-            iri: "http://ex.org/o",
-        });
+        let sub = NamedNode::new_unchecked("http://ex.org/s");
+        let obj = NamedNode::new_unchecked("http://ex.org/o");
         let (iris, blanks, literals) = count_resources(&sub, &obj);
         assert_eq!(iris, 3); // subject + predicate + object
         assert_eq!(blanks, 0);
@@ -931,8 +908,8 @@ mod tests {
 
     #[test]
     fn count_resources_blank_literal() {
-        let sub = Subject::BlankNode(rio_api::model::BlankNode { id: "b1" });
-        let obj = Term::Literal(rio_api::model::Literal::Simple { value: "hello" });
+        let sub = BlankNode::new_unchecked("b1");
+        let obj = Literal::new_simple_literal("hello");
         let (iris, blanks, literals) = count_resources(&sub, &obj);
         assert_eq!(iris, 1); // predicate only
         assert_eq!(blanks, 1);
