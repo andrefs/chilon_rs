@@ -287,8 +287,12 @@ fn restart_timers(
     ns_trie_count_t: u32,
 ) {
     let elapsed = start.elapsed().as_millis();
-    let msg_rate = (res_c.delta() as u128).checked_div(elapsed).map(|r| r * 1000);
-    let trip_rate = (trip_c.delta() as u128).checked_div(elapsed).map(|r| r * 1000);
+    let msg_rate = (res_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
+    let trip_rate = (trip_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
     if msg_rate.is_some() || trip_rate.is_some() {
         trace!(
             "Received {} resources ({}/s), {} triples ({}/s) so far",
@@ -331,7 +335,9 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
         trip_c += 1;
         if trip_c % 1_000_000 == 1 {
             let elapsed = start.elapsed().as_millis();
-            let rate = ((trip_c - last_trip_c) as u128).checked_div(elapsed).map(|r| r * 1000);
+            let rate = ((trip_c - last_trip_c) as u128)
+                .checked_div(elapsed)
+                .map(|r| r * 1000);
             if rate.is_some() {
                 trace!(
                     "[Thread#{tid}] Parsed {trip_c} triples so far ({} triples/s)",
@@ -572,5 +578,26 @@ mod tests {
         assert_eq!(blanks, 1);
         assert_eq!(literals, 0);
         assert_eq!(rx.try_iter().count(), 2);
+    }
+
+    #[test]
+    fn insert_resource_adds_when_no_namespace() {
+        let ns_trie = NamespaceTrie::new();
+        let mut iri_trie = IriTrie::new();
+        let iri = "http://unknown.org/resource".into();
+        insert_resource(&ns_trie, iri, &mut iri_trie);
+        let res = iri_trie.longest_prefix("http://unknown.org/resource", true);
+        assert!(res.is_some());
+    }
+
+    #[test]
+    fn insert_resource_skips_when_namespace_exists() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://known.org/", ("known".into(), NamespaceSource::User));
+        let mut iri_trie = IriTrie::new();
+        let iri = "http://known.org/resource".into();
+        insert_resource(&ns_trie, iri, &mut iri_trie);
+        let res = iri_trie.longest_prefix("http://known.org/resource", true);
+        assert!(res.is_none()); // should NOT be inserted
     }
 }

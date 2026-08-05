@@ -391,7 +391,9 @@ fn proc_triples(
 
         if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
             let elapsed = start.elapsed().as_millis();
-            let rate = ((i - last_i) as u128).checked_div(elapsed).map(|r| r * 1000);
+            let rate = ((i - last_i) as u128)
+                .checked_div(elapsed)
+                .map(|r| r * 1000);
             if rate.is_some() {
                 trace!(
                     "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
@@ -994,5 +996,102 @@ mod tests {
             }
             _ => panic!("Expected NormalizedTriple"),
         }
+    }
+
+    #[test]
+    fn count_resources_all_iris() {
+        let sub = Subject::NamedNode(NamedNode {
+            iri: "http://ex.org/s",
+        });
+        let obj = Term::NamedNode(NamedNode {
+            iri: "http://ex.org/o",
+        });
+        let (iris, blanks, literals) = count_resources(&sub, &obj);
+        assert_eq!(iris, 3); // subject + predicate + object
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+    }
+
+    #[test]
+    fn count_resources_blank_literal() {
+        let sub = Subject::BlankNode(rio_api::model::BlankNode { id: "b1" });
+        let obj = Term::Literal(rio_api::model::Literal::Simple { value: "hello" });
+        let (iris, blanks, literals) = count_resources(&sub, &obj);
+        assert_eq!(iris, 1); // predicate only
+        assert_eq!(blanks, 1);
+        assert_eq!(literals, 1);
+    }
+
+    #[test]
+    fn proc_message_all_named() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.namespaces.contains(&GroupNS {
+            alias: "ex".into(),
+            namespace: "http://ex.org/".into()
+        }));
+        assert!(!groups.unknown);
+        assert!(!groups.blank);
+    }
+
+    #[test]
+    fn proc_message_unknown() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::Unknown,
+            NormalizedResource::Unknown,
+            NormalizedResource::Unknown,
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.unknown);
+    }
+
+    #[test]
+    fn proc_message_blank() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::BlankNode,
+            NormalizedResource::BlankNode,
+            NormalizedResource::BlankNode,
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.blank);
+    }
+
+    #[test]
+    fn proc_message_literal_simple() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::Literal(Lit { lang: None }),
+            NormalizedResource::Literal(Lit { lang: None }),
+            NormalizedResource::Literal(Lit { lang: None }),
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.namespaces.contains(&GroupNS {
+            alias: "xsd".into(),
+            namespace: "http://www.w3.org/TR/xmlschema11-2/".into()
+        }));
     }
 }
