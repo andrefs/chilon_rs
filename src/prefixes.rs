@@ -287,13 +287,15 @@ fn restart_timers(
     ns_trie_count_t: u32,
 ) {
     let elapsed = start.elapsed().as_millis();
-    if elapsed != 0 {
+    let msg_rate = (res_c.delta() as u128).checked_div(elapsed).map(|r| r * 1000);
+    let trip_rate = (trip_c.delta() as u128).checked_div(elapsed).map(|r| r * 1000);
+    if msg_rate.is_some() || trip_rate.is_some() {
         trace!(
             "Received {} resources ({}/s), {} triples ({}/s) so far",
             res_c.cur,
-            (res_c.delta() as u128 / elapsed) * 1000,
+            msg_rate.unwrap_or(0),
             trip_c.cur,
-            (trip_c.delta() as u128 / elapsed) * 1000,
+            trip_rate.unwrap_or(0),
         );
         trace!(
             "iri trie size: {} ({} nodes), ns_trie size: {}, total seconds elapsed: {}s)",
@@ -329,10 +331,11 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
         trip_c += 1;
         if trip_c % 1_000_000 == 1 {
             let elapsed = start.elapsed().as_millis();
-            if elapsed != 0 {
+            let rate = ((trip_c - last_trip_c) as u128).checked_div(elapsed).map(|r| r * 1000);
+            if rate.is_some() {
                 trace!(
                     "[Thread#{tid}] Parsed {trip_c} triples so far ({} triples/s)",
-                    ((trip_c - last_trip_c) / elapsed) * 1000
+                    rate.unwrap_or(0)
                 );
             }
             last_trip_c = trip_c;

@@ -24,7 +24,7 @@ impl<T: Debug + Clone> Node<T> {
         let mut res = "".to_string();
 
         let mut root_children = self.children.iter().collect::<Vec<_>>();
-        root_children.sort_by(|(ch1, _), (ch2, _)| ch1.cmp(ch2));
+        root_children.sort_by_key(|(ch1, _)| *ch1);
 
         let mut stack = root_children
             .iter()

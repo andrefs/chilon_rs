@@ -87,10 +87,10 @@ pub fn build_data(outf: &str) -> VisData {
 
     let mut sorted_edges = edges.into_values().flatten().collect::<Vec<VisEdge>>();
 
-    sorted_edges.sort_by(|a, b| b.count.cmp(&a.count));
+    sorted_edges.sort_by_key(|b| std::cmp::Reverse(b.count));
 
     let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
-    sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
+    sorted_nodes.sort_by_key(|b| std::cmp::Reverse(b.count));
 
     VisData {
         edges: sorted_edges,

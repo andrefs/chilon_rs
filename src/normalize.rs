@@ -293,13 +293,19 @@ fn restart_timers(
     total_triples: usize,
 ) {
     let elapsed = start.elapsed().as_millis();
-    if elapsed != 0 {
+    let msg_rate = (msg_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
+    let trip_rate = (trip_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
+    if msg_rate.is_some() || trip_rate.is_some() {
         trace!(
             "Received {} messages ({}/s), {} triples ({}/s) so far{})",
             msg_c.cur,
-            (msg_c.delta() as u128 / elapsed) * 1000,
+            msg_rate.unwrap_or(0),
             trip_c.cur,
-            (trip_c.delta() as u128 / elapsed) * 1000,
+            trip_rate.unwrap_or(0),
             if !ignore_unknown && total_triples > 0 {
                 format!(" ({}%)", trip_c.cur * 100 / total_triples)
             } else {
@@ -385,10 +391,11 @@ fn proc_triples(
 
         if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
             let elapsed = start.elapsed().as_millis();
-            if elapsed != 0 {
+            let rate = ((i - last_i) as u128).checked_div(elapsed).map(|r| r * 1000);
+            if rate.is_some() {
                 trace!(
                     "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                    ((i - last_i) / elapsed) * 1000
+                    rate.unwrap_or(0)
                 );
             }
             last_i = i;
