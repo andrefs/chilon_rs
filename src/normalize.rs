@@ -5,13 +5,10 @@ use crate::{
     parse::{parse, ParserWrapper},
 };
 use log::{error, info, trace};
+use oxrdf::vocab::xsd;
+use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
+use oxttl::{TurtleParseError, TurtleSerializer};
 use rayon::ThreadPoolBuilder;
-use rio_api::{
-    formatter::TriplesFormatter,
-    model::{Literal, NamedNode, Subject, Term, Triple},
-    parser::TriplesParser,
-};
-use rio_turtle::{TurtleError, TurtleFormatter};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{metadata, File, OpenOptions},
@@ -80,7 +77,7 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
-        err: TurtleError,
+        err: TurtleParseError,
     },
 }
 
@@ -386,7 +383,7 @@ fn proc_triples(
     let mut blank_c = 0;
     let mut literal_c = 0;
 
-    while !graph.is_end() {
+    while let Some(result) = graph.next() {
         i += 1;
 
         if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
@@ -403,20 +400,18 @@ fn proc_triples(
             last_i = i;
             start = Instant::now();
         }
-        let res = graph.parse_step(&mut |t| {
-            let (iris, blanks, literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
-            iri_c += iris;
-            blank_c += blanks;
-            literal_c += literals;
-            Ok(())
-        });
 
-        if let Err(err) = res {
-            let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
-            error!("{}", msg);
-            tx.send(Message::FatalError { err }).unwrap();
-            return;
-        }
+        let t = match result {
+            Ok(t) => t,
+            Err(err) => {
+                let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
+                error!("{}", msg);
+                tx.send(Message::FatalError { err }).unwrap();
+                return;
+            }
+        };
+
+        let (iris, blanks, literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
     }
     tx.send(Message::Finished {
         path: path.to_string_lossy().to_string(),
@@ -428,17 +423,14 @@ fn proc_triples(
     .unwrap();
 }
 
-fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
+fn count_resources(subject: &NamedOrBlankNode, object: &Term) -> (usize, usize, usize) {
     let mut iris = 0;
     let mut blanks = 0;
     let mut literals = 0;
 
     match subject {
-        Subject::NamedNode(_) => iris += 1,
-        Subject::BlankNode(_) => blanks += 1,
-        Subject::Triple(_) => {
-            unimplemented!("Triple subjects are not supported yet")
-        }
+        NamedOrBlankNode::NamedNode(_) => iris += 1,
+        NamedOrBlankNode::BlankNode(_) => blanks += 1,
     }
 
     // predicate is always a NamedNode
@@ -448,9 +440,6 @@ fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
         Term::NamedNode(_) => iris += 1,
         Term::BlankNode(_) => blanks += 1,
         Term::Literal(_) => literals += 1,
-        Term::Triple(_) => {
-            unimplemented!("Triple objects are not supported yet")
-        }
     }
 
     (iris, blanks, literals)
@@ -462,11 +451,10 @@ fn proc_triple(
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
 ) -> (usize, usize, usize) {
+    let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
     let subject = handle_subject(t.subject, ns_trie);
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
-
-    let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
 
     if ignore_unknown {
         for res in [&subject, &predicate, &object] {
@@ -516,13 +504,12 @@ fn proc_triple(
 }
 
 fn handle_subject(
-    sub: Subject,
+    sub: NamedOrBlankNode,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match sub {
-        Subject::BlankNode(_) => Ok(NormalizedResource::BlankNode),
-        Subject::Triple(_) => unimplemented!(),
-        Subject::NamedNode(n) => handle_named_node(n, ns_trie),
+        NamedOrBlankNode::BlankNode(_) => Ok(NormalizedResource::BlankNode),
+        NamedOrBlankNode::NamedNode(n) => handle_named_node(n, ns_trie),
     }
 }
 
@@ -539,7 +526,6 @@ fn handle_object(
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match obj {
         Term::BlankNode(_) => Ok(NormalizedResource::BlankNode),
-        Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
         Term::Literal(lit) => handle_literal(lit, ns_trie),
     }
@@ -560,7 +546,7 @@ fn handle_named_node(
     n: NamedNode,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
-    let res = ns_trie.longest_prefix(n.iri, true);
+    let res = ns_trie.longest_prefix(n.as_str(), true);
     if let Some((node, ns)) = res {
         if let Some((alias, _source)) = &node.value {
             return Ok(NormalizedResource::NamedNode(NNode {
@@ -571,7 +557,7 @@ fn handle_named_node(
         }
     }
     Err(UnknownNamespaceError {
-        iri: n.iri.to_string(),
+        iri: n.as_str().to_string(),
     })
 }
 
@@ -579,34 +565,25 @@ fn handle_literal(
     lit: Literal,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
-    match lit {
-        Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { lang: None })),
-        Literal::LanguageTaggedString { value: _, language } => {
-            Ok(NormalizedResource::Literal(Lit {
-                lang: Some(language.to_string()),
-            }))
-        }
-        //Literal::Typed {
-        //    value: _,
-        //    datatype: _,
-        //} => Ok(NormalizedResource::Literal(Lit {
-        //    data_type: Some("other-datatype".into()),
-        //})),
-        Literal::Typed { value: _, datatype } => {
-            let res = ns_trie.longest_prefix(datatype.iri, true);
-            if let Some((node, ns)) = res {
-                if let Some((alias, _)) = &node.value {
-                    return Ok(NormalizedResource::TypedLiteral(TypedLit {
-                        namespace: ns,
-                        alias: alias.clone(),
-                        iri: datatype.iri.into(),
-                    }));
-                }
+    if let Some(language) = lit.language() {
+        Ok(NormalizedResource::Literal(Lit {
+            lang: Some(language.to_string()),
+        }))
+    } else {
+        let datatype = lit.datatype();
+        let res = ns_trie.longest_prefix(datatype.as_str(), true);
+        if let Some((node, ns)) = res {
+            if let Some((alias, _)) = &node.value {
+                return Ok(NormalizedResource::TypedLiteral(TypedLit {
+                    namespace: ns,
+                    alias: alias.clone(),
+                    iri: datatype.as_str().to_string(),
+                }));
             }
-            Err(UnknownNamespaceError {
-                iri: datatype.iri.to_string(),
-            })
         }
+        Err(UnknownNamespaceError {
+            iri: datatype.as_str().to_string(),
+        })
     }
 }
 
@@ -733,12 +710,12 @@ pub fn save_normalized_triples(
                 predicate: NamedNode {
                     iri: "#occurrences",
                 },
-                object: Literal::Typed {
-                    value: occurs.to_string().as_str(),
-                    datatype: NamedNode {
+                object: oxrdf::Literal::new_typed_literal(
+                    occurs.to_string().as_str(),
+                    NamedNode {
                         iri: "http://www.w3.org/2001/XMLSchema#integer",
                     },
-                }
+                )
                 .into(),
             })
             .unwrap();

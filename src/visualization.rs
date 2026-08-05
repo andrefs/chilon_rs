@@ -8,7 +8,7 @@ use oxigraph::{
 
 use fs_extra::dir::copy;
 
-use rio_turtle::TurtleParser;
+use oxttl::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -21,14 +21,16 @@ use std::{io::Write, path::Path};
 use tera::{Context, Tera};
 use url::Url;
 
-pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
+pub fn load_summary(
+    path: String,
+) -> impl Iterator<Item = Result<oxrdf::Triple, oxttl::TurtleParseError>> {
     let file =
         File::open(path.clone()).unwrap_or_else(|e| panic!("Could not open file {}: {e}", path));
     let buf_reader = BufReader::new(file);
     info!("extracting {:?}", path);
     let stream = BufReader::new(buf_reader);
 
-    TurtleParser::new(stream, None)
+    TurtleParser::new().lenient().for_reader(stream)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

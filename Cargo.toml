@@ -26,8 +26,8 @@ qp-trie = "0.8.0"
 rand = "0.10.2"
 rayon = "1.6.0"
 regex = "1"
-rio_api = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
-rio_turtle = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
+oxttl = "0.2.3"
+oxrdf = "0.3.3"
 serde = { version = "1.0.87", features = ["derive"] }
 serde_json = "1.0"
 simplelog = "0.12.0"

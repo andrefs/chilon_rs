@@ -1,5 +1,5 @@
-use rio_api::parser::{QuadsParser, TriplesParser};
-use rio_turtle::{NQuadsParser, NTriplesParser, TurtleError, TurtleParser};
+use oxrdf::Triple;
+use oxttl::{NQuadsParser, NTriplesParser, TurtleParseError, TurtleParser};
 
 use crate::extract::{extract, ReaderWrapper};
 use std::{
@@ -9,53 +9,35 @@ use std::{
 
 pub struct NTWrapper {
     prefixes: HashMap<String, String>,
-    parser: NTriplesParser<ReaderWrapper>,
+    parser: oxttl::ntriples::ReaderNTriplesParser<ReaderWrapper>,
 }
 pub struct NQWrapper {
     prefixes: HashMap<String, String>,
-    parser: NQuadsParser<ReaderWrapper>,
+    parser: oxttl::nquads::ReaderNQuadsParser<ReaderWrapper>,
 }
 pub enum ParserWrapper {
-    Turtle(TurtleParser<ReaderWrapper>),
+    Turtle(oxttl::turtle::ReaderTurtleParser<ReaderWrapper>),
     NTriples(NTWrapper),
     NQuads(NQWrapper),
 }
 
-impl TriplesParser for ParserWrapper {
-    type Error = TurtleError;
-    fn is_end(&self) -> bool {
-        match self {
-            ParserWrapper::NQuads(w) => w.parser.is_end(),
-            ParserWrapper::NTriples(w) => w.parser.is_end(),
-            ParserWrapper::Turtle(p) => p.is_end(),
-        }
-    }
-
-    fn parse_step<E: From<Self::Error>>(
-        &mut self,
-        on_triple: &mut impl FnMut(rio_api::model::Triple<'_>) -> Result<(), E>,
-    ) -> Result<(), E> {
-        match self {
-            ParserWrapper::NTriples(p) => p.parser.parse_step(on_triple),
-            ParserWrapper::NQuads(p) => p.parser.parse_step(&mut |q| {
-                let t = rio_api::model::Triple {
-                    subject: q.subject,
-                    predicate: q.predicate,
-                    object: q.object,
-                };
-                on_triple(t)
-            }),
-            ParserWrapper::Turtle(p) => p.parse_step(on_triple),
-        }
-    }
-}
-
 impl ParserWrapper {
-    pub fn prefixes(&self) -> &HashMap<String, String> {
+    pub fn next(&mut self) -> Option<Result<Triple, TurtleParseError>> {
         match self {
-            ParserWrapper::Turtle(p) => p.prefixes(),
-            ParserWrapper::NTriples(w) => &w.prefixes,
-            ParserWrapper::NQuads(w) => &w.prefixes,
+            ParserWrapper::NTriples(p) => p.parser.next(),
+            ParserWrapper::NQuads(p) => p.parser.next().map(|r| r.map(Triple::from)),
+            ParserWrapper::Turtle(p) => p.next(),
+        }
+    }
+
+    pub fn prefixes(&mut self) -> HashMap<String, String> {
+        match self {
+            ParserWrapper::Turtle(p) => p
+                .prefixes()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            ParserWrapper::NTriples(w) => w.prefixes.clone(),
+            ParserWrapper::NQuads(w) => w.prefixes.clone(),
         }
     }
 }
@@ -67,21 +49,21 @@ pub fn parse(path: &PathBuf) -> ParserWrapper {
 
     if let Some(ext) = ext {
         if ext == "nt" {
-            let parser = NTriplesParser::new(stream);
+            let parser = NTriplesParser::new().lenient().for_reader(stream);
             return ParserWrapper::NTriples(NTWrapper {
                 prefixes: Default::default(),
                 parser,
             });
         }
         if ext == "nq" {
-            let parser = NQuadsParser::new(stream);
+            let parser = NQuadsParser::new().lenient().for_reader(stream);
             return ParserWrapper::NQuads(NQWrapper {
                 prefixes: Default::default(),
                 parser,
             });
         }
     }
-    let parser = TurtleParser::new(stream, None);
+    let parser = TurtleParser::new().lenient().for_reader(stream);
     ParserWrapper::Turtle(parser)
 }
 

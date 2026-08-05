@@ -10,8 +10,8 @@ use crate::{
     iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats},
 };
 use log::{debug, error, info, trace};
-use rio_api::model::{NamedNode, Subject, Term, Triple};
-use rio_turtle::TurtleError;
+use oxrdf::{NamedNode, NamedOrBlankNode, Term, Triple};
+use oxttl::TurtleParseError;
 use std::collections::BTreeMap;
 use std::fs::metadata;
 use std::path::Path;
@@ -22,7 +22,6 @@ use unicode_segmentation::UnicodeSegmentation;
 use url::Url;
 
 use crate::ns_trie::InferredNamespaces;
-use rio_api::parser::TriplesParser;
 
 pub enum Position {
     Subject,
@@ -50,7 +49,7 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
-        err: TurtleError,
+        err: TurtleParseError,
     },
 }
 
@@ -331,7 +330,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
     let mut iri_c = 0;
     let mut literal_c = 0;
 
-    while !graph.is_end() {
+    while let Some(result) = graph.next() {
         trip_c += 1;
         if trip_c % 1_000_000 == 1 {
             let elapsed = start.elapsed().as_millis();
@@ -348,22 +347,22 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             start = Instant::now();
         }
 
-        if let Err(err) = graph.parse_step(&mut |t| {
-            let (blanks, literals, iris) = proc_triple(t, &tx);
-            iri_c += iris;
-            blank_c += blanks;
-            literal_c += literals;
-
-            Ok(())
-        }) {
-            let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
-            error!("{}", msg);
-            tx.send(Message::FatalError { err }).unwrap();
-            return 0;
-        }
+        let t = match result {
+            Ok(t) => t,
+            Err(err) => {
+                let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
+                error!("{}", msg);
+                tx.send(Message::FatalError { err }).unwrap();
+                return 0;
+            }
+        };
+        let (blanks, literals, iris) = proc_triple(t, &tx);
+        iri_c += iris;
+        blank_c += blanks;
+        literal_c += literals;
     }
 
-    for (alias, namespace) in graph.prefixes().iter() {
+    for (alias, namespace) in graph.prefixes() {
         tx.send(Message::PrefixDecl {
             namespace: namespace.to_string(),
             alias: alias.to_string(),
@@ -387,51 +386,36 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
     let mut literals = 0;
     let mut iris = 0;
 
-    // subject
     match t.subject {
-        Subject::NamedNode(NamedNode { iri }) => {
+        NamedOrBlankNode::NamedNode(n) => {
             iris += 1;
             tx.send(Message::Resource {
-                iri: normalize_iri(iri),
+                iri: normalize_iri(n.as_str()),
                 pos: Position::Subject,
             })
             .unwrap();
         }
-        Subject::BlankNode(_) => {
-            blanks += 1;
-        }
-        Subject::Triple(_) => {
-            unimplemented!("Triple as subject not supported");
-        }
+        NamedOrBlankNode::BlankNode(_) => blanks += 1,
     }
 
-    // predicate
     iris += 1;
     tx.send(Message::Resource {
-        iri: normalize_iri(t.predicate.iri),
+        iri: normalize_iri(t.predicate.as_str()),
         pos: Position::Predicate,
     })
     .unwrap();
 
-    // object
     match t.object {
-        Term::NamedNode(NamedNode { iri }) => {
+        Term::NamedNode(n) => {
             iris += 1;
             tx.send(Message::Resource {
-                iri: normalize_iri(iri),
+                iri: normalize_iri(n.as_str()),
                 pos: Position::Object,
             })
             .unwrap();
         }
-        Term::BlankNode(_) => {
-            blanks += 1;
-        }
-        Term::Literal(_) => {
-            literals += 1;
-        }
-        Term::Triple(_) => {
-            unimplemented!("Triple as object not supported");
-        }
+        Term::BlankNode(_) => blanks += 1,
+        Term::Literal(_) => literals += 1,
     }
 
     (blanks, literals, iris)
