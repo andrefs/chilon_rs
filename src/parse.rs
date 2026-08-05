@@ -21,15 +21,19 @@ pub enum ParserWrapper {
     NQuads(NQWrapper),
 }
 
-impl ParserWrapper {
-    pub fn next(&mut self) -> Option<Result<Triple, TurtleParseError>> {
+impl Iterator for ParserWrapper {
+    type Item = Result<Triple, TurtleParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         match self {
             ParserWrapper::NTriples(p) => p.parser.next(),
             ParserWrapper::NQuads(p) => p.parser.next().map(|r| r.map(Triple::from)),
             ParserWrapper::Turtle(p) => p.next(),
         }
     }
+}
 
+impl ParserWrapper {
     pub fn prefixes(&mut self) -> HashMap<String, String> {
         match self {
             ParserWrapper::Turtle(p) => p

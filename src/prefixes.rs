@@ -330,7 +330,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
     let mut iri_c = 0;
     let mut literal_c = 0;
 
-    while let Some(result) = graph.next() {
+    for result in graph.by_ref() {
         trip_c += 1;
         if trip_c % 1_000_000 == 1 {
             let elapsed = start.elapsed().as_millis();

@@ -382,7 +382,7 @@ fn proc_triples(
     let blank_c = 0;
     let literal_c = 0;
 
-    while let Some(result) = graph.next() {
+    for result in graph.by_ref() {
         i += 1;
 
         if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
@@ -691,7 +691,7 @@ pub fn format_group(
     serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
 ) {
     let t = Triple::new(
-        NamedNode::new_unchecked(&format!("#{}", group.alias)),
+        NamedNode::new_unchecked(format!("#{}", group.alias)),
         NamedNode::new_unchecked("#namespacePrefix"),
         NamedNode::new_unchecked(&group.namespace),
     );

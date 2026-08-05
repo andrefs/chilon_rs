@@ -32,7 +32,7 @@ fn main() {
         let mut graph = parse(&path);
 
         let mut i = 0;
-        while let Some(result) = graph.next() {
+        for result in graph.by_ref() {
             let t = result.unwrap_or_else(|err| {
                 panic!("Error testing file {}: {}", path.to_string_lossy(), err);
             });
