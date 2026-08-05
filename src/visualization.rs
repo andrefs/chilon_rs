@@ -280,7 +280,12 @@ pub fn dump_json(data: &VisData, outf: &str) {
 
 pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     let render_dir = Path::new(".").join("chilon-viz");
-    let tera = Tera::new("templates/**/*").unwrap();
+    let mut tera = Tera::new();
+    tera.add_raw_templates(vec![(
+        "raw-data.ts",
+        &std::fs::read_to_string("templates/raw-data.ts").unwrap(),
+    )])
+    .unwrap();
     let mut ctx = Context::new();
     ctx.insert("data", &data);
 
@@ -288,14 +293,15 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
 
     info!("Copying data to {}", data_path.to_string_lossy());
 
-    let data_fd = OpenOptions::new()
+    let mut data_fd = OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
         .open(data_path.clone())
         .unwrap();
 
-    tera.render_to("raw-data.ts", &ctx, data_fd).unwrap();
+    let rendered = tera.render("raw-data.ts", &ctx).unwrap();
+    data_fd.write_all(rendered.as_bytes()).unwrap();
 
     info!("Building Vite");
     let output = Command::new("sh")
