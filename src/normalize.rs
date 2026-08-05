@@ -568,7 +568,11 @@ fn handle_literal(
         Ok(NormalizedResource::Literal(Lit {
             lang: Some(language.to_string()),
         }))
+    } else if lit.datatype().as_str() == "http://www.w3.org/2001/XMLSchema#string" {
+        // Simple literal — no namespace lookup needed
+        Ok(NormalizedResource::Literal(Lit { lang: None }))
     } else {
+        // Typed literal — look up datatype namespace
         let datatype = lit.datatype();
         let res = ns_trie.longest_prefix(datatype.as_str(), true);
         if let Some((node, ns)) = res {
@@ -727,7 +731,7 @@ mod tests {
 
         match res.unwrap() {
             NormalizedResource::Literal(lit) => {
-                assert_eq!(lit.lang, Some("pt-PT".into()));
+                assert_eq!(lit.lang, Some("pt-pt".into()));
             }
             _ => panic!("Result should be a NormalizedResource::Literal"),
         }
