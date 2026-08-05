@@ -696,12 +696,8 @@ pub fn format_group(
 
 #[cfg(test)]
 mod tests {
-
-    use oxrdf::BlankNode;
-
-    use crate::ns_trie::NamespaceSource;
-
     use super::*;
+    use crate::ns_trie::NamespaceSource;
 
     #[test]
     fn handle_literal_simple() {
@@ -749,7 +745,7 @@ mod tests {
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert(ns, (alias.into(), NamespaceSource::User));
 
-        let res = handle_literal(lit, &ns_trie);
+        let res = handle_literal(lit.clone(), &ns_trie);
 
         assert!(res.is_ok());
 
@@ -898,8 +894,8 @@ mod tests {
 
     #[test]
     fn count_resources_all_iris() {
-        let sub = NamedNode::new_unchecked("http://ex.org/s");
-        let obj = NamedNode::new_unchecked("http://ex.org/o");
+        let sub = NamedOrBlankNode::NamedNode(NamedNode::new_unchecked("http://ex.org/s"));
+        let obj = Term::NamedNode(NamedNode::new_unchecked("http://ex.org/o"));
         let (iris, blanks, literals) = count_resources(&sub, &obj);
         assert_eq!(iris, 3); // subject + predicate + object
         assert_eq!(blanks, 0);
@@ -908,8 +904,8 @@ mod tests {
 
     #[test]
     fn count_resources_blank_literal() {
-        let sub = BlankNode::new_unchecked("b1");
-        let obj = Literal::new_simple_literal("hello");
+        let sub = NamedOrBlankNode::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
+        let obj = Term::Literal(Literal::new_simple_literal("hello"));
         let (iris, blanks, literals) = count_resources(&sub, &obj);
         assert_eq!(iris, 1); // predicate only
         assert_eq!(blanks, 1);
