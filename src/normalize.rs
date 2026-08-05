@@ -864,4 +864,128 @@ mod tests {
         let UnknownNamespaceError { iri } = res.unwrap_err();
         assert_eq!(iri, dt_iri)
     }
+
+    #[test]
+    fn handle_named_node_known() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let nn = NamedNode {
+            iri: "http://ex.org/foo",
+        };
+        let res = handle_named_node(nn, &ns_trie).unwrap();
+        assert_eq!(
+            res,
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into()
+            })
+        );
+    }
+
+    #[test]
+    fn handle_named_node_unknown() {
+        let ns_trie = NamespaceTrie::new();
+        let nn = NamedNode {
+            iri: "http://unknown.org/foo",
+        };
+        let res = handle_named_node(nn, &ns_trie);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().iri, "http://unknown.org/foo");
+    }
+
+    #[test]
+    fn handle_subject_blank() {
+        let ns_trie = NamespaceTrie::new();
+        let sub = Subject::BlankNode(rio_api::model::BlankNode { id: "b1" });
+        let res = handle_subject(sub, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::BlankNode);
+    }
+
+    #[test]
+    fn handle_subject_named() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let sub = Subject::NamedNode(NamedNode {
+            iri: "http://ex.org/s",
+        });
+        let res = handle_subject(sub, &ns_trie).unwrap();
+        assert_eq!(
+            res,
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into()
+            })
+        );
+    }
+
+    #[test]
+    fn handle_object_blank() {
+        let ns_trie = NamespaceTrie::new();
+        let obj = Term::BlankNode(rio_api::model::BlankNode { id: "b1" });
+        let res = handle_object(obj, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::BlankNode);
+    }
+
+    #[test]
+    fn handle_object_literal_simple() {
+        let ns_trie = NamespaceTrie::new();
+        let obj = Term::Literal(Literal::Simple { value: "hello" });
+        let res = handle_object(obj, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::Literal(Lit { lang: None }));
+    }
+
+    #[test]
+    fn proc_triple_all_known() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let triple = Triple {
+            subject: Subject::NamedNode(NamedNode {
+                iri: "http://ex.org/s",
+            }),
+            predicate: NamedNode {
+                iri: "http://ex.org/p",
+            },
+            object: Term::NamedNode(NamedNode {
+                iri: "http://ex.org/o",
+            }),
+        };
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let (iris, blanks, literals) = proc_triple(triple, &tx, &ns_trie, false);
+
+        assert_eq!(iris, 3);
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+
+        let msg = rx.try_recv().unwrap();
+        match msg {
+            Message::NormalizedTriple {
+                subject,
+                predicate,
+                object,
+            } => {
+                assert_eq!(
+                    subject,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
+                assert_eq!(
+                    predicate,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
+                assert_eq!(
+                    object,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
+            }
+            _ => panic!("Expected NormalizedTriple"),
+        }
+    }
 }

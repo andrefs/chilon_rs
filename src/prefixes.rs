@@ -513,4 +513,61 @@ mod tests {
         let res = normalize_iri(&iri);
         assert_eq!(res.chars().count(), 200);
     }
+
+    #[test]
+    fn proc_triple_all_named() {
+        let t = Triple {
+            subject: Subject::NamedNode(NamedNode {
+                iri: "http://ex.org/s",
+            }),
+            predicate: NamedNode {
+                iri: "http://ex.org/p",
+            },
+            object: Term::NamedNode(NamedNode {
+                iri: "http://ex.org/o",
+            }),
+        };
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let (blanks, literals, iris) = proc_triple(t, &tx);
+        assert_eq!(iris, 3);
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+        assert_eq!(rx.try_iter().count(), 3);
+    }
+
+    #[test]
+    fn proc_triple_blank_literal() {
+        let t = Triple {
+            subject: Subject::BlankNode(rio_api::model::BlankNode { id: "b1" }),
+            predicate: NamedNode {
+                iri: "http://ex.org/p",
+            },
+            object: Term::Literal(rio_api::model::Literal::Simple { value: "hello" }),
+        };
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let (blanks, literals, iris) = proc_triple(t, &tx);
+        assert_eq!(iris, 1);
+        assert_eq!(blanks, 1);
+        assert_eq!(literals, 1);
+        assert_eq!(rx.try_iter().count(), 1);
+    }
+
+    #[test]
+    fn proc_triple_named_blank_mixed() {
+        let t = Triple {
+            subject: Subject::NamedNode(NamedNode {
+                iri: "http://ex.org/s",
+            }),
+            predicate: NamedNode {
+                iri: "http://ex.org/p",
+            },
+            object: Term::BlankNode(rio_api::model::BlankNode { id: "b2" }),
+        };
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let (blanks, literals, iris) = proc_triple(t, &tx);
+        assert_eq!(iris, 2);
+        assert_eq!(blanks, 1);
+        assert_eq!(literals, 0);
+        assert_eq!(rx.try_iter().count(), 2);
+    }
 }
