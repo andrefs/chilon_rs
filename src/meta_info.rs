@@ -401,7 +401,6 @@ mod tests {
         assert!(matches!(t.task_type, TaskType::InferNamespaces));
         assert_eq!(t.size, 0);
         t.finish("finished test");
-        assert!(t.duration.as_millis() >= 0);
     }
 
     #[test]
