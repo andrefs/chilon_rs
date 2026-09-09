@@ -87,16 +87,23 @@ pub fn build_iri_trie(
             let tx = tx.clone();
 
             s.spawn_fifo(move |_| {
-                tx.send(Message::Started {
-                    path: path.to_string_lossy().to_string(),
-                })
-                .unwrap();
+                if tx
+                    .send(Message::Started {
+                        path: path.to_string_lossy().to_string(),
+                    })
+                    .is_err()
+                {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                    return;
+                }
 
                 info!("Parsing {:?} ({}/{running})", path, index + 1);
                 let mut graph = match parse(path) {
                     Ok(g) => g,
                     Err(err) => {
-                        tx.send(Message::FatalError { err }).unwrap();
+                        if tx.send(Message::FatalError { err }).is_err() {
+                            warn!("Channel disconnected, aborting file {:?}", path);
+                        }
                         return;
                     }
                 };
@@ -364,36 +371,51 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             Err(err) => {
                 let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
-                tx.send(Message::FatalError { err: err.into() }).unwrap();
+                if tx.send(Message::FatalError { err: err.into() }).is_err() {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                }
                 return 0;
             }
         };
-        let (blanks, literals, iris) = proc_triple(t, &tx);
+        let (blanks, literals, iris) = match proc_triple(t, &tx) {
+            Ok(counts) => counts,
+            Err(()) => return trip_c as usize,
+        };
         iri_c += iris;
         blank_c += blanks;
         literal_c += literals;
     }
 
     for (alias, namespace) in graph.prefixes() {
-        tx.send(Message::PrefixDecl {
-            namespace: namespace.to_string(),
-            alias: alias.to_string(),
-        })
-        .unwrap()
+        if tx
+            .send(Message::PrefixDecl {
+                namespace: namespace.to_string(),
+                alias: alias.to_string(),
+            })
+            .is_err()
+        {
+            warn!("Channel disconnected, aborting file {:?}", path);
+            return trip_c as usize;
+        }
     }
-    tx.send(Message::Finished {
-        path: path.to_string_lossy().to_string(),
-        triples: trip_c as usize,
-        iris: iri_c,
-        blanks: blank_c,
-        literals: literal_c,
-    })
-    .unwrap();
+    if tx
+        .send(Message::Finished {
+            path: path.to_string_lossy().to_string(),
+            triples: trip_c as usize,
+            iris: iri_c,
+            blanks: blank_c,
+            literals: literal_c,
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file {:?}", path);
+        return trip_c as usize;
+    }
 
     trip_c as usize
 }
 
-fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
+fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(usize, usize, usize), ()> {
     let mut blanks = 0;
     let mut literals = 0;
     let mut iris = 0;
@@ -401,36 +423,51 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> (usize, usize, usize) {
     match t.subject {
         NamedOrBlankNode::NamedNode(n) => {
             iris += 1;
-            tx.send(Message::Resource {
-                iri: normalize_iri(n.as_str()),
-                pos: Position::Subject,
-            })
-            .unwrap();
+            if tx
+                .send(Message::Resource {
+                    iri: normalize_iri(n.as_str()),
+                    pos: Position::Subject,
+                })
+                .is_err()
+            {
+                warn!("Channel disconnected, aborting file");
+                return Err(());
+            }
         }
         NamedOrBlankNode::BlankNode(_) => blanks += 1,
     }
 
     iris += 1;
-    tx.send(Message::Resource {
-        iri: normalize_iri(t.predicate.as_str()),
-        pos: Position::Predicate,
-    })
-    .unwrap();
+    if tx
+        .send(Message::Resource {
+            iri: normalize_iri(t.predicate.as_str()),
+            pos: Position::Predicate,
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file");
+        return Err(());
+    }
 
     match t.object {
         Term::NamedNode(n) => {
             iris += 1;
-            tx.send(Message::Resource {
-                iri: normalize_iri(n.as_str()),
-                pos: Position::Object,
-            })
-            .unwrap();
+            if tx
+                .send(Message::Resource {
+                    iri: normalize_iri(n.as_str()),
+                    pos: Position::Object,
+                })
+                .is_err()
+            {
+                warn!("Channel disconnected, aborting file");
+                return Err(());
+            }
         }
         Term::BlankNode(_) => blanks += 1,
         Term::Literal(_) => literals += 1,
     }
 
-    (blanks, literals, iris)
+    Ok((blanks, literals, iris))
 }
 
 fn normalize_iri(iri: &str) -> String {
@@ -527,7 +564,7 @@ mod tests {
             NamedNode::new_unchecked("http://ex.org/o"),
         );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
-        let (blanks, literals, iris) = proc_triple(t, &tx);
+        let (blanks, literals, iris) = proc_triple(t, &tx).unwrap();
         assert_eq!(iris, 3);
         assert_eq!(blanks, 0);
         assert_eq!(literals, 0);
@@ -542,7 +579,7 @@ mod tests {
             Literal::new_simple_literal("hello"),
         );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
-        let (blanks, literals, iris) = proc_triple(t, &tx);
+        let (blanks, literals, iris) = proc_triple(t, &tx).unwrap();
         assert_eq!(iris, 1);
         assert_eq!(blanks, 1);
         assert_eq!(literals, 1);
@@ -557,7 +594,7 @@ mod tests {
             oxrdf::BlankNode::new_unchecked("b2"),
         );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
-        let (blanks, literals, iris) = proc_triple(t, &tx);
+        let (blanks, literals, iris) = proc_triple(t, &tx).unwrap();
         assert_eq!(iris, 2);
         assert_eq!(blanks, 1);
         assert_eq!(literals, 0);
