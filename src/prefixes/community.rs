@@ -93,18 +93,17 @@ pub fn load(allow_subns: bool) -> NamespaceTrie {
     vec_to_trie(map, allow_subns)
 }
 
+fn is_deprecated_entry(prefix: &str, namespace: &str) -> bool {
+    (prefix.contains("walmart") && namespace.contains("amazon"))
+        || (prefix.contains("movie") && namespace.contains("data.linkedmdb.org/resource/movie"))
+}
+
 fn fix_pv(pv: Vec<Record>) -> PrefixVec {
     let fixed: PrefixVec = pv
         .iter()
         .filter(|r| r.status == "canonical")
         .filter(|r| {
-            // TODO improve
-            if r.prefix.contains("walmart") && r.namespace.contains("amazon") {
-                return false;
-            }
-            if r.prefix.contains("movie")
-                && r.namespace.contains("data.linkedmdb.org/resource/movie")
-            {
+            if is_deprecated_entry(&r.prefix, &r.namespace) {
                 return false;
             }
 
@@ -183,6 +182,16 @@ mod tests {
         }];
         let fixed = fix_pv(pv);
         assert!(fixed.is_empty());
+    }
+
+    #[test]
+    fn is_deprecated_entry_known_and_fresh() {
+        assert!(is_deprecated_entry("walmart", "https://www.amazon.de/"));
+        assert!(is_deprecated_entry(
+            "movie",
+            "http://data.linkedmdb.org/resource/movie/foo"
+        ));
+        assert!(!is_deprecated_entry("ex", "http://example.org/"));
     }
 
     #[test]
