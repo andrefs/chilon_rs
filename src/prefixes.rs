@@ -10,7 +10,7 @@ use crate::{
     counter::Counter,
     iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats},
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use oxrdf::{NamedOrBlankNode, Term, Triple};
 use std::collections::BTreeMap;
 use std::fs::metadata;
@@ -141,59 +141,62 @@ fn handle_loop(
             info!("All threads finished");
             break;
         }
-        if let Ok(message) = rx.recv() {
-            match message {
-                Message::Started { path } => {
-                    let mut t = Task::new(path.clone(), TaskType::InferNamespaces);
-                    t.size = metadata(path.clone())?.len() as usize;
-                    tasks.insert(path, t);
+        let Ok(message) = rx.recv() else {
+            warn!("Channel disconnected, stopping handle_loop");
+            break;
+        };
+
+        match message {
+            Message::Started { path } => {
+                let mut t = Task::new(path.clone(), TaskType::InferNamespaces);
+                t.size = metadata(path.clone())?.len() as usize;
+                tasks.insert(path, t);
+            }
+            Message::Resource { iri, pos } => {
+                if let Position::Predicate = pos {
+                    trip_c.inc();
                 }
-                Message::Resource { iri, pos } => {
-                    if let Position::Predicate = pos {
-                        trip_c.inc();
+                res_c.inc();
+
+                if res_c.cur % 1_000_000 == 1 {
+                    let it_c = iri_trie.count();
+                    let it_n = iri_trie.count_nodes();
+                    let nst_ct = ns_trie.count_terminals();
+                    restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
+
+                    let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
+                    if let Some(infer_hk) = infer_hk {
+                        hk.add(infer_hk);
                     }
-                    res_c.inc();
-
-                    if res_c.cur % 1_000_000 == 1 {
-                        let it_c = iri_trie.count();
-                        let it_n = iri_trie.count_nodes();
-                        let nst_ct = ns_trie.count_terminals();
-                        restart_timers(start, res_c, trip_c, it_c, it_n, nst_ct);
-
-                        let infer_hk = maintenance(iri_trie, ns_trie, allow_subns);
-                        if let Some(infer_hk) = infer_hk {
-                            hk.add(infer_hk);
-                        }
-                    }
-
-                    insert_resource(ns_trie, iri, iri_trie);
                 }
-                Message::PrefixDecl { namespace, alias } => {
-                    debug!("Found local prefix {alias}: {namespace}");
-                    local_ns.insert(namespace, alias);
-                }
-                Message::Finished {
-                    path,
-                    triples,
-                    iris,
-                    blanks,
-                    literals,
-                } => {
-                    let t = tasks.get_mut(&path).unwrap();
-                    t.triples = triples;
-                    t.blanks = blanks;
-                    t.iris = iris;
-                    t.literals = literals;
 
-                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
+                insert_resource(ns_trie, iri, iri_trie);
+            }
+            Message::PrefixDecl { namespace, alias } => {
+                debug!("Found local prefix {alias}: {namespace}");
+                local_ns.insert(namespace, alias);
+            }
+            Message::Finished {
+                path,
+                triples,
+                iris,
+                blanks,
+                literals,
+            } => {
+                let t = tasks.get_mut(&path).unwrap();
+                t.triples = triples;
+                t.blanks = blanks;
+                t.iris = iris;
+                t.literals = literals;
 
-                    *running -= 1;
-                    trace!("Running: {running}");
-                }
-                Message::FatalError { err } => {
-                    error!("Fatal error: {err}");
-                    *running -= 1;
-                }
+                t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
+
+                *running -= 1;
+                trace!("Running: {running}");
+            }
+            Message::FatalError { err } => {
+                error!("Fatal error: {err}");
+                *running -= 1;
             }
         }
     }

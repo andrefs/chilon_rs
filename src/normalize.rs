@@ -5,7 +5,7 @@ use crate::{
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
 };
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
 use oxttl::TurtleSerializer;
 use rayon::ThreadPoolBuilder;
@@ -242,47 +242,50 @@ fn handle_loop(
             info!("All threads finished");
             break;
         }
-        if let Ok(message) = rx.recv() {
-            match message {
-                Message::Started { path } => {
-                    let mut t = Task::new(path.clone(), TaskType::Normalize);
-                    t.size = metadata(path.clone())?.len() as usize;
-                    tasks.insert(path, t);
-                }
-                Message::NormalizedTriple {
-                    subject,
-                    predicate,
-                    object,
-                } => {
-                    trip_c.inc();
-                    proc_message(subject, predicate, object, triples, used_groups);
-                }
-                Message::NamespacesUnknown { iris } => {
-                    for _iri in iris.iter() {
-                        //let msg = format!("Unknown namespace for resource '{iri}'");
-                        //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-                    }
-                }
-                Message::Finished {
-                    path,
-                    triples,
-                    iris,
-                    blanks,
-                    literals,
-                } => {
-                    let t = tasks.get_mut(&path).unwrap();
-                    t.triples = triples;
-                    t.iris = iris;
-                    t.blanks = blanks;
-                    t.literals = literals;
-                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
 
-                    *running -= 1;
+        let Ok(message) = rx.recv() else {
+            warn!("Channel disconnected, stopping handle_loop");
+            break;
+        };
+        match message {
+            Message::Started { path } => {
+                let mut t = Task::new(path.clone(), TaskType::Normalize);
+                t.size = metadata(path.clone())?.len() as usize;
+                tasks.insert(path, t);
+            }
+            Message::NormalizedTriple {
+                subject,
+                predicate,
+                object,
+            } => {
+                trip_c.inc();
+                proc_message(subject, predicate, object, triples, used_groups);
+            }
+            Message::NamespacesUnknown { iris } => {
+                for _iri in iris.iter() {
+                    //let msg = format!("Unknown namespace for resource '{iri}'");
+                    //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
                 }
-                Message::FatalError { err } => {
-                    error!("Fatal error: {err}");
-                    *running -= 1;
-                }
+            }
+            Message::Finished {
+                path,
+                triples,
+                iris,
+                blanks,
+                literals,
+            } => {
+                let t = tasks.get_mut(&path).unwrap();
+                t.triples = triples;
+                t.iris = iris;
+                t.blanks = blanks;
+                t.literals = literals;
+                t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
+
+                *running -= 1;
+            }
+            Message::FatalError { err } => {
+                error!("Fatal error: {err}");
+                *running -= 1;
             }
         }
     }
