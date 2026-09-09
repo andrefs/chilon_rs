@@ -167,10 +167,7 @@ pub fn normalize_triples(
     info!("Creating pool with {n_workers} threads");
 
     let mut running = paths.len();
-    let pool = ThreadPoolBuilder::new()
-        .num_threads(n_workers)
-        .build()
-        .unwrap();
+    let pool = ThreadPoolBuilder::new().num_threads(n_workers).build()?;
 
     let mut tasks = BTreeMap::<String, Task>::new();
 
