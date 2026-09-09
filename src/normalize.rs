@@ -1068,4 +1068,34 @@ mod tests {
         assert_eq!(blanks, 0);
         assert_eq!(literals, 0);
     }
+
+    #[test]
+    fn handle_loop_breaks_on_channel_disconnect() {
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        drop(tx);
+
+        let mut running = 1;
+        let mut triples = TripleFreq::new();
+        let mut used_groups = Groups::default();
+        let mut tasks = BTreeMap::new();
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let res = handle_loop(
+                &mut running,
+                rx,
+                &mut triples,
+                &mut used_groups,
+                &mut tasks,
+                false,
+                0,
+            );
+            done_tx.send(res).unwrap();
+        });
+
+        let res = done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("handle_loop busy-looped after channel disconnect");
+        assert!(res.is_ok());
+    }
 }

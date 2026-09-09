@@ -632,4 +632,37 @@ mod tests {
         let res = iri_trie.longest_prefix("http://known.org/resource", true);
         assert!(res.is_none()); // should NOT be inserted
     }
+
+    #[test]
+    fn handle_loop_breaks_on_channel_disconnect() {
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        drop(tx);
+
+        let mut running = 1;
+        let mut iri_trie = Node::<NodeStats>::new();
+        let mut ns_trie = NamespaceTrie::new();
+        let mut local_ns = BTreeMap::new();
+        let mut tasks = BTreeMap::new();
+        let mut hk = InferHK::new();
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let res = handle_loop(
+                &mut running,
+                rx,
+                &mut iri_trie,
+                &mut ns_trie,
+                &mut local_ns,
+                &mut tasks,
+                &mut hk,
+                false,
+            );
+            done_tx.send(res).unwrap();
+        });
+
+        let res = done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("handle_loop busy-looped after channel disconnect");
+        assert!(res.is_ok());
+    }
 }
