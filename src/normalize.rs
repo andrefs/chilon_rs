@@ -212,8 +212,8 @@ pub fn normalize_triples(
             &mut fd,
             ignore_unknown,
             total_triples,
-        );
-    });
+        )
+    })?;
 
     Ok((triples, used_groups, tasks))
 }
@@ -228,7 +228,7 @@ fn handle_loop(
     _fd: &mut File,
     ignore_unknown: bool,
     total_triples: usize,
-) {
+) -> Result<(), ChilonError> {
     let msg_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
@@ -246,7 +246,7 @@ fn handle_loop(
             match message {
                 Message::Started { path } => {
                     let mut t = Task::new(path.clone(), TaskType::Normalize);
-                    t.size = metadata(path.clone()).unwrap().len() as usize;
+                    t.size = metadata(path.clone())?.len() as usize;
                     tasks.insert(path, t);
                 }
                 Message::NormalizedTriple {
@@ -286,6 +286,7 @@ fn handle_loop(
             }
         }
     }
+    Ok(())
 }
 
 fn restart_timers(

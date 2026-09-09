@@ -113,8 +113,8 @@ pub fn build_iri_trie(
             &mut tasks,
             &mut hk,
             allow_subns,
-        );
-    });
+        )
+    })?;
 
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
@@ -131,7 +131,7 @@ fn handle_loop(
     tasks: &mut BTreeMap<String, Task>,
     hk: &mut InferHK,
     allow_subns: bool,
-) {
+) -> Result<(), ChilonError> {
     let res_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
@@ -145,7 +145,7 @@ fn handle_loop(
             match message {
                 Message::Started { path } => {
                     let mut t = Task::new(path.clone(), TaskType::InferNamespaces);
-                    t.size = metadata(path.clone()).unwrap().len() as usize;
+                    t.size = metadata(path.clone())?.len() as usize;
                     tasks.insert(path, t);
                 }
                 Message::Resource { iri, pos } => {
@@ -197,6 +197,7 @@ fn handle_loop(
             }
         }
     }
+    Ok(())
 }
 
 fn insert_resource(ns_trie: &NamespaceTrie, iri: String, iri_trie: &mut Node<NodeStats>) {
