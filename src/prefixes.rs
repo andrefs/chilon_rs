@@ -29,6 +29,7 @@ pub enum Position {
     Object,
 }
 
+const CHANNEL_BUFFER: usize = 100;
 pub enum Message {
     Started {
         path: String,
@@ -82,7 +83,7 @@ pub fn build_iri_trie(
     let mut hk = InferHK::new();
 
     pool.scope_fifo(|s| {
-        let (tx, rx) = sync_channel::<Message>(100);
+        let (tx, rx) = sync_channel::<Message>(CHANNEL_BUFFER);
         for (index, path) in paths.iter().enumerate() {
             let tx = tx.clone();
 

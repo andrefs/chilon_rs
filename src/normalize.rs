@@ -56,6 +56,8 @@ impl TripleFreqFns for TripleFreq {
     }
 }
 
+const CHANNEL_BUFFER: usize = 100;
+
 #[derive(Debug)]
 pub enum Message {
     Started {
@@ -171,7 +173,7 @@ pub fn normalize_triples(
     let mut tasks = BTreeMap::<String, Task>::new();
 
     pool.scope_fifo(|s| {
-        let (tx, rx) = sync_channel::<Message>(100);
+        let (tx, rx) = sync_channel::<Message>(CHANNEL_BUFFER);
 
         for path in paths {
             let tx = tx.clone();
