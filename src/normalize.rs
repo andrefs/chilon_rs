@@ -1,17 +1,15 @@
 use crate::{
     counter::Counter,
+    error::ChilonError,
     meta_info::{Task, TaskType},
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
+    util::validate_workers,
 };
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
+use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
+use oxttl::TurtleSerializer;
 use rayon::ThreadPoolBuilder;
-use rio_api::{
-    formatter::TriplesFormatter,
-    model::{Literal, NamedNode, Subject, Term, Triple},
-    parser::TriplesParser,
-};
-use rio_turtle::{TurtleError, TurtleFormatter};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{metadata, File, OpenOptions},
@@ -46,11 +44,11 @@ impl TripleFreqFns for TripleFreq {
     }
 
     fn iter_all(&self) -> Vec<(String, String, String, bool, i32)> {
-        self.into_iter()
+        self.iter()
             .flat_map(|(s, m)| {
-                m.into_iter().flat_map(|(p, m)| {
-                    m.into_iter().flat_map(|(o, m)| {
-                        m.into_iter()
+                m.iter().flat_map(|(p, m)| {
+                    m.iter().flat_map(|(o, m)| {
+                        m.iter()
                             .map(|(d, count)| (s.clone(), p.clone(), o.clone(), *d, *count))
                     })
                 })
@@ -58,6 +56,9 @@ impl TripleFreqFns for TripleFreq {
             .collect()
     }
 }
+
+const CHANNEL_BUFFER: usize = 100;
+const PROGRESS_LOG_INTERVAL: usize = 1_000_000;
 
 #[derive(Debug)]
 pub enum Message {
@@ -80,7 +81,8 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
-        err: TurtleError,
+        err: ChilonError,
+        path: String,
     },
 }
 
@@ -122,9 +124,9 @@ impl From<NormalizedResource> for String {
                 Some(_) => "rdf".into(),
             },
             NormalizedResource::TypedLiteral(TypedLit {
-                namespace,
+                namespace: _,
                 alias,
-                iri,
+                iri: _,
             }) => {
                 alias
                 //format!("{}:{}", alias, &iri[namespace.len()..])
@@ -155,51 +157,55 @@ pub fn normalize_triples(
     n_workers: usize,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-    outf: &str,
     total_triples: usize,
-) -> (TripleFreq, Groups, BTreeMap<String, Task>) {
+) -> Result<(TripleFreq, Groups, BTreeMap<String, Task>), ChilonError> {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
-    if n_workers < 2 {
-        panic!("Number of workers must be at least 2");
-    }
+    validate_workers(n_workers)?;
     info!("Creating pool with {n_workers} threads");
 
     let mut running = paths.len();
-    let pool = ThreadPoolBuilder::new()
-        .num_threads(n_workers)
-        .build()
-        .unwrap();
-
-    let mut trip_c = 0;
+    let pool = ThreadPoolBuilder::new().num_threads(n_workers).build()?;
 
     let mut tasks = BTreeMap::<String, Task>::new();
 
     pool.scope_fifo(|s| {
-        let (tx, rx) = sync_channel::<Message>(100);
+        let (tx, rx) = sync_channel::<Message>(CHANNEL_BUFFER);
 
         for path in paths {
             let tx = tx.clone();
 
             s.spawn_fifo(move |_| {
-                tx.send(Message::Started {
-                    path: path.to_string_lossy().to_string(),
-                })
-                .unwrap();
+                if tx
+                    .send(Message::Started {
+                        path: path.to_string_lossy().to_string(),
+                    })
+                    .is_err()
+                {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                    return;
+                }
 
                 info!("Parsing {:?}", path);
-                let mut graph = parse(&path);
+                let mut graph = match parse(&path) {
+                    Ok(g) => g,
+                    Err(err) => {
+                        if tx
+                            .send(Message::FatalError {
+                                err,
+                                path: path.to_string_lossy().to_string(),
+                            })
+                            .is_err()
+                        {
+                            warn!("Channel disconnected, aborting file {:?}", path);
+                        }
+                        return;
+                    }
+                };
                 proc_triples(&mut graph, &path, &tx, ns_trie, ignore_unknown);
             });
         }
-
-        let errors_path = Path::new(".").join(outf).join("errors.log");
-        let mut fd = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(errors_path.clone())
-            .unwrap();
 
         handle_loop(
             &mut running,
@@ -207,82 +213,80 @@ pub fn normalize_triples(
             &mut triples,
             &mut used_groups,
             &mut tasks,
-            &mut fd,
             ignore_unknown,
             total_triples,
-        );
-    });
+        )
+    })?;
 
-    return (triples, used_groups, tasks);
+    Ok((triples, used_groups, tasks))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_loop(
     running: &mut usize,
     rx: Receiver<Message>,
     triples: &mut TripleFreq,
     used_groups: &mut Groups,
     tasks: &mut BTreeMap<String, Task>,
-    fd: &mut File,
     ignore_unknown: bool,
     total_triples: usize,
-) {
+) -> Result<(), ChilonError> {
     let msg_c = &mut Counter::default();
     let trip_c = &mut Counter::default();
     let start = &mut Instant::now();
 
     loop {
         msg_c.inc();
-        if msg_c.cur % 1_000_000 == 1 {
+        if msg_c.cur % PROGRESS_LOG_INTERVAL == 1 {
             restart_timers(start, msg_c, trip_c, ignore_unknown, total_triples);
         }
         if *running == 0 {
             info!("All threads finished");
             break;
         }
-        if let Ok(message) = rx.recv() {
-            match message {
-                Message::Started { path } => {
-                    let mut t = Task::new(path.clone(), TaskType::Normalize);
-                    t.size = metadata(path.clone()).unwrap().len() as usize;
-                    tasks.insert(path, t);
-                }
-                Message::NormalizedTriple {
-                    subject,
-                    predicate,
-                    object,
-                } => {
-                    trip_c.inc();
-                    proc_message(subject, predicate, object, triples, used_groups);
-                }
-                Message::NamespacesUnknown { iris } => {
-                    for iri in iris.iter() {
-                        //let msg = format!("Unknown namespace for resource '{iri}'");
-                        //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-                    }
-                }
-                Message::Finished {
-                    path,
-                    triples,
-                    iris,
-                    blanks,
-                    literals,
-                } => {
-                    let mut t = tasks.get_mut(&path).unwrap();
-                    t.triples = triples;
-                    t.iris = iris;
-                    t.blanks = blanks;
-                    t.literals = literals;
-                    t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
 
-                    *running -= 1;
-                }
-                Message::FatalError { err } => {
-                    error!("Fatal error: {err}");
-                    *running -= 1;
-                }
+        let Ok(message) = rx.recv() else {
+            warn!("Channel disconnected, stopping handle_loop");
+            break;
+        };
+        match message {
+            Message::Started { path } => {
+                let mut t = Task::new(path.clone(), TaskType::Normalize);
+                t.size = metadata(path.clone())?.len() as usize;
+                tasks.insert(path, t);
+            }
+            Message::NormalizedTriple {
+                subject,
+                predicate,
+                object,
+            } => {
+                trip_c.inc();
+                proc_message(subject, predicate, object, triples, used_groups);
+            }
+            Message::NamespacesUnknown { .. } => {}
+            Message::Finished {
+                path,
+                triples,
+                iris,
+                blanks,
+                literals,
+            } => {
+                let t = tasks.get_mut(&path).unwrap();
+                t.triples = triples;
+                t.iris = iris;
+                t.blanks = blanks;
+                t.literals = literals;
+                t.finish(format!("Finished task {:?} on {}", t.task_type, t.name).as_str());
+
+                *running -= 1;
+            }
+            Message::FatalError { path, err } => {
+                error!("Fatal error in {}: {err}", path);
+                *running -= 1;
             }
         }
     }
+    Ok(())
 }
 
 fn restart_timers(
@@ -293,13 +297,19 @@ fn restart_timers(
     total_triples: usize,
 ) {
     let elapsed = start.elapsed().as_millis();
-    if elapsed != 0 {
+    let msg_rate = (msg_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
+    let trip_rate = (trip_c.delta() as u128)
+        .checked_div(elapsed)
+        .map(|r| r * 1000);
+    if msg_rate.is_some() || trip_rate.is_some() {
         trace!(
             "Received {} messages ({}/s), {} triples ({}/s) so far{})",
             msg_c.cur,
-            (msg_c.delta() as u128 / elapsed) * 1000,
+            msg_rate.unwrap_or(0),
             trip_c.cur,
-            (trip_c.delta() as u128 / elapsed) * 1000,
+            trip_rate.unwrap_or(0),
             if !ignore_unknown && total_triples > 0 {
                 format!(" ({}%)", trip_c.cur * 100 / total_triples)
             } else {
@@ -322,7 +332,7 @@ fn proc_message(
 ) {
     let mut is_datatype = false;
 
-    for resource in vec![subject.clone(), predicate.clone(), object.clone()] {
+    for resource in [subject.clone(), predicate.clone(), object.clone()] {
         match resource {
             NormalizedResource::Unknown => {
                 used_groups.unknown = true;
@@ -362,7 +372,7 @@ fn proc_message(
 
 fn proc_triples(
     graph: &mut ParserWrapper,
-    path: &PathBuf,
+    path: &Path,
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
@@ -380,57 +390,75 @@ fn proc_triples(
     let mut blank_c = 0;
     let mut literal_c = 0;
 
-    while !graph.is_end() {
+    for result in graph.by_ref() {
         i += 1;
 
-        if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
+        if i % PROGRESS_LOG_INTERVAL == 1 && !start.elapsed().is_zero() {
             let elapsed = start.elapsed().as_millis();
-            if elapsed != 0 {
+            let rate = ((i - last_i) as u128)
+                .checked_div(elapsed)
+                .map(|r| r * 1000);
+            if rate.is_some() {
                 trace!(
                     "[Thread#{tid}] Parsed {i} triples so far ({} triples/s)",
-                    ((i - last_i) / elapsed) * 1000
+                    rate.unwrap_or(0)
                 );
             }
             last_i = i;
             start = Instant::now();
         }
-        let res = graph.parse_step(&mut |t| {
-            let (iris, blanks, literals) =
-                proc_triple::<TurtleError>(t, tx, ns_trie, ignore_unknown);
-            iri_c += iris;
-            blank_c += blanks;
-            literal_c += literals;
-            Ok(())
-        });
 
-        if let Err(err) = res {
-            let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
-            error!("{}", msg);
-            tx.send(Message::FatalError { err }).unwrap();
-            panic!("{}", msg);
-        }
+        let t = match result {
+            Ok(t) => t,
+            Err(err) => {
+                let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
+                error!("{}", msg);
+                if tx
+                    .send(Message::FatalError {
+                        path: path.to_string_lossy().to_string(),
+                        err: err.into(),
+                    })
+                    .is_err()
+                {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                }
+                return;
+            }
+        };
+
+        let (iris, blanks, literals) = match proc_triple(t, tx, ns_trie, ignore_unknown) {
+            Ok(counts) => counts,
+            Err(_) => {
+                warn!("Aborting file {:?} due to channel disconnect", path);
+                return;
+            }
+        };
+        iri_c += iris;
+        blank_c += blanks;
+        literal_c += literals;
     }
-    tx.send(Message::Finished {
-        path: path.to_string_lossy().to_string(),
-        triples: i as usize,
-        iris: iri_c,
-        blanks: blank_c,
-        literals: literal_c,
-    })
-    .unwrap();
+    if tx
+        .send(Message::Finished {
+            path: path.to_string_lossy().to_string(),
+            triples: i,
+            iris: iri_c,
+            blanks: blank_c,
+            literals: literal_c,
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file {:?}", path);
+    }
 }
 
-fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
+fn count_resources(subject: &NamedOrBlankNode, object: &Term) -> (usize, usize, usize) {
     let mut iris = 0;
     let mut blanks = 0;
     let mut literals = 0;
 
     match subject {
-        Subject::NamedNode(_) => iris += 1,
-        Subject::BlankNode(_) => blanks += 1,
-        Subject::Triple(_) => {
-            unimplemented!("Triple subjects are not supported yet")
-        }
+        NamedOrBlankNode::NamedNode(_) => iris += 1,
+        NamedOrBlankNode::BlankNode(_) => blanks += 1,
     }
 
     // predicate is always a NamedNode
@@ -440,83 +468,85 @@ fn count_resources(subject: &Subject, object: &Term) -> (usize, usize, usize) {
         Term::NamedNode(_) => iris += 1,
         Term::BlankNode(_) => blanks += 1,
         Term::Literal(_) => literals += 1,
-        Term::Triple(_) => {
-            unimplemented!("Triple objects are not supported yet")
-        }
     }
 
     (iris, blanks, literals)
 }
 
-fn proc_triple<E>(
+fn proc_triple(
     t: Triple,
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-) -> (usize, usize, usize) {
+) -> Result<(usize, usize, usize), ()> {
+    let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
     let subject = handle_subject(t.subject, ns_trie);
     let predicate = handle_predicate(t.predicate, ns_trie);
     let object = handle_object(t.object, ns_trie);
 
-    let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
-
     if ignore_unknown {
-        for res in vec![&subject, &predicate, &object] {
-            if let Err(UnknownNamespaceError) = res {
-                return (iris, blanks, literals);
+        for res in [&subject, &predicate, &object] {
+            if let Err(e) = res {
+                error!("Skipping triple, unknown namespace: {e}");
             }
+        }
+        if subject.is_err() || predicate.is_err() || object.is_err() {
+            return Ok((iris, blanks, literals));
         }
     }
 
     let mut unknown_ns = Vec::new();
 
-    if let Err(UnknownNamespaceError { iri: _ }) = subject {
-        if let Subject::NamedNode(NamedNode { iri }) = t.subject {
-            unknown_ns.push(iri.to_string());
-        }
+    if let Err(e) = &subject {
+        unknown_ns.push(e.iri.clone());
     }
-    if let Err(UnknownNamespaceError { iri: _ }) = predicate {
-        unknown_ns.push(t.predicate.to_string());
+    if let Err(e) = &predicate {
+        unknown_ns.push(e.iri.clone());
     }
-
-    if let Err(UnknownNamespaceError { iri: _ }) = object {
-        if let Term::NamedNode(NamedNode { iri }) = t.object {
-            unknown_ns.push(iri.to_string());
-        }
+    if let Err(e) = &object {
+        unknown_ns.push(e.iri.clone());
     }
 
-    if !unknown_ns.is_empty() {
-        tx.send(Message::NamespacesUnknown { iris: unknown_ns })
-            .unwrap();
+    if !unknown_ns.is_empty()
+        && tx
+            .send(Message::NamespacesUnknown { iris: unknown_ns })
+            .is_err()
+    {
+        warn!("Channel disconnected, aborting file");
+        return Err(());
     }
 
-    tx.send(Message::NormalizedTriple {
-        subject: match subject {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-        predicate: match predicate {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-        object: match object {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-    })
-    .unwrap();
+    if tx
+        .send(Message::NormalizedTriple {
+            subject: match subject {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+            predicate: match predicate {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+            object: match object {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file");
+        return Err(());
+    }
 
-    (iris, blanks, literals)
+    Ok((iris, blanks, literals))
 }
 
 fn handle_subject(
-    sub: Subject,
+    sub: NamedOrBlankNode,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match sub {
-        Subject::BlankNode(_) => Ok(NormalizedResource::BlankNode),
-        Subject::Triple(_) => unimplemented!(),
-        Subject::NamedNode(n) => handle_named_node(n, ns_trie),
+        NamedOrBlankNode::BlankNode(_) => Ok(NormalizedResource::BlankNode),
+        NamedOrBlankNode::NamedNode(n) => handle_named_node(n, ns_trie),
     }
 }
 
@@ -533,7 +563,6 @@ fn handle_object(
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
     match obj {
         Term::BlankNode(_) => Ok(NormalizedResource::BlankNode),
-        Term::Triple(_) => unimplemented!(),
         Term::NamedNode(n) => handle_named_node(n, ns_trie),
         Term::Literal(lit) => handle_literal(lit, ns_trie),
     }
@@ -544,13 +573,19 @@ pub struct UnknownNamespaceError {
     iri: String,
 }
 
+impl std::fmt::Display for UnknownNamespaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown namespace for IRI {}", self.iri)
+    }
+}
+
 fn handle_named_node(
     n: NamedNode,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
-    let res = ns_trie.longest_prefix(n.iri, true);
+    let res = ns_trie.longest_prefix(n.as_str(), true);
     if let Some((node, ns)) = res {
-        if let Some((alias, source)) = &node.value {
+        if let Some((alias, _source)) = &node.value {
             return Ok(NormalizedResource::NamedNode(NNode {
                 alias: alias.clone(),
                 namespace: ns,
@@ -558,44 +593,38 @@ fn handle_named_node(
             //return Ok(node.value.as_ref().unwrap().clone());
         }
     }
-    return Err(UnknownNamespaceError {
-        iri: n.iri.to_string(),
-    });
+    Err(UnknownNamespaceError {
+        iri: n.as_str().to_string(),
+    })
 }
 
 fn handle_literal(
     lit: Literal,
     ns_trie: &NamespaceTrie,
 ) -> Result<NormalizedResource, UnknownNamespaceError> {
-    match lit {
-        Literal::Simple { value: _ } => Ok(NormalizedResource::Literal(Lit { lang: None })),
-        Literal::LanguageTaggedString { value: _, language } => {
-            Ok(NormalizedResource::Literal(Lit {
-                lang: Some(language.to_string()),
-            }))
-        }
-        //Literal::Typed {
-        //    value: _,
-        //    datatype: _,
-        //} => Ok(NormalizedResource::Literal(Lit {
-        //    data_type: Some("other-datatype".into()),
-        //})),
-        Literal::Typed { value: _, datatype } => {
-            let res = ns_trie.longest_prefix(datatype.iri, true);
-            if let Some((node, ns)) = res {
-                if node.value.is_some() {
-                    let (alias, _) = node.value.as_ref().unwrap().clone();
-                    return Ok(NormalizedResource::TypedLiteral(TypedLit {
-                        namespace: ns,
-                        alias,
-                        iri: datatype.iri.into(),
-                    }));
-                }
+    if let Some(language) = lit.language() {
+        Ok(NormalizedResource::Literal(Lit {
+            lang: Some(language.to_string()),
+        }))
+    } else if lit.datatype().as_str() == "http://www.w3.org/2001/XMLSchema#string" {
+        // Simple literal, no namespace lookup needed
+        Ok(NormalizedResource::Literal(Lit { lang: None }))
+    } else {
+        // Typed literal, look up datatype namespace
+        let datatype = lit.datatype();
+        let res = ns_trie.longest_prefix(datatype.as_str(), true);
+        if let Some((node, ns)) = res {
+            if let Some((alias, _)) = &node.value {
+                return Ok(NormalizedResource::TypedLiteral(TypedLit {
+                    namespace: ns,
+                    alias: alias.clone(),
+                    iri: datatype.as_str().to_string(),
+                }));
             }
-            return Err(UnknownNamespaceError {
-                iri: datatype.iri.to_string(),
-            });
         }
+        Err(UnknownNamespaceError {
+            iri: datatype.as_str().to_string(),
+        })
     }
 }
 
@@ -604,7 +633,7 @@ pub fn save_normalized_triples(
     used_groups: Groups,
     min_occurs: Option<i32>,
     outf: &str,
-) {
+) -> Result<(), ChilonError> {
     let file_path = Path::new(".").join(outf).join("output.ttl");
     info!("Saving graph summary to {}", file_path.to_string_lossy());
 
@@ -613,25 +642,37 @@ pub fn save_normalized_triples(
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(file_path.clone())
-        .unwrap();
+        .map_err(ChilonError::Io)?;
 
     let base = "http://andrefs.com/graph-summ/v1";
-    writeln!(fd, "@base <{}> .", { base }).unwrap();
-    writeln!(fd, "@prefix ngont: <{}/ontology> .", base).unwrap(); // ontology (data-types?, unknown, blank, classes and predicates, etc)
-    writeln!(fd, "@prefix ngns: <{}/instance> .", base).unwrap(); // namespaces (kgs, data types?)
-    writeln!(fd, "").unwrap();
+    writeln!(fd, "@base <{}> .", { base })?;
+    writeln!(fd, "@prefix ngont: <{}/ontology> .", base)?; // ontology (data-types?, unknown, blank, classes and predicates, etc)
+    writeln!(fd, "@prefix ngns: <{}/instance> .", base)?; // namespaces (kgs, data types?)
+    writeln!(fd)?;
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
-    let mut formatter = TurtleFormatter::new(fd);
-    // print namespace alias
-    format_groups(used_groups, &mut formatter);
+    let mut serializer = TurtleSerializer::new()
+        .with_prefix("ngont", format!("{base}/ontology"))
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
+        .with_prefix("ngns", format!("{base}/instance"))
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
+        .for_writer(&mut fd);
 
-    fd = formatter.finish().unwrap();
-    writeln!(fd, "").unwrap();
+    format_groups(used_groups, &mut serializer)?;
 
-    formatter = TurtleFormatter::new(fd);
+    serializer.finish()?;
+    writeln!(fd)?;
+
+    let mut serializer = TurtleSerializer::new()
+        .with_prefix("ngont", format!("{base}/ontology"))
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
+        .with_prefix("ngns", format!("{base}/instance"))
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
+        .for_writer(&mut fd);
+
     for (s, p, o, is_datatype, occurs) in nts.iter_all() {
         if min_occurs.is_some() && occurs < min_occurs.unwrap() {
             continue;
@@ -640,142 +681,72 @@ pub fn save_normalized_triples(
         id_count += 1;
         let t_id = format!("#t{:0width$}", id_count, width = 4);
 
-        // declare groups link
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}type").as_str(),
-                },
-                object: NamedNode {
-                    iri: if is_datatype {
-                        "#DatatypeLink"
-                    } else {
-                        "#GroupsLink"
-                    },
-                }
-                .into(),
-            })
-            .unwrap();
+        let type_link = if is_datatype {
+            "#DatatypeLink"
+        } else {
+            "#GroupsLink"
+        };
 
-        // declare statement id
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}type").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("{rdf}Statement").as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
+        for (pred, obj) in [
+            (&format!("{rdf}type"), type_link),
+            (&format!("{rdf}type"), &format!("{rdf}Statement")),
+            (&format!("{rdf}subject"), &format!("#{s}")),
+            (&format!("{rdf}predicate"), &format!("#{p}")),
+            (&format!("{rdf}object"), &format!("#{o}")),
+        ] {
+            let t = Triple::new(
+                NamedNode::new_unchecked(&t_id),
+                NamedNode::new_unchecked(pred),
+                NamedNode::new_unchecked(obj),
+            );
+            serializer.serialize_triple(&t)?;
+        }
 
-        // declare statement subject
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}subject").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", s).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare statement predicate
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}predicate").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", p).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare statement object
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: format!("{rdf}object").as_str(),
-                },
-                object: NamedNode {
-                    iri: format!("#{}", o).as_str(),
-                }
-                .into(),
-            })
-            .unwrap();
-
-        // declare number of occurrences
-        formatter
-            .format(&Triple {
-                subject: NamedNode { iri: t_id.as_str() }.into(),
-                predicate: NamedNode {
-                    iri: "#occurrences",
-                },
-                object: Literal::Typed {
-                    value: occurs.to_string().as_str(),
-                    datatype: NamedNode {
-                        iri: "http://www.w3.org/2001/XMLSchema#integer",
-                    },
-                }
-                .into(),
-            })
-            .unwrap();
+        let t = Triple::new(
+            NamedNode::new_unchecked(&t_id),
+            NamedNode::new_unchecked("#occurrences"),
+            Literal::new_typed_literal(
+                occurs.to_string(),
+                NamedNode::new_unchecked("http://www.w3.org/2001/XMLSchema#integer"),
+            ),
+        );
+        serializer.serialize_triple(&t)?;
     }
-    formatter.finish().unwrap();
+    serializer.finish()?;
+    Ok(())
 }
 
-pub fn format_groups(groups: Groups, formatter: &mut TurtleFormatter<File>) {
-    if groups.blank {
-        let blank = "http://andrefs.com/graph-summ/v1/ontology#BLANK";
-    }
-
+pub fn format_groups(
+    groups: Groups,
+    serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
+) -> Result<(), ChilonError> {
     for group in groups.namespaces {
-        format_group(group, formatter);
+        format_group(group, serializer)?;
     }
+    Ok(())
 }
 
-pub fn format_group(group: GroupNS, formatter: &mut TurtleFormatter<File>) {
-    let unknown = "http://andrefs.com/graph-summ/v1/ontology#UNKNOWN";
-    let ns = "http://andrefs.com/graph-summ/v1/ontology#Namespace";
-
-    formatter
-        .format(&Triple {
-            subject: NamedNode {
-                iri: format!("#{}", group.alias).as_str(),
-            }
-            .into(),
-            predicate: NamedNode {
-                iri: "#namespacePrefix",
-            }
-            .into(),
-            object: NamedNode {
-                iri: group.namespace.as_str(),
-            }
-            .into(),
-        })
-        .unwrap();
+pub fn format_group(
+    group: GroupNS,
+    serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
+) -> Result<(), ChilonError> {
+    let t = Triple::new(
+        NamedNode::new_unchecked(format!("#{}", group.alias)),
+        NamedNode::new_unchecked("#namespacePrefix"),
+        NamedNode::new_unchecked(&group.namespace),
+    );
+    serializer.serialize_triple(&t)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::ns_trie::NamespaceSource;
-
     use super::*;
+    use crate::ns_trie::NamespaceSource;
 
     #[test]
     fn handle_literal_simple() {
-        let lit = Literal::Simple { value: "my-lit" };
+        let lit = Literal::new_simple_literal("my-lit");
         let ns_trie = NamespaceTrie::new();
 
         let res = handle_literal(lit, &ns_trie);
@@ -792,10 +763,7 @@ mod tests {
 
     #[test]
     fn handle_literal_lts() {
-        let lit = Literal::LanguageTaggedString {
-            value: "my-lit",
-            language: "pt-PT",
-        };
+        let lit = Literal::new_language_tagged_literal("my-lit", "pt-PT").unwrap();
         let ns_trie = NamespaceTrie::new();
 
         let res = handle_literal(lit, &ns_trie);
@@ -804,7 +772,7 @@ mod tests {
 
         match res.unwrap() {
             NormalizedResource::Literal(lit) => {
-                assert_eq!(lit.lang, Some("pt-PT".into()));
+                assert_eq!(lit.lang, Some("pt-pt".into()));
             }
             _ => panic!("Result should be a NormalizedResource::Literal"),
         }
@@ -816,16 +784,13 @@ mod tests {
         let ns = "http://example.org/";
         let alias = "example";
 
-        let dt = NamedNode { iri };
-        let lit = Literal::Typed {
-            value: "my-lit",
-            datatype: dt,
-        };
+        let dt = NamedNode::new_unchecked(iri);
+        let lit = Literal::new_typed_literal("my-lit", dt);
 
         let mut ns_trie = NamespaceTrie::new();
         ns_trie.insert(ns, (alias.into(), NamespaceSource::User));
 
-        let res = handle_literal(lit, &ns_trie);
+        let res = handle_literal(lit.clone(), &ns_trie);
 
         assert!(res.is_ok());
 
@@ -845,13 +810,10 @@ mod tests {
     #[test]
     fn handle_literal_typed_unknown() {
         let dt_iri = "http://example.org/#my-datatype";
-        let alias = "mydt";
+        let _alias = "mydt";
 
-        let dt = NamedNode { iri: dt_iri };
-        let lit = Literal::Typed {
-            value: "my-lit",
-            datatype: dt,
-        };
+        let dt = NamedNode::new_unchecked(dt_iri);
+        let lit = Literal::new_typed_literal("my-lit", dt);
 
         let ns_trie = NamespaceTrie::new();
 
@@ -859,11 +821,281 @@ mod tests {
 
         assert!(res.is_err());
 
-        match res.unwrap_err() {
-            UnknownNamespaceError { iri } => {
-                assert_eq!(iri, dt_iri)
+        let UnknownNamespaceError { iri } = res.unwrap_err();
+        assert_eq!(iri, dt_iri)
+    }
+
+    #[test]
+    fn handle_named_node_known() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let nn = NamedNode::new_unchecked("http://ex.org/foo");
+        let res = handle_named_node(nn, &ns_trie).unwrap();
+        assert_eq!(
+            res,
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into()
+            })
+        );
+    }
+
+    #[test]
+    fn handle_named_node_unknown() {
+        let ns_trie = NamespaceTrie::new();
+        let nn = NamedNode::new_unchecked("http://unknown.org/foo");
+        let res = handle_named_node(nn, &ns_trie);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().iri, "http://unknown.org/foo");
+    }
+
+    #[test]
+    fn handle_subject_blank() {
+        let ns_trie = NamespaceTrie::new();
+        let sub = NamedOrBlankNode::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
+        let res = handle_subject(sub, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::BlankNode);
+    }
+
+    #[test]
+    fn handle_subject_named() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let sub = NamedOrBlankNode::NamedNode(NamedNode::new_unchecked("http://ex.org/s"));
+        let res = handle_subject(sub, &ns_trie).unwrap();
+        assert_eq!(
+            res,
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into()
+            })
+        );
+    }
+
+    #[test]
+    fn handle_object_blank() {
+        let ns_trie = NamespaceTrie::new();
+        let obj = Term::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
+        let res = handle_object(obj, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::BlankNode);
+    }
+
+    #[test]
+    fn handle_object_literal_simple() {
+        let ns_trie = NamespaceTrie::new();
+        let obj = Term::Literal(Literal::new_simple_literal("hello"));
+        let res = handle_object(obj, &ns_trie).unwrap();
+        assert_eq!(res, NormalizedResource::Literal(Lit { lang: None }));
+    }
+
+    #[test]
+    fn proc_triple_all_known() {
+        let mut ns_trie = NamespaceTrie::new();
+        ns_trie.insert("http://ex.org/", ("ex".into(), NamespaceSource::User));
+        let triple = Triple::new(
+            NamedNode::new_unchecked("http://ex.org/s"),
+            NamedNode::new_unchecked("http://ex.org/p"),
+            NamedNode::new_unchecked("http://ex.org/o"),
+        );
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let (iris, blanks, literals) = match proc_triple(triple, &tx, &ns_trie, false) {
+            Ok(counts) => counts,
+            Err(()) => return,
+        };
+
+        assert_eq!(iris, 3);
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+
+        let msg = rx.try_recv().unwrap();
+        match msg {
+            Message::NormalizedTriple {
+                subject,
+                predicate,
+                object,
+            } => {
+                assert_eq!(
+                    subject,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
+                assert_eq!(
+                    predicate,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
+                assert_eq!(
+                    object,
+                    NormalizedResource::NamedNode(NNode {
+                        alias: "ex".into(),
+                        namespace: "http://ex.org/".into()
+                    })
+                );
             }
-            _ => panic!("Result should be an UnknownNamespaceError"),
+            _ => panic!("Expected NormalizedTriple"),
         }
+    }
+
+    #[test]
+    fn count_resources_all_iris() {
+        let sub = NamedOrBlankNode::NamedNode(NamedNode::new_unchecked("http://ex.org/s"));
+        let obj = Term::NamedNode(NamedNode::new_unchecked("http://ex.org/o"));
+        let (iris, blanks, literals) = count_resources(&sub, &obj);
+        assert_eq!(iris, 3); // subject + predicate + object
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+    }
+
+    #[test]
+    fn count_resources_blank_literal() {
+        let sub = NamedOrBlankNode::BlankNode(oxrdf::BlankNode::new_unchecked("b1"));
+        let obj = Term::Literal(Literal::new_simple_literal("hello"));
+        let (iris, blanks, literals) = count_resources(&sub, &obj);
+        assert_eq!(iris, 1); // predicate only
+        assert_eq!(blanks, 1);
+        assert_eq!(literals, 1);
+    }
+
+    #[test]
+    fn proc_message_all_named() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            NormalizedResource::NamedNode(NNode {
+                alias: "ex".into(),
+                namespace: "http://ex.org/".into(),
+            }),
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.namespaces.contains(&GroupNS {
+            alias: "ex".into(),
+            namespace: "http://ex.org/".into()
+        }));
+        assert!(!groups.unknown);
+        assert!(!groups.blank);
+    }
+
+    #[test]
+    fn proc_message_unknown() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::Unknown,
+            NormalizedResource::Unknown,
+            NormalizedResource::Unknown,
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.unknown);
+    }
+
+    #[test]
+    fn proc_message_blank() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::BlankNode,
+            NormalizedResource::BlankNode,
+            NormalizedResource::BlankNode,
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.blank);
+    }
+
+    #[test]
+    fn proc_message_literal_simple() {
+        let mut triples = TripleFreq::new();
+        let mut groups = Groups::default();
+        proc_message(
+            NormalizedResource::Literal(Lit { lang: None }),
+            NormalizedResource::Literal(Lit { lang: None }),
+            NormalizedResource::Literal(Lit { lang: None }),
+            &mut triples,
+            &mut groups,
+        );
+        assert!(groups.namespaces.contains(&GroupNS {
+            alias: "xsd".into(),
+            namespace: "http://www.w3.org/TR/xmlschema11-2/".into()
+        }));
+    }
+
+    #[test]
+    fn proc_triples_finished_counts() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("test.nt");
+        std::fs::write(
+            &path,
+            "<http://ex.org/s1> <http://ex.org/p> <http://ex.org/o1> .\n\
+             <http://ex.org/s2> <http://ex.org/p> <http://ex.org/o2> .",
+        )
+        .unwrap();
+
+        let mut graph = parse(&path).unwrap();
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let ns_trie = NamespaceTrie::new();
+        proc_triples(&mut graph, &path, &tx, &ns_trie, false);
+
+        let mut finished = None;
+        for msg in rx.try_iter() {
+            if let Message::Finished {
+                triples,
+                iris,
+                blanks,
+                literals,
+                ..
+            } = msg
+            {
+                finished = Some((triples, iris, blanks, literals));
+            }
+        }
+        let (triples, iris, blanks, literals) = finished.unwrap();
+        assert_eq!(triples, 2);
+        assert_eq!(iris, 6); // 2 triples x (subject + predicate + object)
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
+    }
+
+    #[test]
+    fn handle_loop_breaks_on_channel_disconnect() {
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        drop(tx);
+
+        let mut running = 1;
+        let mut triples = TripleFreq::new();
+        let mut used_groups = Groups::default();
+        let mut tasks = BTreeMap::new();
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let res = handle_loop(
+                &mut running,
+                rx,
+                &mut triples,
+                &mut used_groups,
+                &mut tasks,
+                false,
+                0,
+            );
+            done_tx.send(res).unwrap();
+        });
+
+        let res = done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("handle_loop busy-looped after channel disconnect");
+        assert!(res.is_ok());
     }
 }

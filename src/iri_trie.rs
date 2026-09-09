@@ -1,12 +1,6 @@
-use std::{
-    borrow::Borrow,
-    collections::{BTreeMap, VecDeque},
-    fmt::Debug,
-};
-
 use crate::trie::Node;
-use itertools::Itertools;
 use log::{info, warn};
+use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -18,20 +12,20 @@ pub struct Stats {
 }
 
 // Each node keeps its own stats (if terminal) and its descendants stats
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct NodeStats {
     pub own: usize,
     pub desc: usize,
     pub uniq_desc: usize,
 }
-pub type IriTrie = Node<NodeStats>; // todo finish
+pub type IriTrie = Node<NodeStats>;
 
 impl NodeStats {
     pub fn new() -> NodeStats {
         NodeStats {
             own: 0,       // occurrences of this IRI (as terminal)
             desc: 0,      // occurrences of IRIs with this prefix
-            uniq_desc: 0, // occurrences of IRIs with this prefix (unique)
+            uniq_desc: 0, // distinct descendant IRIs (terminal count below this node)
         }
     }
 
@@ -58,16 +52,6 @@ impl IriTrieStatsExt for IriTrie {
     }
 }
 
-impl Default for NodeStats {
-    fn default() -> Self {
-        NodeStats {
-            desc: 0,
-            own: 0,
-            uniq_desc: 0,
-        }
-    }
-}
-
 pub fn init_stats(n: &mut IriTrie) {
     let new_stats = NodeStats::new();
     n.value = Some(new_stats);
@@ -86,8 +70,8 @@ pub fn inc_own(node: &mut IriTrie) {
 pub fn update_stats(node: &mut IriTrie) {
     let (desc, uniq_desc) = node
         .children
-        .iter()
-        .map(|(_, child)| {
+        .values()
+        .map(|child| {
             let child_stats = child.stats();
             let desc = child_stats.own + child_stats.desc;
             let uniq_desc = if child_stats.own == 0 { 0 } else { 1 } + child_stats.uniq_desc;
@@ -132,13 +116,13 @@ impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
         let mut sorted_children = n.children.iter().collect::<Vec<_>>();
         sorted_children.sort_by(|(k1, _), (k2, _)| (**k1).cmp(*k2));
         for (k, v) in sorted_children.iter().rev() {
-            self.queue.push((format!("{s}{k}"), &v));
+            self.queue.push((format!("{s}{k}"), v));
         }
 
         if n.children.is_empty() {
             return Some((s, n));
         }
-        return self.next();
+        self.next()
     }
 }
 
@@ -146,7 +130,7 @@ pub trait IriTrieExt {
     fn count(&self) -> usize;
     fn remove_leaves(&mut self) -> bool;
     fn remove_leaves_aux(&mut self, cur_str: String) -> bool;
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>);
+    fn remove_prefixes(&mut self, ns_vec: &[String]);
     fn remove_prefix<S: ?Sized + Borrow<str>>(&mut self, namespace: &S) -> Option<NodeStats>;
     fn value_along_path(&mut self, cur_str: String, str_acc: String, v: &mut Vec<(String, String)>);
 }
@@ -158,14 +142,11 @@ impl IriTrieExt for IriTrie {
         str_acc: String,
         v: &mut Vec<(String, String)>,
     ) {
-        v.push((
-            str_acc.clone(),
-            if self.value.is_some() {
-                self.value.unwrap().desc.to_string()
-            } else {
-                "".to_string()
-            },
-        ));
+        let desc = match &self.value {
+            Some(val) => val.desc.to_string(),
+            None => "".to_string(),
+        };
+        v.push((str_acc.clone(), desc));
         if str_left.is_empty() {
             return;
         }
@@ -177,8 +158,7 @@ impl IriTrieExt for IriTrie {
             panic!("Something is wrong: {str_left} has no char {first_char} ");
         }
 
-        let node = self
-            .children
+        self.children
             .get_mut(&first_char)
             .unwrap()
             .value_along_path(rest.to_string(), format!("{str_acc}{first_char}"), v);
@@ -188,7 +168,7 @@ impl IriTrieExt for IriTrie {
         let stats = self.stats();
         let mut total = 0;
         total += stats.desc + stats.own;
-        return total;
+        total
     }
 
     fn remove_leaves(&mut self) -> bool {
@@ -203,7 +183,7 @@ impl IriTrieExt for IriTrie {
         let mut to_remove = Vec::<char>::new();
 
         for (&ch, node) in self.children.iter_mut() {
-            let node_had_children = !node.children.is_empty();
+            let _node_had_children = !node.children.is_empty();
             let child_deleted = node.remove_leaves_aux(format!("{}{}", cur_str, ch));
             if !child_deleted && ['/', '#'].contains(&ch) {
                 to_remove.push(ch);
@@ -217,17 +197,17 @@ impl IriTrieExt for IriTrie {
             let sub_node = self.get_mut(*ch).unwrap();
             sub_node.children = BTreeMap::new();
         }
-        return deleted;
+        deleted
     }
 
-    fn remove_prefixes(&mut self, ns_vec: &Vec<String>) {
+    fn remove_prefixes(&mut self, ns_vec: &[String]) {
         for namespace in ns_vec.iter() {
             self.remove_prefix(namespace);
         }
         warn!(
             "IRIs with unknown namespaces: {} ({} occurrences).",
             self.count(),
-            self.value.unwrap_or(Default::default()).desc,
+            self.value.unwrap_or_default().desc,
         );
         let examples = self.iter_leaves().take(10).map(|x| x.0).collect::<Vec<_>>();
         // 1 example is the root node
@@ -243,9 +223,10 @@ impl IriTrieExt for IriTrie {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::trie::InsertFnVisitors;
+use crate::trie::InsertFnVisitors;
 
+#[cfg(test)]
+mod tests {
     use super::*;
 
     #[test]
@@ -365,7 +346,7 @@ mod tests {
         trie.insert_fn("http://example.org/path3/a", Default::default(), &visitors);
         trie.insert_fn("http://example.org/path3/b", Default::default(), &visitors);
 
-        trie.remove_prefixes(&vec![
+        trie.remove_prefixes(&[
             "http://example.org/path1".to_string(),
             "http://example.org/path2".to_string(),
         ]);
@@ -389,4 +370,47 @@ mod tests {
         assert_eq!(t.stats().desc, 2);
         assert_eq!(t.stats().uniq_desc, 1);
     }
+}
+
+#[test]
+fn uniq_desc_counts_distinct_descendants() {
+    let mut trie = IriTrie::new();
+    trie.insert_fn(
+        "http://example.org/",
+        Default::default(),
+        &InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        },
+    );
+    for _ in 0..3 {
+        trie.insert_fn(
+            "http://example.org/foo",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+    }
+    trie.insert_fn(
+        "http://example.org/foo/bar",
+        Default::default(),
+        &InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        },
+    );
+
+    // root: 1 own, 4 descendant occurrences (3x foo + 1x bar), 2 distinct descendants
+    let root = trie.find("http://example.org/", true).unwrap();
+    assert_eq!(root.0.stats().own, 1);
+    assert_eq!(root.0.stats().desc, 4);
+    assert_eq!(root.0.stats().uniq_desc, 2);
+
+    // foo: own=3 (inserted 3x), 1 descendant occurrence, 1 distinct descendant
+    let foo = trie.find("http://example.org/foo", true).unwrap();
+    assert_eq!(foo.0.stats().own, 3);
+    assert_eq!(foo.0.stats().desc, 1);
+    assert_eq!(foo.0.stats().uniq_desc, 1);
 }

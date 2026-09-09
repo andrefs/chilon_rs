@@ -50,7 +50,7 @@ impl SaveTrie for NamespaceTrie {
 pub trait InferredNamespaces {
     fn add_namespaces(
         &mut self,
-        inferred: &Vec<(String, usize, NamespaceSource)>,
+        inferred: &[(String, usize, NamespaceSource)],
         allow_subns: bool,
     ) -> Vec<String>;
 
@@ -65,12 +65,12 @@ impl InferredNamespaces for NamespaceTrie {
                 trie.insert(alias, (ns, source));
             }
         }
-        return trie;
+        trie
     }
 
     fn add_namespaces(
         &mut self,
-        inferred: &Vec<(String, usize, NamespaceSource)>,
+        inferred: &[(String, usize, NamespaceSource)],
         allow_subns: bool,
     ) -> Vec<String> {
         let mut aliases = self.to_map();
@@ -131,14 +131,14 @@ impl InferredNamespaces for NamespaceTrie {
                 }
             })
             .collect::<Vec<String>>();
-        return res;
+        res
     }
 }
 
 pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     let mut domains = url_obj
         .host_str()
-        .unwrap_or_else(|| panic!("Url {} has no host str", url_obj.to_string()))
+        .unwrap_or_else(|| panic!("Url {} has no host str", url_obj))
         .split('.');
 
     let alias_cand = domains.next().unwrap_or_else(|| {
@@ -149,14 +149,14 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
             domains
         )
     });
-    let tld = domains.last();
+    let tld = domains.next_back();
 
     let mut alias = alias_cand.to_string();
     let alias_abbrv = alias.chars().take(5).collect::<String>();
 
     // check if already exists
     let conflict = aliases.get(&alias);
-    if let None = conflict {
+    if conflict.is_none() {
         return Some(alias);
     }
 
@@ -183,15 +183,15 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
     }
 
     // check if last segment is different
-    let segs = url_obj.path_segments();
-    let confl_segs = confl_url_obj.path_segments();
-    if segs.is_some() && confl_segs.is_some() {
-        let last_seg = segs.unwrap().last();
-        let confl_last_seg = confl_segs.unwrap().last();
-        if last_seg.is_some() && confl_last_seg.is_some() && last_seg != confl_last_seg {
-            let alias_seg = format!("{}{}", alias_abbrv, last_seg.unwrap());
-            if !aliases.contains_key(&alias_seg) {
-                return Some(alias_seg);
+    if let (Some(mut segs), Some(mut confl_segs)) =
+        (url_obj.path_segments(), confl_url_obj.path_segments())
+    {
+        if let (Some(last_seg), Some(confl_last_seg)) = (segs.next_back(), confl_segs.next_back()) {
+            if last_seg != confl_last_seg {
+                let alias_seg = format!("{}{}", alias_abbrv, last_seg);
+                if !aliases.contains_key(&alias_seg) {
+                    return Some(alias_seg);
+                }
             }
         }
     }
@@ -203,5 +203,61 @@ pub fn gen_alias(url_obj: Url, aliases: &NamespaceMap) -> Option<String> {
         count += 1;
     }
 
-    return Some(alias);
+    Some(alias)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gen_alias_fresh_host() {
+        let url = Url::parse("http://www.example.com/x").unwrap();
+        assert_eq!(
+            gen_alias(url, &NamespaceMap::new()),
+            Some("www".to_string())
+        );
+    }
+
+    #[test]
+    fn gen_alias_same_url_conflict() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "www".to_string(),
+            (
+                "http://www.example.com/x".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://www.example.com/x").unwrap();
+        assert_eq!(gen_alias(url, &m), None);
+    }
+
+    #[test]
+    fn gen_alias_different_last_segment() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "www".to_string(),
+            (
+                "http://www.example.com/foo/bbb".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://www.example.com/foo/aaa").unwrap();
+        assert_eq!(gen_alias(url, &m), Some("wwwaaa".to_string()));
+    }
+
+    #[test]
+    fn gen_alias_different_tld() {
+        let mut m = NamespaceMap::new();
+        m.insert(
+            "foo".to_string(),
+            (
+                "http://foo.example.org/".to_string(),
+                NamespaceSource::Community,
+            ),
+        );
+        let url = Url::parse("http://foo.example.com/").unwrap();
+        assert_eq!(gen_alias(url, &m), Some("fooorg".to_string()));
+    }
 }

@@ -2,7 +2,6 @@ use std::{
     collections::BTreeMap,
     fs::{metadata, File},
     io::Write,
-    ops::Add,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -120,6 +119,12 @@ pub struct InferHKTask {
     pub added_ns: usize,
 }
 
+impl Default for InferHK {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InferHK {
     pub fn add(&mut self, task: InferHKTask) {
         self.rounds += 1;
@@ -137,6 +142,12 @@ impl InferHK {
             added_ns: 0,
             inferred_ns: 0,
         }
+    }
+}
+
+impl Default for InferHKTask {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -195,6 +206,12 @@ pub struct MetaInfoVisualization {
     pub size: usize,
     #[serde(skip)]
     start: Instant,
+}
+
+impl Default for MetaInfoVisualization {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetaInfoVisualization {
@@ -370,5 +387,88 @@ impl HasTasks for MetaInfoNormalization {
     }
     fn tasks_mut(&mut self) -> &mut BTreeMap<String, Task> {
         &mut self.tasks
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn task_new_and_finish() {
+        let mut t = Task::new("test".into(), TaskType::InferNamespaces);
+        assert_eq!(t.name, "test");
+        assert!(matches!(t.task_type, TaskType::InferNamespaces));
+        assert_eq!(t.size, 0);
+        t.finish("finished test");
+    }
+
+    #[test]
+    fn infer_hk_new_and_add() {
+        let mut hk = InferHK::new();
+        assert_eq!(hk.rounds, 0);
+        assert_eq!(hk.discarded_ns, 0);
+
+        let mut hktask = InferHKTask::new();
+        hktask.discarded_ns = 5;
+        hktask.inferred_ns = 10;
+        hktask.added_ns = 3;
+        hk.add(hktask);
+
+        assert_eq!(hk.rounds, 1);
+        assert_eq!(hk.discarded_ns, 5);
+        assert_eq!(hk.inferred_ns, 10);
+        assert_eq!(hk.added_ns, 3);
+    }
+
+    #[test]
+    fn inference_add_tasks_accumulates() {
+        let mut inference = MetaInfoInference::new();
+        let mut tasks = BTreeMap::new();
+        let mut t1 = Task::new("file1.ttl".into(), TaskType::InferNamespaces);
+        t1.triples = 100;
+        t1.iris = 50;
+        t1.blanks = 10;
+        t1.literals = 40;
+        t1.size = 1024;
+        tasks.insert("file1.ttl".into(), t1);
+
+        inference.add_tasks(tasks);
+        assert_eq!(inference.triples, 100);
+        assert_eq!(inference.iris, 50);
+        assert_eq!(inference.blanks, 10);
+        assert_eq!(inference.literals, 40);
+        assert_eq!(inference.size, 1024);
+    }
+
+    #[test]
+    fn normalization_add_tasks_accumulates() {
+        let mut norm = MetaInfoNormalization::new();
+        let mut tasks = BTreeMap::new();
+        let mut t1 = Task::new("f.nt".into(), TaskType::Normalize);
+        t1.triples = 200;
+        t1.iris = 80;
+        t1.blanks = 20;
+        t1.literals = 100;
+        t1.unknowns = 5;
+        t1.size = 2048;
+        tasks.insert("f.nt".into(), t1);
+
+        norm.add_tasks(tasks);
+        assert_eq!(norm.triples, 200);
+        assert_eq!(norm.iris, 80);
+        assert_eq!(norm.blanks, 20);
+        assert_eq!(norm.literals, 100);
+        assert_eq!(norm.unknowns, 5);
+        assert_eq!(norm.size, 2048);
+    }
+
+    #[test]
+    fn meta_info_new() {
+        let mi = MetaInfo::new(PathBuf::from("test.json"));
+        assert_eq!(mi.file_path, PathBuf::from("test.json"));
+        assert!(mi.inference.is_none());
+        assert!(mi.normalization.is_none());
+        assert!(mi.visualization.is_none());
     }
 }

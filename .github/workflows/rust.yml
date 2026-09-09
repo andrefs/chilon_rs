@@ -1,33 +1,28 @@
 name: Rust
 
-
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-    - name: ⚡ Rust Cache
-      uses: Swatinem/rust-cache@v2
-    - name: 🔨 Build
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-    - name: 🔎 Test
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
+      - uses: actions/checkout@v4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: ⚡ Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: 🔨 Build
+        run: cargo build --workspace
+      - name: 🔎 Clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: 🔎 Test
+        run: cargo test --workspace

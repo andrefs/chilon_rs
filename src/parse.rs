@@ -1,7 +1,10 @@
-use rio_api::parser::{QuadsParser, TriplesParser};
-use rio_turtle::{NQuadsParser, NTriplesParser, TurtleError, TurtleParser};
+use oxrdf::Triple;
+use oxttl::{NQuadsParser, NTriplesParser, TurtleParseError, TurtleParser};
 
-use crate::extract::{extract, ReaderWrapper};
+use crate::{
+    error::ChilonError,
+    extract::{extract, ReaderWrapper},
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -9,78 +12,134 @@ use std::{
 
 pub struct NTWrapper {
     prefixes: HashMap<String, String>,
-    parser: NTriplesParser<ReaderWrapper>,
+    parser: oxttl::ntriples::ReaderNTriplesParser<ReaderWrapper>,
 }
 pub struct NQWrapper {
     prefixes: HashMap<String, String>,
-    parser: NQuadsParser<ReaderWrapper>,
+    parser: oxttl::nquads::ReaderNQuadsParser<ReaderWrapper>,
 }
 pub enum ParserWrapper {
-    Turtle(TurtleParser<ReaderWrapper>),
+    Turtle(oxttl::turtle::ReaderTurtleParser<ReaderWrapper>),
     NTriples(NTWrapper),
     NQuads(NQWrapper),
 }
 
-impl TriplesParser for ParserWrapper {
-    type Error = TurtleError;
-    fn is_end(&self) -> bool {
-        match &self {
-            &ParserWrapper::NQuads(w) => w.parser.is_end(),
-            &ParserWrapper::NTriples(w) => w.parser.is_end(),
-            &ParserWrapper::Turtle(p) => p.is_end(),
-        }
-    }
+impl Iterator for ParserWrapper {
+    type Item = Result<Triple, TurtleParseError>;
 
-    fn parse_step<E: From<Self::Error>>(
-        &mut self,
-        on_triple: &mut impl FnMut(rio_api::model::Triple<'_>) -> Result<(), E>,
-    ) -> Result<(), E> {
+    fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ParserWrapper::NTriples(p) => p.parser.parse_step(on_triple),
-            ParserWrapper::NQuads(p) => p.parser.parse_step(&mut |q| {
-                let t = rio_api::model::Triple {
-                    subject: q.subject,
-                    predicate: q.predicate,
-                    object: q.object,
-                };
-                on_triple(t)
-            }),
-            ParserWrapper::Turtle(p) => p.parse_step(on_triple),
+            ParserWrapper::NTriples(p) => p.parser.next(),
+            ParserWrapper::NQuads(p) => p.parser.next().map(|r| r.map(Triple::from)),
+            ParserWrapper::Turtle(p) => p.next(),
         }
     }
 }
 
 impl ParserWrapper {
-    pub fn prefixes(&self) -> &HashMap<String, String> {
+    pub fn prefixes(&mut self) -> HashMap<String, String> {
         match self {
-            ParserWrapper::Turtle(p) => p.prefixes(),
-            ParserWrapper::NTriples(w) => &w.prefixes,
-            ParserWrapper::NQuads(w) => &w.prefixes,
+            ParserWrapper::Turtle(p) => p
+                .prefixes()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            ParserWrapper::NTriples(w) => w.prefixes.clone(),
+            ParserWrapper::NQuads(w) => w.prefixes.clone(),
         }
     }
 }
 
-pub fn parse(path: &PathBuf) -> ParserWrapper {
-    let (stream, file_stem) = extract(&path);
+pub fn parse(path: &PathBuf) -> Result<ParserWrapper, ChilonError> {
+    let (stream, file_stem) = extract(path)?;
     let path_stem = Path::new(file_stem);
-    let ext = path_stem.extension();
+    let ext = path_stem.extension().or_else(|| path.extension());
 
     if let Some(ext) = ext {
         if ext == "nt" {
-            let parser = NTriplesParser::new(stream);
-            return ParserWrapper::NTriples(NTWrapper {
+            let parser = NTriplesParser::new().lenient().for_reader(stream);
+            return Ok(ParserWrapper::NTriples(NTWrapper {
                 prefixes: Default::default(),
                 parser,
-            });
+            }));
         }
         if ext == "nq" {
-            let parser = NQuadsParser::new(stream);
-            return ParserWrapper::NQuads(NQWrapper {
+            let parser = NQuadsParser::new().lenient().for_reader(stream);
+            return Ok(ParserWrapper::NQuads(NQWrapper {
                 prefixes: Default::default(),
                 parser,
-            });
+            }));
         }
     }
-    let parser = TurtleParser::new(stream, None);
-    return ParserWrapper::Turtle(parser);
+    let parser = TurtleParser::new().lenient().for_reader(stream);
+    Ok(ParserWrapper::Turtle(parser))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn make_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
+        let path = dir.path().join(name);
+        let mut f = File::create(&path).unwrap();
+        write!(f, "{}", content).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_parse_turtle() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.ttl",
+            "@prefix ex: <http://ex.org/> .\nex:s ex:p ex:o .\n",
+        );
+        let parser = parse(&path).unwrap();
+        assert!(matches!(parser, ParserWrapper::Turtle(_)));
+    }
+
+    #[test]
+    fn test_parse_ntriples() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.nt",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
+        );
+        let parser = parse(&path).unwrap();
+        assert!(matches!(parser, ParserWrapper::NTriples(_)));
+    }
+
+    #[test]
+    fn test_parse_nquads() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.nq",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> <http://ex.org/g> .\n",
+        );
+        let parser = parse(&path).unwrap();
+        assert!(matches!(parser, ParserWrapper::NQuads(_)));
+    }
+
+    #[test]
+    fn test_parse_unknown_extension_defaults_to_turtle() {
+        let dir = TempDir::new().unwrap();
+        let path = make_file(
+            &dir,
+            "test.xyz",
+            "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
+        );
+        let parser = parse(&path).unwrap();
+        assert!(matches!(parser, ParserWrapper::Turtle(_)));
+    }
+}
+
+#[test]
+fn test_parse_nonexistent_errors() {
+    let path = PathBuf::from("/this/file/does/not/exist.ttl");
+    assert!(parse(&path).is_err());
 }

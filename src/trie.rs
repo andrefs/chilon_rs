@@ -4,6 +4,8 @@ use std::{
     fmt::Debug,
 };
 
+type RemoveCb<'a, T, U> = Option<&'a dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T: Clone + Debug> {
     pub value: Option<T>,
@@ -11,25 +13,27 @@ pub struct Node<T: Clone + Debug> {
     pub children: BTreeMap<char, Node<T>>,
 }
 
+impl<T: Debug + Clone> Default for Node<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Debug + Clone> Node<T> {
     pub fn pp(&self, print_value: bool) -> String {
         let mut res = "".to_string();
 
         let mut root_children = self.children.iter().collect::<Vec<_>>();
-        root_children.sort_by(|(ch1, _), (ch2, _)| ch1.cmp(ch2));
+        root_children.sort_by_key(|(ch1, _)| *ch1);
 
-        let mut stack = Vec::from(
-            root_children
-                .iter()
-                .enumerate()
-                .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
-                .rev()
-                .collect::<Vec<_>>(),
-        );
+        let mut stack = root_children
+            .iter()
+            .enumerate()
+            .map(|(i, (ch, id))| (*ch, *id, 0, i != 0))
+            .rev()
+            .collect::<Vec<_>>();
 
-        while stack.len() > 0 {
-            let (ch, node, indent, new_line) = stack.pop().unwrap();
-
+        while let Some((ch, node, indent, new_line)) = stack.pop() {
             if new_line {
                 res.push('\n');
                 res.push_str(&" ".repeat(indent));
@@ -39,14 +43,15 @@ impl<T: Debug + Clone> Node<T> {
                 res.push('·');
             }
             if print_value && node.value.is_some() {
-                res.push_str(
-                    format!(
-                        "{}{:?}",
-                        if node.is_terminal { " " } else { "  " },
-                        node.value.as_ref().unwrap()
-                    )
-                    .as_str(),
-                );
+                let value_str = match &node.value {
+                    Some(val) => format!("{:?}", val),
+                    None => String::new(),
+                };
+                res.push_str(&format!(
+                    "{}{}",
+                    if node.is_terminal { " " } else { "  " },
+                    value_str
+                ));
             }
 
             let child_new_line = (print_value && node.value.is_some())
@@ -77,27 +82,26 @@ impl<T: Debug + Clone> Node<T> {
     }
 
     pub fn count_nodes(&self) -> u32 {
-        return self
-            .children
+        self.children
             .iter()
             .fold(self.children.len() as u32, |acc, (_, v)| {
                 acc + v.count_nodes()
-            });
+            })
     }
 
     pub fn count_terminals(&self) -> u32 {
-        return self.children.iter().fold(0, |acc, (_, v)| {
+        self.children.iter().fold(0, |acc, (_, v)| {
             acc + if v.is_terminal { 1 } else { 0 } + v.count_terminals()
-        });
+        })
     }
 
     pub fn get_mut(&mut self, ch: char) -> Option<&mut Node<T>> {
-        return self.children.get_mut(&ch);
+        self.children.get_mut(&ch)
     }
 
-    pub fn insert<S: ?Sized>(&mut self, key: &S, value: T)
+    pub fn insert<S>(&mut self, key: &S, value: T)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.insert_fn(
             key,
@@ -109,9 +113,9 @@ impl<T: Debug + Clone> Node<T> {
         )
     }
 
-    pub fn insert_fn<S: ?Sized>(&mut self, key: &S, value: T, visitors: &InsertFnVisitors<T>)
+    pub fn insert_fn<S>(&mut self, key: &S, value: T, visitors: &InsertFnVisitors<T>)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         let k: &str = key.borrow();
 
@@ -149,9 +153,9 @@ impl<T: Debug + Clone> Node<T> {
         }
     }
 
-    pub fn remove<S: ?Sized>(&mut self, key: &S, remove_subtree: bool) -> Option<T>
+    pub fn remove<S>(&mut self, key: &S, remove_subtree: bool) -> Option<T>
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.remove_fn(
             key,
@@ -159,26 +163,26 @@ impl<T: Debug + Clone> Node<T> {
             None::<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> u32>,
         )
     }
-    pub fn remove_fn<U, S: ?Sized>(
+    pub fn remove_fn<U, S>(
         &mut self,
         str_left: &S,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
+        cb: RemoveCb<'_, T, U>,
     ) -> Option<T>
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         self.remove_fn_aux(str_left, remove_subtree, cb).0
     }
 
-    pub fn remove_fn_aux<U, S: ?Sized>(
+    pub fn remove_fn_aux<U, S>(
         &mut self,
         str_left: &S,
         remove_subtree: bool,
-        cb: Option<&dyn Fn(&mut Node<T>, char, Option<&Node<T>>) -> U>,
+        cb: RemoveCb<'_, T, U>,
     ) -> (Option<T>, bool)
     where
-        S: Borrow<str>,
+        S: Borrow<str> + ?Sized,
     {
         let sl: &str = str_left.borrow();
         let first_char = sl.chars().next().unwrap();
@@ -230,7 +234,7 @@ impl<T: Debug + Clone> Node<T> {
         if let Some(f) = cb {
             f(self, first_char, None);
         }
-        return (res.0, false);
+        (res.0, false)
     }
 
     pub fn contains_key(&self, s: &str) -> bool {
@@ -287,7 +291,7 @@ impl<T: Debug + Clone> Node<T> {
             }
 
             if cur_node.is_terminal {
-                last_term = Some((cur_node, format!("{str_acc}")));
+                last_term = Some((cur_node, str_acc.to_string()));
             }
 
             cur_node = next_node.unwrap();
@@ -339,23 +343,16 @@ impl<T: Debug + Clone> Node<T> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct InsertFnVisitors<'a, T: Debug + Clone> {
     pub node: Option<&'a dyn Fn(&mut Node<T>)>,
     pub terminal: Option<&'a dyn Fn(&mut Node<T>)>,
-}
-enum MatchType {
-    FullQuery,
-    FullPath,
-    Exact,
-    Loose,
 }
 
 struct LongestPrefOpts {
     must_be_terminal: bool,
     must_match_fully: bool,
 }
-
-type FindResults<'a, T> = Option<(&'a Node<T>, String)>;
 
 #[derive(Copy, Clone)]
 pub enum TraverseDirection {
@@ -384,12 +381,12 @@ impl<'a, T: Debug + Clone> Iterator for NodeIter<'a, T> {
         }
         let (s, n) = self.queue.pop_front().unwrap();
         for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{s}{k}"), &v));
+            self.queue.push_front((format!("{s}{k}"), v));
         }
         if n.is_terminal {
             return Some((s, n));
         }
-        return self.next();
+        self.next()
     }
 }
 
@@ -524,10 +521,10 @@ mod tests {
         t.insert("a", 1);
 
         assert_eq!(t.value, None);
-        assert_eq!(t.is_terminal, false);
+        assert!(!t.is_terminal);
         let subt = t.children.get(&'a').unwrap();
         assert_eq!(subt.value, Some(1));
-        assert_eq!(subt.is_terminal, true);
+        assert!(subt.is_terminal);
     }
 
     #[test]
@@ -578,7 +575,7 @@ mod tests {
         assert_eq!(t.pp(false), "a·\n bcde·\n");
     }
 
-    fn upd_stats_visitor(node: &mut Node<usize>, ch: char, _: Option<&Node<usize>>) {
+    fn upd_stats_visitor(node: &mut Node<usize>, _ch: char, _: Option<&Node<usize>>) {
         let visitors = ins_vis();
         visitors.node.unwrap()(node);
     }
@@ -602,7 +599,7 @@ mod tests {
         t.insert("abc", 2);
         t.insert("abcd", 3);
 
-        // TODO remove returns true/false
+        // false = remove only the exact key, keep descendants
         t.remove("ab", false);
         assert!(t.contains_key("a"));
         assert!(t.contains_key("abc"));

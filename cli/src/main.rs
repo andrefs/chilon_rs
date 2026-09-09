@@ -1,33 +1,18 @@
-#![feature(btree_extract_if)]
-
-mod args;
-mod counter;
-mod extract;
-mod iri_trie;
-mod meta_info;
-mod normalize;
-mod ns_trie;
-mod parse;
-mod prefixes;
-mod seg_tree;
-mod trie;
-mod util;
-mod visualization;
-
-use crate::iri_trie::IriTrieExt;
-use crate::meta_info::{MetaInfo, MetaInfoNormalization, MetaInfoVisualization, StageTask};
-use crate::normalize::save_normalized_triples;
-use crate::prefixes::build_iri_trie;
-use crate::seg_tree::SegTree;
-use args::Cli;
+use chilon_rs::args::Cli;
+use chilon_rs::error::ChilonError;
+use chilon_rs::iri_trie::IriTrieExt;
+use chilon_rs::meta_info::{
+    MetaInfo, MetaInfoInference, MetaInfoNormalization, MetaInfoVisualization, StageTask,
+};
+use chilon_rs::normalize::{normalize_triples, save_normalized_triples};
+use chilon_rs::ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
+use chilon_rs::prefixes::{build_iri_trie, community};
+use chilon_rs::seg_tree::SegTree;
 use chilon_rs::util::gen_file_name;
-use chilon_rs::visualization::{build_data, dump_json, render_vis, vis_dev_server};
+use chilon_rs::visualization::{build_data, dump_json, render_vis};
 use chrono::Utc;
 use clap::Parser;
-use log::{info, warn};
-use normalize::normalize_triples;
-use ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
-use prefixes::community;
+use log::info;
 use std::fs::{self, File};
 use std::path::Path;
 use std::process::Command;
@@ -35,7 +20,7 @@ use std::str;
 
 use simplelog::*;
 
-fn main() {
+fn main() -> Result<(), ChilonError> {
     /**********************
      * Initializing stuff *
      **********************/
@@ -70,6 +55,10 @@ fn main() {
         str::from_utf8(&output.stdout).unwrap().trim()
     );
 
+    // log command line
+    let args: Vec<String> = std::env::args().collect();
+    info!("Command: {}", args.join(" "));
+
     let cli = Cli::parse();
 
     /**********************
@@ -81,15 +70,18 @@ fn main() {
     info!("Loading community namespaces");
     let mut ns_trie: NamespaceTrie = community::load(allow_subns);
 
-    let n_workers = std::cmp::max(2, std::cmp::min(cli.files.len() + 1, num_cpus::get() - 2));
+    let n_workers = std::cmp::max(
+        2,
+        std::cmp::min(cli.files.len() + 1, num_cpus::get().saturating_sub(2)),
+    );
     let mut total_triples = 0;
 
     if cli.infer_ns {
         info!("Getting namespaces");
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
-        let mut infer_t = meta_info::MetaInfoInference::new();
+        let mut infer_t = MetaInfoInference::new();
         let (mut iri_trie, tasks, hk) =
-            build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns);
+            build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns)?;
 
         infer_t.add_tasks(tasks);
         infer_t.housekeeping = hk.clone();
@@ -130,17 +122,16 @@ fn main() {
     let (nts, used_groups, tasks) = normalize_triples(
         cli.files.clone(),
         n_workers,
-        &mut ns_trie,
+        &ns_trie,
         cli.ignore_unknown,
-        outf,
         total_triples,
-    );
+    )?;
 
     norm_t.add_tasks(tasks);
     norm_t.namespaces = used_groups.namespaces.len();
 
     info!("Saving normalized triples");
-    save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
+    save_normalized_triples(&nts, used_groups, Some(10), outf)?; // min_occurs = 10
 
     norm_t.finish("Finished summarizing graph");
     meta.normalization = Some(norm_t);
@@ -156,12 +147,13 @@ fn main() {
     let vis_data = build_data(outf);
     dump_json(&vis_data, outf);
 
-    let render_dir = render_vis(&vis_data, outf);
+    let _render_dir = render_vis(&vis_data, outf);
 
     vis_t.finish("Finished generating visualization");
     meta.visualization = Some(vis_t);
     meta.save();
     //vis_dev_server(render_dir);
+    Ok(())
 }
 
 fn init_log(outf: &str) {

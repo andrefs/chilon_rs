@@ -1,34 +1,44 @@
+[workspace]
+members = ["cli"]
+resolver = "2"
+
 [package]
 name = "chilon_rs"
 version = "1.3.2"
 edition = "2021"
+rust-version = "1.77"
+description = "Namespace-based summarization tool for RDF graphs"
+homepage = "https://github.com/andrefs/chilon_rs"
+repository = "https://github.com/andrefs/chilon_rs"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
 [dependencies]
-rio_turtle = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
-rio_api = { git = "https://github.com/andrefs/lax-rio/", version = "0.7.1" }
-bzip2 = "0.4.3"
+bzip2 = "0.6.1"
+chrono = "0.4.23"
 clap = { version = "4.1", features = ["derive"] }
+csv = "1.1.6"
+flate2 = "1.0.25"
+fs_extra = "1.3.0"
+itertools = "0.10.5"
+log = "0.4.0"
 num_cpus = "1.13.1"
+oxigraph = { version = "0.5.9", default-features = false }
+qp-trie = "0.8.0"
+rand = "0.10.2"
 rayon = "1.6.0"
-ureq = "2.5.0"
 regex = "1"
+oxttl = "0.2.3"
+oxrdf = "0.3.3"
 serde = { version = "1.0.87", features = ["derive"] }
 serde_json = "1.0"
-qp-trie = "0.8.0"
-log = "0.4.0"
-#simple_logger = {version = "4.0.0", features = ["stderr"]}
 simplelog = "0.12.0"
-url = "2.3.1"
-rand = "0.8.5"
+tera = "2.1.0"
 unicode-segmentation = "1.10.0"
-oxigraph = "0.3.10"
-tera = "1.17.1"
-chrono = "0.4.23"
-itertools = "0.10.5"
-flate2 = "1.0.25"
-csv = "1.1.6"
-fs_extra = "1.3.0"
-# spinners = "4.1.0"
+ureq = "3.3.0"
+url = "2.3.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

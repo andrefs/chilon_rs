@@ -1,19 +1,19 @@
-use log::{debug, info, warn};
+use log::{info, warn};
 use oxigraph::{
-    io::GraphFormat,
-    model::{GraphName, NamedNode},
-    sparql::{EvaluationError, QueryResults, QuerySolution},
-    store::{StorageError, Store},
+    io::RdfFormat,
+    model::NamedNode,
+    sparql::{QueryEvaluationError, QueryResults, QuerySolution, SparqlEvaluator},
+    store::Store,
 };
 
 use fs_extra::dir::copy;
 
-use rio_turtle::TurtleParser;
+use oxttl::TurtleParser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
-    fs::{remove_dir_all, rename, File, OpenOptions},
-    io::{self, BufRead, BufReader},
+    fs::{remove_dir_all, File, OpenOptions},
+    io::{self, BufReader},
     path::PathBuf,
     process::Command,
 };
@@ -21,14 +21,16 @@ use std::{io::Write, path::Path};
 use tera::{Context, Tera};
 use url::Url;
 
-pub fn load_summary(path: String) -> TurtleParser<impl BufRead> {
+pub fn load_summary(
+    path: String,
+) -> impl Iterator<Item = Result<oxrdf::Triple, oxttl::TurtleParseError>> {
     let file =
         File::open(path.clone()).unwrap_or_else(|e| panic!("Could not open file {}: {e}", path));
     let buf_reader = BufReader::new(file);
     info!("extracting {:?}", path);
     let stream = BufReader::new(buf_reader);
-    let parser = TurtleParser::new(stream, None);
-    return parser;
+
+    TurtleParser::new().lenient().for_reader(stream)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,42 +73,32 @@ pub fn build_data(outf: &str) -> VisData {
     let mut edges = HashMap::<(String, String), Vec<VisEdge>>::new();
     let mut aliases = HashMap::<String, String>::new();
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres1 {
-        let mut id_count = 0;
+    if let Ok(QueryResults::Solutions(sols)) = qres1 {
+        let _id_count = 0;
 
-        for s in sols {
-            if let Ok(sol) = s {
-                proc_norm_triples(sol, &mut nodes, &mut edges);
-            }
+        for sol in sols.flatten() {
+            proc_norm_triples(sol, &mut nodes, &mut edges);
         }
     }
 
-    if let Ok(QueryResults::Solutions(mut sols)) = qres2 {
-        for s in sols {
-            if let Ok(sol) = s {
-                proc_alias(sol, &mut aliases);
-            }
+    if let Ok(QueryResults::Solutions(sols)) = qres2 {
+        for sol in sols.flatten() {
+            proc_alias(sol, &mut aliases);
         }
     }
 
-    let mut sorted_edges = edges
-        .into_iter()
-        .map(|(_, v)| v)
-        .flatten()
-        .collect::<Vec<VisEdge>>();
+    let mut sorted_edges = edges.into_values().flatten().collect::<Vec<VisEdge>>();
 
-    sorted_edges.sort_by(|a, b| b.count.cmp(&a.count));
+    sorted_edges.sort_by_key(|b| std::cmp::Reverse(b.count));
 
     let mut sorted_nodes = nodes.into_values().collect::<Vec<_>>();
-    sorted_nodes.sort_by(|a, b| b.count.cmp(&a.count));
+    sorted_nodes.sort_by_key(|b| std::cmp::Reverse(b.count));
 
-    let data = VisData {
+    VisData {
         edges: sorted_edges,
         nodes: sorted_nodes,
         aliases,
-    };
-
-    return data;
+    }
 }
 
 fn proc_alias(sol: QuerySolution, aliases: &mut HashMap<String, String>) {
@@ -187,7 +179,7 @@ fn proc_norm_triples(
             .count += occurs_val.parse::<usize>().unwrap();
 
         let key = sort_pair(src_name.clone(), tgt_name.clone());
-        let colliding = edges.entry(key.clone()).or_insert_with(|| Vec::new());
+        let colliding = edges.entry(key.clone()).or_default();
         let signal = if src_name == key.0 { 1 } else { -1 };
 
         colliding.push(VisEdge {
@@ -217,15 +209,11 @@ fn load_store(outf: &str) -> Store {
     let stream = BufReader::new(buf_reader);
 
     let store = Store::new().unwrap();
-
-    store
-        .bulk_loader()
-        .load_graph(stream, GraphFormat::Turtle, &GraphName::DefaultGraph, None)
-        .unwrap();
+    store.load_from_reader(RdfFormat::Turtle, stream).unwrap();
     store
 }
 
-fn query_norm_triples(store: Store) -> Result<QueryResults, EvaluationError> {
+fn query_norm_triples(store: Store) -> Result<QueryResults<'static>, QueryEvaluationError> {
     let q = r#"
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         PREFIX afsgs: <http://andrefs.com/graph-summ/v1#>
@@ -241,11 +229,13 @@ fn query_norm_triples(store: Store) -> Result<QueryResults, EvaluationError> {
         ORDER BY DESC(?occurs)
         "#;
 
-    let qres = store.query(q);
-    return qres;
+    SparqlEvaluator::new()
+        .parse_query(q)?
+        .on_store(&store)
+        .execute()
 }
 
-fn query_aliases(store: Store) -> Result<QueryResults, EvaluationError> {
+fn query_aliases(store: Store) -> Result<QueryResults<'static>, QueryEvaluationError> {
     let q = r#"
         BASE <http://andrefs.com/graph-summ/v1>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
@@ -257,8 +247,10 @@ fn query_aliases(store: Store) -> Result<QueryResults, EvaluationError> {
         }
         "#;
 
-    let qres = store.query(q);
-    return qres;
+    SparqlEvaluator::new()
+        .parse_query(q)?
+        .on_store(&store)
+        .execute()
 }
 
 fn get_fragment(n: NamedNode) -> Option<String> {
@@ -281,6 +273,7 @@ pub fn dump_json(data: &VisData, outf: &str) {
     let mut fd = OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(true)
         .open(file_path.clone())
         .unwrap();
 
@@ -288,36 +281,43 @@ pub fn dump_json(data: &VisData, outf: &str) {
 }
 
 pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
-    let RENDER_DIR = Path::new(".").join("chilon-viz");
-    let tera = Tera::new("templates/**/*").unwrap();
+    let render_dir = Path::new(".").join("chilon-viz");
+    let mut tera = Tera::new();
+    tera.add_raw_templates(vec![(
+        "raw-data.ts",
+        &std::fs::read_to_string("templates/raw-data.ts").unwrap(),
+    )])
+    .unwrap();
     let mut ctx = Context::new();
-    ctx.insert("data", &data);
+    let data_json = serde_json::to_string_pretty(&data).unwrap();
+    ctx.insert("data_json", &data_json);
 
-    let data_path = RENDER_DIR.join("src").join("data").join("raw-data.ts");
+    let data_path = render_dir.join("src").join("data").join("raw-data.ts");
 
     info!("Copying data to {}", data_path.to_string_lossy());
 
-    let data_fd = OpenOptions::new()
+    let mut data_fd = OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
         .open(data_path.clone())
         .unwrap();
 
-    tera.render_to("raw-data.ts", &ctx, data_fd).unwrap();
+    let rendered = tera.render("raw-data.ts", &ctx).unwrap();
+    data_fd.write_all(rendered.as_bytes()).unwrap();
 
     info!("Building Vite");
     let output = Command::new("sh")
         .arg("-c")
         .arg("yarn build-no-tsc")
-        .current_dir(RENDER_DIR.clone())
+        .current_dir(render_dir.clone())
         .output()
         .expect("Failed to execute vite build");
 
     io::stdout().write_all(&output.stdout).unwrap();
     io::stderr().write_all(&output.stderr).unwrap();
 
-    let src = RENDER_DIR.join("dist");
+    let src = render_dir.join("dist");
     let dst = Path::new(outf).join("dist");
     info!(
         "Copying {} to {}",
@@ -334,12 +334,12 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     }
     copy(src, outf, &Default::default()).unwrap();
 
-    return RENDER_DIR;
+    render_dir
 }
 
 pub fn vis_dev_server(dir: PathBuf) {
     info!("Opening dev env");
-    let output = Command::new("sh")
+    let _output = Command::new("sh")
         .arg("-c")
         .arg("yarn dev")
         .current_dir(dir)
@@ -348,4 +348,57 @@ pub fn vis_dev_server(dir: PathBuf) {
 
     //io::stdout().write_all(&output.stdout).unwrap();
     //io::stderr().write_all(&output.stderr).unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_pair_already_sorted() {
+        assert_eq!(sort_pair("a".into(), "b".into()), ("a".into(), "b".into()));
+    }
+
+    #[test]
+    fn sort_pair_reversed() {
+        assert_eq!(sort_pair("b".into(), "a".into()), ("a".into(), "b".into()));
+    }
+
+    #[test]
+    fn sort_pair_equal() {
+        assert_eq!(
+            sort_pair("same".into(), "same".into()),
+            ("same".into(), "same".into())
+        );
+    }
+
+    #[test]
+    fn dump_json_writes_file() {
+        let data = VisData {
+            nodes: vec![VisNode {
+                name: "ex".into(),
+                count: 42,
+                node_type: VisNodeType::Namespace,
+            }],
+            edges: vec![VisEdge {
+                source: "ex".into(),
+                target: "nt".into(),
+                count: 10,
+                label: "p".into(),
+                is_datatype: false,
+                link_num: 1,
+            }],
+            aliases: [("ex".into(), "http://ex.org/".into())].into(),
+        };
+        let dir = tempfile::TempDir::new().unwrap();
+        dump_json(&data, dir.path().to_str().unwrap());
+
+        let json_path = dir.path().join("vis-data.json");
+        assert!(json_path.exists());
+
+        let content = std::fs::read_to_string(json_path).unwrap();
+        assert!(content.contains("ex"));
+        assert!(content.contains("42"));
+        assert!(content.contains("http://ex.org/"));
+    }
 }

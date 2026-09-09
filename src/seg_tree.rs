@@ -1,11 +1,12 @@
+use crate::{iri_trie::IriTrie, ns_trie::NamespaceSource};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
-    usize,
 };
 use url::Url;
 
-use crate::{iri_trie::IriTrie, ns_trie::NamespaceSource};
+const MIN_NS_SIZE: usize = 1000;
+const MIN_DOMAIN_OCCURS: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegTree {
@@ -14,7 +15,7 @@ pub struct SegTree {
 }
 
 impl SegTree {
-    fn from_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
+    fn build_aux(&mut self, iri_trie: &IriTrie, word_acc: String, prev_str: &str) {
         if iri_trie.children.is_empty() {
             if !word_acc.is_empty() {
                 self.children.insert(
@@ -32,14 +33,14 @@ impl SegTree {
         }
 
         for (c, node) in &iri_trie.children {
-            if ['/', '#'].contains(&c) {
+            if ['/', '#'].contains(c) {
                 let ns_cand = format!("{prev_str}{word_acc}{c}");
                 let url_obj = Url::parse(ns_cand.as_str());
 
                 // this is not a URL or the kind we want
                 if url_obj.is_err() || !url_obj.unwrap().has_host() {
-                    self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
-                    return;
+                    self.build_aux(node, format!("{word_acc}{c}"), prev_str);
+                    continue;
                 }
 
                 let sub_tree = SegTree {
@@ -52,13 +53,13 @@ impl SegTree {
                 self.children
                     .entry(format!("{word_acc}{c}"))
                     .or_insert(sub_tree)
-                    .from_aux(
-                        &node,
+                    .build_aux(
+                        node,
                         "".to_string(),
                         format!("{prev_str}{word_acc}{c}").as_str(),
                     );
             } else {
-                self.from_aux(&node, format!("{word_acc}{c}"), prev_str);
+                self.build_aux(node, format!("{word_acc}{c}"), prev_str);
             }
         }
     }
@@ -66,8 +67,6 @@ impl SegTree {
     pub fn infer_namespaces(&self) -> (Vec<(String, usize, NamespaceSource)>, Vec<String>) {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
         let mut gbg_collected: Vec<String> = Vec::new();
-        let MIN_NS_SIZE = 1000;
-        let MIN_DOMAIN_OCCURS = 100;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
@@ -93,16 +92,16 @@ impl SegTree {
             .map(|ns| (ns.namespace.clone(), ns.size, NamespaceSource::Inference))
             .collect();
 
-        return (inferred, gbg_collected);
+        (inferred, gbg_collected)
     }
 
-    pub fn could_be_ns(&self, MIN_NS_SIZE: usize) -> bool {
-        self.value >= MIN_NS_SIZE
+    pub fn could_be_ns(&self, min_ns_size: usize) -> bool {
+        self.value >= min_ns_size
     }
 }
 
-fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize) {
-    let MAX_NS = 5;
+fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, min_ns_size: usize) {
+    const MAX_NS: usize = 5;
     let mut expanded = 0;
     let mut added = true;
 
@@ -110,34 +109,27 @@ fn infer_namespaces_aux(h: &mut BTreeSet<NamespaceCandidate>, MIN_NS_SIZE: usize
         //while h.len() < MAX_NS {
         added = false;
         let h_len = h.len();
-        let mut found = false;
 
-        match h
-            .extract_if(|item| {
-                if !found {
-                    let suitable = item
-                        .node
-                        .children
-                        .iter()
-                        .filter(|(_, n)| n.could_be_ns(MIN_NS_SIZE))
-                        .collect::<Vec<_>>();
-                    if !suitable.is_empty() && ((suitable.len() + h_len) <= MAX_NS) {
-                        found = true;
-                        return true;
-                    }
-                }
-                return false;
+        let parent = h
+            .iter()
+            .find(|item| {
+                let suitable = item
+                    .node
+                    .children
+                    .iter()
+                    .filter(|(_, n)| n.could_be_ns(min_ns_size))
+                    .count();
+                suitable > 0 && (suitable + h_len) <= MAX_NS
             })
-            .collect::<Vec<_>>()
-            .first()
-            .cloned()
-        {
+            .cloned();
+
+        match parent {
             Some(parent) => {
                 h.remove(&parent);
                 expanded -= 1;
 
                 for (seg, node) in parent.node.children {
-                    if node.could_be_ns(MIN_NS_SIZE) {
+                    if node.could_be_ns(min_ns_size) {
                         expanded += 1;
                         added = true;
                         h.insert(NamespaceCandidate {
@@ -161,9 +153,9 @@ impl From<&IriTrie> for SegTree {
             children: BTreeMap::new(),
         };
 
-        res.from_aux(iri_trie, "".to_string(), "");
+        res.build_aux(iri_trie, "".to_string(), "");
 
-        return res;
+        res
     }
 }
 
@@ -183,13 +175,13 @@ impl Ord for NamespaceCandidate {
         if self.size > other.size {
             return Ordering::Greater;
         }
-        if self.children > other.size {
+        if self.children > other.children {
             return Ordering::Less;
         }
-        if self.children < other.size {
+        if self.children < other.children {
             return Ordering::Greater;
         }
-        return Ordering::Equal;
+        Ordering::Equal
     }
 }
 
@@ -226,9 +218,9 @@ impl<'a> Iterator for NodeIter<'a> {
         }
         let (s, n) = self.queue.pop_front().unwrap();
         for (k, v) in n.children.iter() {
-            self.queue.push_front((format!("{k}"), &v));
+            self.queue.push_front((k.to_string(), v));
         }
-        return Some((s, n));
+        Some((s, n))
     }
 }
 
@@ -262,5 +254,50 @@ mod tests {
         assert!(v.contains("1/"));
         assert!(v.contains("2"));
         assert!(v.contains("more"));
+    }
+
+    #[test]
+    fn infer_namespaces_orders_by_size_then_children() {
+        fn leaf(value: usize) -> SegTree {
+            SegTree {
+                value,
+                children: BTreeMap::new(),
+            }
+        }
+
+        let mut root = SegTree {
+            value: 0,
+            children: BTreeMap::new(),
+        };
+
+        // value 1000, no children (order: smallest size first)
+        root.children.insert("http://a/".to_string(), leaf(1000));
+
+        // value 3000, 1 non-worthy child (children = 1)
+        let mut x = SegTree {
+            value: 3000,
+            children: BTreeMap::new(),
+        };
+        x.children.insert("x/".to_string(), leaf(500));
+        root.children.insert("http://x/".to_string(), x);
+
+        // value 3000, 3 non-worthy children (children = 3)
+        let mut y = SegTree {
+            value: 3000,
+            children: BTreeMap::new(),
+        };
+        y.children.insert("y1/".to_string(), leaf(500));
+        y.children.insert("y2/".to_string(), leaf(500));
+        y.children.insert("y3/".to_string(), leaf(500));
+        root.children.insert("http://y/".to_string(), y);
+
+        let (inferred, gbg) = root.infer_namespaces();
+
+        assert!(gbg.is_empty());
+        let ns: Vec<&str> = inferred.iter().map(|(n, _, _)| n.as_str()).collect();
+        // size ascending; on the 3000 tie, more children (y=3 > x=1) sorts first
+        assert_eq!(ns, vec!["http://a/", "http://y/", "http://x/"]);
+        assert_eq!(inferred[1].1, 3000);
+        assert_eq!(inferred[2].1, 3000);
     }
 }
