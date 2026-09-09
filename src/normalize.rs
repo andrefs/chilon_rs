@@ -396,9 +396,9 @@ fn proc_triples(
     let mut last_i = 0;
     let mut start = Instant::now();
 
-    let iri_c = 0;
-    let blank_c = 0;
-    let literal_c = 0;
+    let mut iri_c = 0;
+    let mut blank_c = 0;
+    let mut literal_c = 0;
 
     for result in graph.by_ref() {
         i += 1;
@@ -430,13 +430,16 @@ fn proc_triples(
             }
         };
 
-        let (_iris, _blanks, _literals) = match proc_triple(t, tx, ns_trie, ignore_unknown) {
+        let (iris, blanks, literals) = match proc_triple(t, tx, ns_trie, ignore_unknown) {
             Ok(counts) => counts,
             Err(_) => {
                 warn!("Aborting file {:?} due to channel disconnect", path);
                 return;
             }
         };
+        iri_c += iris;
+        blank_c += blanks;
+        literal_c += literals;
     }
     if tx
         .send(Message::Finished {
@@ -1032,5 +1035,41 @@ mod tests {
             alias: "xsd".into(),
             namespace: "http://www.w3.org/TR/xmlschema11-2/".into()
         }));
+    }
+
+    #[test]
+    fn proc_triples_finished_counts() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("test.nt");
+        std::fs::write(
+            &path,
+            "<http://ex.org/s1> <http://ex.org/p> <http://ex.org/o1> .\n\
+             <http://ex.org/s2> <http://ex.org/p> <http://ex.org/o2> .",
+        )
+        .unwrap();
+
+        let mut graph = parse(&path).unwrap();
+        let (tx, rx) = std::sync::mpsc::sync_channel(100);
+        let ns_trie = NamespaceTrie::new();
+        proc_triples(&mut graph, &path, &tx, &ns_trie, false);
+
+        let mut finished = None;
+        for msg in rx.try_iter() {
+            if let Message::Finished {
+                triples,
+                iris,
+                blanks,
+                literals,
+                ..
+            } = msg
+            {
+                finished = Some((triples, iris, blanks, literals));
+            }
+        }
+        let (triples, iris, blanks, literals) = finished.unwrap();
+        assert_eq!(triples, 2);
+        assert_eq!(iris, 6); // 2 triples x (subject + predicate + object)
+        assert_eq!(blanks, 0);
+        assert_eq!(literals, 0);
     }
 }
