@@ -19,7 +19,7 @@ pub struct NodeStats {
     pub desc: usize,
     pub uniq_desc: usize,
 }
-pub type IriTrie = Node<NodeStats>; // todo finish
+pub type IriTrie = Node<NodeStats>;
 
 impl NodeStats {
     pub fn new() -> NodeStats {

@@ -599,7 +599,7 @@ mod tests {
         t.insert("abc", 2);
         t.insert("abcd", 3);
 
-        // TODO remove returns true/false
+        // false = remove only the exact key, keep descendants
         t.remove("ab", false);
         assert!(t.contains_key("a"));
         assert!(t.contains_key("abc"));
