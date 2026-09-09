@@ -77,7 +77,7 @@ fn main() -> Result<(), ChilonError> {
         // TODO: add more mappings to ns_map  from user supplied rdf file with flag -p
         let mut infer_t = MetaInfoInference::new();
         let (mut iri_trie, tasks, hk) =
-            build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns);
+            build_iri_trie(cli.files.clone(), n_workers, &mut ns_trie, allow_subns)?;
 
         infer_t.add_tasks(tasks);
         infer_t.housekeeping = hk.clone();

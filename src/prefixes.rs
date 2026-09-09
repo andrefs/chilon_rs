@@ -58,17 +58,19 @@ pub fn build_iri_trie(
     n_workers: usize,
     ns_trie: &mut NamespaceTrie,
     allow_subns: bool,
-) -> (IriTrie, BTreeMap<String, Task>, InferHK) {
+) -> Result<(IriTrie, BTreeMap<String, Task>, InferHK), ChilonError> {
     debug!("Building IRI trie");
 
     if n_workers < 2 {
-        panic!("Number of workers must be at least 2");
+        return Err(ChilonError::InvalidInput(format!(
+            "Number of workers must be at least 2, got {}",
+            n_workers
+        )));
     }
     info!("Creating pool with {n_workers} threads");
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)
-        .build()
-        .unwrap();
+        .build()?;
     let paths_len = paths.len();
     let mut running = paths_len;
     debug!("Processing {running} files: {paths:?}");
@@ -116,7 +118,7 @@ pub fn build_iri_trie(
 
     handle_pref_decls(&mut iri_trie, local_ns, ns_trie);
 
-    (iri_trie, tasks, hk)
+    Ok((iri_trie, tasks, hk))
 }
 
 #[allow(clippy::too_many_arguments)]
