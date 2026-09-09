@@ -617,30 +617,30 @@ pub fn save_normalized_triples(
         .map_err(ChilonError::Io)?;
 
     let base = "http://andrefs.com/graph-summ/v1";
-    writeln!(fd, "@base <{}> .", { base }).unwrap();
-    writeln!(fd, "@prefix ngont: <{}/ontology> .", base).unwrap(); // ontology (data-types?, unknown, blank, classes and predicates, etc)
-    writeln!(fd, "@prefix ngns: <{}/instance> .", base).unwrap(); // namespaces (kgs, data types?)
-    writeln!(fd).unwrap();
+    writeln!(fd, "@base <{}> .", { base })?;
+    writeln!(fd, "@prefix ngont: <{}/ontology> .", base)?; // ontology (data-types?, unknown, blank, classes and predicates, etc)
+    writeln!(fd, "@prefix ngns: <{}/instance> .", base)?; // namespaces (kgs, data types?)
+    writeln!(fd)?;
 
     let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 
     let mut serializer = TurtleSerializer::new()
         .with_prefix("ngont", format!("{base}/ontology"))
-        .unwrap()
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
         .with_prefix("ngns", format!("{base}/instance"))
-        .unwrap()
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
         .for_writer(&mut fd);
 
-    format_groups(used_groups, &mut serializer);
+    format_groups(used_groups, &mut serializer)?;
 
-    serializer.finish().unwrap();
-    writeln!(fd).unwrap();
+    serializer.finish()?;
+    writeln!(fd)?;
 
     let mut serializer = TurtleSerializer::new()
         .with_prefix("ngont", format!("{base}/ontology"))
-        .unwrap()
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
         .with_prefix("ngns", format!("{base}/instance"))
-        .unwrap()
+        .map_err(|e| ChilonError::Parse(e.to_string()))?
         .for_writer(&mut fd);
 
     for (s, p, o, is_datatype, occurs) in nts.iter_all() {
@@ -669,7 +669,7 @@ pub fn save_normalized_triples(
                 NamedNode::new_unchecked(pred),
                 NamedNode::new_unchecked(obj),
             );
-            serializer.serialize_triple(&t).unwrap();
+            serializer.serialize_triple(&t)?;
         }
 
         let t = Triple::new(
@@ -680,31 +680,33 @@ pub fn save_normalized_triples(
                 NamedNode::new_unchecked("http://www.w3.org/2001/XMLSchema#integer"),
             ),
         );
-        serializer.serialize_triple(&t).unwrap();
+        serializer.serialize_triple(&t)?;
     }
-    serializer.finish().unwrap();
+    serializer.finish()?;
     Ok(())
 }
 
 pub fn format_groups(
     groups: Groups,
     serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
-) {
+) -> Result<(), ChilonError> {
     for group in groups.namespaces {
-        format_group(group, serializer);
+        format_group(group, serializer)?;
     }
+    Ok(())
 }
 
 pub fn format_group(
     group: GroupNS,
     serializer: &mut oxttl::turtle::WriterTurtleSerializer<&mut File>,
-) {
+) -> Result<(), ChilonError> {
     let t = Triple::new(
         NamedNode::new_unchecked(format!("#{}", group.alias)),
         NamedNode::new_unchecked("#namespacePrefix"),
         NamedNode::new_unchecked(&group.namespace),
     );
-    serializer.serialize_triple(&t).unwrap();
+    serializer.serialize_triple(&t)?;
+    Ok(())
 }
 
 #[cfg(test)]
