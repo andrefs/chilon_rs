@@ -178,16 +178,23 @@ pub fn normalize_triples(
             let tx = tx.clone();
 
             s.spawn_fifo(move |_| {
-                tx.send(Message::Started {
-                    path: path.to_string_lossy().to_string(),
-                })
-                .unwrap();
+                if tx
+                    .send(Message::Started {
+                        path: path.to_string_lossy().to_string(),
+                    })
+                    .is_err()
+                {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                    return;
+                }
 
                 info!("Parsing {:?}", path);
                 let mut graph = match parse(&path) {
                     Ok(g) => g,
                     Err(err) => {
-                        tx.send(Message::FatalError { err }).unwrap();
+                        if tx.send(Message::FatalError { err }).is_err() {
+                            warn!("Channel disconnected, aborting file {:?}", path);
+                        }
                         return;
                     }
                 };
@@ -416,21 +423,33 @@ fn proc_triples(
             Err(err) => {
                 let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
-                tx.send(Message::FatalError { err: err.into() }).unwrap();
+                if tx.send(Message::FatalError { err: err.into() }).is_err() {
+                    warn!("Channel disconnected, aborting file {:?}", path);
+                }
                 return;
             }
         };
 
-        let (_iris, _blanks, _literals) = proc_triple(t, tx, ns_trie, ignore_unknown);
+        let (_iris, _blanks, _literals) = match proc_triple(t, tx, ns_trie, ignore_unknown) {
+            Ok(counts) => counts,
+            Err(_) => {
+                warn!("Aborting file {:?} due to channel disconnect", path);
+                return;
+            }
+        };
     }
-    tx.send(Message::Finished {
-        path: path.to_string_lossy().to_string(),
-        triples: i as usize,
-        iris: iri_c,
-        blanks: blank_c,
-        literals: literal_c,
-    })
-    .unwrap();
+    if tx
+        .send(Message::Finished {
+            path: path.to_string_lossy().to_string(),
+            triples: i as usize,
+            iris: iri_c,
+            blanks: blank_c,
+            literals: literal_c,
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file {:?}", path);
+    }
 }
 
 fn count_resources(subject: &NamedOrBlankNode, object: &Term) -> (usize, usize, usize) {
@@ -460,7 +479,7 @@ fn proc_triple(
     tx: &SyncSender<Message>,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-) -> (usize, usize, usize) {
+) -> Result<(usize, usize, usize), ()> {
     let (iris, blanks, literals) = count_resources(&t.subject, &t.object);
     let subject = handle_subject(t.subject, ns_trie);
     let predicate = handle_predicate(t.predicate, ns_trie);
@@ -473,7 +492,7 @@ fn proc_triple(
             }
         }
         if subject.is_err() || predicate.is_err() || object.is_err() {
-            return (iris, blanks, literals);
+            return Ok((iris, blanks, literals));
         }
     }
 
@@ -489,28 +508,37 @@ fn proc_triple(
         unknown_ns.push(e.iri.clone());
     }
 
-    if !unknown_ns.is_empty() {
-        tx.send(Message::NamespacesUnknown { iris: unknown_ns })
-            .unwrap();
+    if !unknown_ns.is_empty()
+        && tx
+            .send(Message::NamespacesUnknown { iris: unknown_ns })
+            .is_err()
+    {
+        warn!("Channel disconnected, aborting file");
+        return Err(());
     }
 
-    tx.send(Message::NormalizedTriple {
-        subject: match subject {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-        predicate: match predicate {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-        object: match object {
-            Ok(ns) => ns.clone(),
-            Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
-        },
-    })
-    .unwrap();
+    if tx
+        .send(Message::NormalizedTriple {
+            subject: match subject {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+            predicate: match predicate {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+            object: match object {
+                Ok(ns) => ns.clone(),
+                Err(UnknownNamespaceError { iri: _ }) => NormalizedResource::Unknown,
+            },
+        })
+        .is_err()
+    {
+        warn!("Channel disconnected, aborting file");
+        return Err(());
+    }
 
-    (iris, blanks, literals)
+    Ok((iris, blanks, literals))
 }
 
 fn handle_subject(
@@ -871,7 +899,10 @@ mod tests {
             NamedNode::new_unchecked("http://ex.org/o"),
         );
         let (tx, rx) = std::sync::mpsc::sync_channel(100);
-        let (iris, blanks, literals) = proc_triple(triple, &tx, &ns_trie, false);
+        let (iris, blanks, literals) = match proc_triple(triple, &tx, &ns_trie, false) {
+            Ok(counts) => counts,
+            Err(()) => return,
+        };
 
         assert_eq!(iris, 3);
         assert_eq!(blanks, 0);
