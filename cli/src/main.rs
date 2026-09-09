@@ -128,7 +128,7 @@ fn main() -> Result<(), ChilonError> {
     norm_t.namespaces = used_groups.namespaces.len();
 
     info!("Saving normalized triples");
-    save_normalized_triples(&nts, used_groups, Some(10), outf); // min_occurs = 10
+    save_normalized_triples(&nts, used_groups, Some(10), outf)?; // min_occurs = 10
 
     norm_t.finish("Finished summarizing graph");
     meta.normalization = Some(norm_t);

@@ -577,10 +577,10 @@ fn handle_literal(
             lang: Some(language.to_string()),
         }))
     } else if lit.datatype().as_str() == "http://www.w3.org/2001/XMLSchema#string" {
-        // Simple literal — no namespace lookup needed
+        // Simple literal, no namespace lookup needed
         Ok(NormalizedResource::Literal(Lit { lang: None }))
     } else {
-        // Typed literal — look up datatype namespace
+        // Typed literal, look up datatype namespace
         let datatype = lit.datatype();
         let res = ns_trie.longest_prefix(datatype.as_str(), true);
         if let Some((node, ns)) = res {
@@ -603,7 +603,7 @@ pub fn save_normalized_triples(
     used_groups: Groups,
     min_occurs: Option<i32>,
     outf: &str,
-) {
+) -> Result<(), ChilonError> {
     let file_path = Path::new(".").join(outf).join("output.ttl");
     info!("Saving graph summary to {}", file_path.to_string_lossy());
 
@@ -614,7 +614,7 @@ pub fn save_normalized_triples(
         .create(true)
         .truncate(true)
         .open(file_path.clone())
-        .unwrap();
+        .map_err(ChilonError::Io)?;
 
     let base = "http://andrefs.com/graph-summ/v1";
     writeln!(fd, "@base <{}> .", { base }).unwrap();
@@ -683,6 +683,7 @@ pub fn save_normalized_triples(
         serializer.serialize_triple(&t).unwrap();
     }
     serializer.finish().unwrap();
+    Ok(())
 }
 
 pub fn format_groups(
