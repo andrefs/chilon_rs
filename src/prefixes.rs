@@ -2,6 +2,7 @@ pub mod community;
 
 use crate::error::ChilonError;
 use crate::meta_info::{InferHK, InferHKTask, Task, TaskType};
+use crate::ns_trie::InferredNamespaces;
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
@@ -21,8 +22,6 @@ use std::{path::PathBuf, sync::mpsc::sync_channel};
 use unicode_segmentation::UnicodeSegmentation;
 use url::Url;
 
-use crate::ns_trie::InferredNamespaces;
-
 pub enum Position {
     Subject,
     Predicate,
@@ -30,6 +29,9 @@ pub enum Position {
 }
 
 const CHANNEL_BUFFER: usize = 100;
+const IRI_TRIE_SIZE: usize = 1_000_000;
+const IRI_MAX_LENGTH: usize = 200;
+
 pub enum Message {
     Started {
         path: String,
@@ -235,8 +237,6 @@ fn maintenance(
     let mut res = None::<InferHKTask>;
 
     if let Some(size) = iri_trie.value {
-        const IRI_TRIE_SIZE: usize = 1_000_000;
-
         if size.desc > IRI_TRIE_SIZE {
             let mut t = InferHKTask::new();
 
@@ -472,7 +472,6 @@ fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(usize, usize, usi
 }
 
 fn normalize_iri(iri: &str) -> String {
-    const IRI_MAX_LENGTH: usize = 200;
     if iri.len() <= IRI_MAX_LENGTH {
         return iri.to_string();
     }

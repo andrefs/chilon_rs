@@ -1,10 +1,12 @@
+use crate::{iri_trie::IriTrie, ns_trie::NamespaceSource};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
 };
 use url::Url;
 
-use crate::{iri_trie::IriTrie, ns_trie::NamespaceSource};
+const MIN_NS_SIZE: usize = 1000;
+const MIN_DOMAIN_OCCURS: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegTree {
@@ -65,8 +67,6 @@ impl SegTree {
     pub fn infer_namespaces(&self) -> (Vec<(String, usize, NamespaceSource)>, Vec<String>) {
         let mut h: BTreeSet<NamespaceCandidate> = BTreeSet::new();
         let mut gbg_collected: Vec<String> = Vec::new();
-        const MIN_NS_SIZE: usize = 1000;
-        const MIN_DOMAIN_OCCURS: usize = 100;
 
         // self is empty string root node
         for (ns, st) in self.children.iter() {
