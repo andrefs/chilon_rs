@@ -45,3 +45,31 @@ impl From<oxttl::TurtleParseError> for ChilonError {
         ChilonError::Parse(e.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn invalid_input_display_is_non_empty() {
+        let err = ChilonError::InvalidInput("n_workers < 2".into());
+        assert!(!err.to_string().is_empty());
+        assert_eq!(err.to_string(), "invalid input: n_workers < 2");
+    }
+
+    #[test]
+    fn io_error_converts_via_from() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "nope");
+        let converted: ChilonError = io_err.into();
+        assert!(matches!(converted, ChilonError::Io(_)));
+    }
+
+    #[test]
+    fn io_error_exposes_source() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let err = ChilonError::Io(io_err);
+        assert!(err.source().is_some());
+        assert_eq!(err.source().unwrap().to_string(), "denied");
+    }
+}

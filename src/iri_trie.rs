@@ -1,7 +1,6 @@
-use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug};
-
 use crate::trie::Node;
 use log::{info, warn};
+use std::{borrow::Borrow, collections::BTreeMap, fmt::Debug};
 
 // Represents occurrences as subject, predicate or object
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +25,7 @@ impl NodeStats {
         NodeStats {
             own: 0,       // occurrences of this IRI (as terminal)
             desc: 0,      // occurrences of IRIs with this prefix
-            uniq_desc: 0, // occurrences of IRIs with this prefix (unique)
+            uniq_desc: 0, // distinct descendant IRIs (terminal count below this node)
         }
     }
 
@@ -224,9 +223,10 @@ impl IriTrieExt for IriTrie {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::trie::InsertFnVisitors;
+use crate::trie::InsertFnVisitors;
 
+#[cfg(test)]
+mod tests {
     use super::*;
 
     #[test]
@@ -370,4 +370,47 @@ mod tests {
         assert_eq!(t.stats().desc, 2);
         assert_eq!(t.stats().uniq_desc, 1);
     }
+}
+
+#[test]
+fn uniq_desc_counts_distinct_descendants() {
+    let mut trie = IriTrie::new();
+    trie.insert_fn(
+        "http://example.org/",
+        Default::default(),
+        &InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        },
+    );
+    for _ in 0..3 {
+        trie.insert_fn(
+            "http://example.org/foo",
+            Default::default(),
+            &InsertFnVisitors {
+                node: Some(&update_stats),
+                terminal: Some(&inc_own),
+            },
+        );
+    }
+    trie.insert_fn(
+        "http://example.org/foo/bar",
+        Default::default(),
+        &InsertFnVisitors {
+            node: Some(&update_stats),
+            terminal: Some(&inc_own),
+        },
+    );
+
+    // root: 1 own, 4 descendant occurrences (3x foo + 1x bar), 2 distinct descendants
+    let root = trie.find("http://example.org/", true).unwrap();
+    assert_eq!(root.0.stats().own, 1);
+    assert_eq!(root.0.stats().desc, 4);
+    assert_eq!(root.0.stats().uniq_desc, 2);
+
+    // foo: own=3 (inserted 3x), 1 descendant occurrence, 1 distinct descendant
+    let foo = trie.find("http://example.org/foo", true).unwrap();
+    assert_eq!(foo.0.stats().own, 3);
+    assert_eq!(foo.0.stats().desc, 1);
+    assert_eq!(foo.0.stats().uniq_desc, 1);
 }

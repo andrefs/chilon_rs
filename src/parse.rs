@@ -137,3 +137,9 @@ mod tests {
         assert!(matches!(parser, ParserWrapper::Turtle(_)));
     }
 }
+
+#[test]
+fn test_parse_nonexistent_errors() {
+    let path = PathBuf::from("/this/file/does/not/exist.ttl");
+    assert!(parse(&path).is_err());
+}
