@@ -4,6 +4,7 @@ use crate::{
     meta_info::{Task, TaskType},
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
+    util::validate_workers,
 };
 use log::{error, info, trace, warn};
 use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
@@ -161,12 +162,7 @@ pub fn normalize_triples(
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
-    if n_workers < 2 {
-        return Err(ChilonError::InvalidInput(format!(
-            "Number of workers must be at least 2, got {}",
-            n_workers
-        )));
-    }
+    validate_workers(n_workers)?;
     info!("Creating pool with {n_workers} threads");
 
     let mut running = paths.len();

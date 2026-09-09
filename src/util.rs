@@ -1,3 +1,4 @@
+use crate::error::ChilonError;
 use std::path::Path;
 
 pub fn gen_file_name(name: String, ext: String) -> String {
@@ -18,6 +19,16 @@ pub fn gen_file_name(name: String, ext: String) -> String {
     }
 
     file_path.to_str().unwrap().to_string()
+}
+
+pub fn validate_workers(n_workers: usize) -> Result<(), ChilonError> {
+    if n_workers < 2 {
+        return Err(ChilonError::InvalidInput(format!(
+            "Number of workers must be at least 2, got {}",
+            n_workers
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

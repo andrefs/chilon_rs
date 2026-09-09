@@ -7,6 +7,7 @@ use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
 use crate::seg_tree::SegTree;
 use crate::trie::{InsertFnVisitors, Node};
+use crate::util::validate_workers;
 use crate::{
     counter::Counter,
     iri_trie::{inc_own, update_stats, IriTrie, IriTrieExt, NodeStats},
@@ -66,13 +67,9 @@ pub fn build_iri_trie(
 ) -> Result<(IriTrie, BTreeMap<String, Task>, InferHK), ChilonError> {
     debug!("Building IRI trie");
 
-    if n_workers < 2 {
-        return Err(ChilonError::InvalidInput(format!(
-            "Number of workers must be at least 2, got {}",
-            n_workers
-        )));
-    }
+    validate_workers(n_workers)?;
     info!("Creating pool with {n_workers} threads");
+
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(n_workers)
         .build()?;
