@@ -152,7 +152,6 @@ pub fn normalize_triples(
     n_workers: usize,
     ns_trie: &NamespaceTrie,
     ignore_unknown: bool,
-    outf: &str,
     total_triples: usize,
 ) -> Result<(TripleFreq, Groups, BTreeMap<String, Task>), ChilonError> {
     let mut triples = TripleFreq::new();
@@ -202,21 +201,12 @@ pub fn normalize_triples(
             });
         }
 
-        let errors_path = Path::new(".").join(outf).join("errors.log");
-        let mut fd = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(errors_path.clone())
-            .unwrap();
-
         handle_loop(
             &mut running,
             rx,
             &mut triples,
             &mut used_groups,
             &mut tasks,
-            &mut fd,
             ignore_unknown,
             total_triples,
         )
@@ -232,7 +222,6 @@ fn handle_loop(
     triples: &mut TripleFreq,
     used_groups: &mut Groups,
     tasks: &mut BTreeMap<String, Task>,
-    _fd: &mut File,
     ignore_unknown: bool,
     total_triples: usize,
 ) -> Result<(), ChilonError> {
@@ -268,12 +257,7 @@ fn handle_loop(
                 trip_c.inc();
                 proc_message(subject, predicate, object, triples, used_groups);
             }
-            Message::NamespacesUnknown { iris } => {
-                for _iri in iris.iter() {
-                    //let msg = format!("Unknown namespace for resource '{iri}'");
-                    //writeln!(fd, "Unknown namespace for resource '{iri}'").unwrap();
-                }
-            }
+            Message::NamespacesUnknown { .. } => {}
             Message::Finished {
                 path,
                 triples,

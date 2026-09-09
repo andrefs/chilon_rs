@@ -120,7 +120,6 @@ fn main() -> Result<(), ChilonError> {
         n_workers,
         &ns_trie,
         cli.ignore_unknown,
-        outf,
         total_triples,
     )?;
 
