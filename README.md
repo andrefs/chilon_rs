@@ -103,18 +103,32 @@ Worker threads are auto-tuned: `max(2, min(files + 1, CPU cores - 2))`.
 
 ## Outputs & Visualization
 
-After processing, a folder `results/YYYYMMDD/` is created with:
+After processing, a folder `results/YYYYMMDD-N/` is created with:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Complete summary data (namespaces, groups, counts, metadata). |
-| `visualization.html` | Standalone HTML/JS visualization — open in any browser. |
+| `output.ttl` | Normalized triples grouped by namespace (Turtle). |
+| `vis-data.json` | Visualization data (nodes, edges, aliases). |
 | `namespaces.tsv` | Inferred + community prefix table (prefix, URI, count). |
 | `normalized.tsv` | Normalized triples: `subject\tpredicate\tobject\tcount`. |
 | `tasks.json` | Processing metadata (timings, triple counts, stages). |
 | `chilon.log` | Detailed execution log. |
 
-Open `visualization.html` directly in a browser to explore the summary interactively.
+### Viewing the Visualization
+
+The visualization is a JavaScript module that **must be served over HTTP** (browsers block ES modules on `file://`). Two steps:
+
+1. **Build the visualization assets** (requires Node.js ≥ 18 + yarn):
+   ```bash
+   cargo run --bin gen-viz -- results/20260909-9
+   ```
+   This runs `vite build` inside `chilon-viz/` and copies `dist/` into the results folder.
+
+2. **Serve the `dist/` folder** and open in browser:
+   ```bash
+   cd results/20260909-9/dist && python3 -m http.server 8000
+   # Then open http://localhost:8000
+   ```
 
 ## Auxiliary Commands
 
@@ -122,7 +136,7 @@ Two additional binaries ship with the crate:
 
 ```bash
 # Generate visualization from an existing results folder
-cargo run --bin gen-viz -- results/20260909
+cargo run --bin gen-viz -- results/20260909-9
 
 # Quick test/debug: parse RDF and show basic stats without full pipeline
 cargo run --bin test-files -- file1.ttl file2.ttl
