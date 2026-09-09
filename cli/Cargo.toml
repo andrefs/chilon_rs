@@ -1,6 +1,6 @@
 [package]
 name = "chilon-cli"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2021"
 description = "CLI for chilon_rs - namespace-based RDF graph summarization"
 homepage = "https://github.com/andrefs/chilon_rs"
@@ -21,7 +21,7 @@ name = "test-files"
 path = "src/bin/test-files.rs"
 
 [dependencies]
-chilon_rs = "2.0.1"
+chilon_rs = "2.0.2"
 clap = { version = "4.1", features = ["derive"] }
 num_cpus = "1.13.1"
 log = "0.4.0"
