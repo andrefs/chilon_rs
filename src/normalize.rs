@@ -1,12 +1,13 @@
 use crate::{
     counter::Counter,
+    error::ChilonError,
     meta_info::{Task, TaskType},
     ns_trie::NamespaceTrie,
     parse::{parse, ParserWrapper},
 };
 use log::{error, info, trace};
 use oxrdf::{Literal, NamedNode, NamedOrBlankNode, Term, Triple};
-use oxttl::{TurtleParseError, TurtleSerializer};
+use oxttl::TurtleSerializer;
 use rayon::ThreadPoolBuilder;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -76,7 +77,7 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
-        err: TurtleParseError,
+        err: ChilonError,
     },
 }
 
@@ -183,7 +184,13 @@ pub fn normalize_triples(
                 .unwrap();
 
                 info!("Parsing {:?}", path);
-                let mut graph = parse(&path);
+                let mut graph = match parse(&path) {
+                    Ok(g) => g,
+                    Err(err) => {
+                        tx.send(Message::FatalError { err }).unwrap();
+                        return;
+                    }
+                };
                 proc_triples(&mut graph, &path, &tx, ns_trie, ignore_unknown);
             });
         }
@@ -405,7 +412,7 @@ fn proc_triples(
             Err(err) => {
                 let msg = format!("Error normalizing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
-                tx.send(Message::FatalError { err }).unwrap();
+                tx.send(Message::FatalError { err: err.into() }).unwrap();
                 return;
             }
         };

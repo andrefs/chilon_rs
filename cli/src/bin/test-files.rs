@@ -29,7 +29,9 @@ fn main() {
 
     for path in cli.files {
         info!("Checking file {}", path.to_string_lossy());
-        let mut graph = parse(&path);
+        let mut graph = parse(&path).unwrap_or_else(|err| {
+            panic!("Could not parse file {}: {}", path.to_string_lossy(), err);
+        });
 
         let mut i = 0;
         for result in graph.by_ref() {

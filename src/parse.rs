@@ -1,7 +1,10 @@
 use oxrdf::Triple;
 use oxttl::{NQuadsParser, NTriplesParser, TurtleParseError, TurtleParser};
 
-use crate::extract::{extract, ReaderWrapper};
+use crate::{
+    error::ChilonError,
+    extract::{extract, ReaderWrapper},
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -46,29 +49,29 @@ impl ParserWrapper {
     }
 }
 
-pub fn parse(path: &PathBuf) -> ParserWrapper {
-    let (stream, file_stem) = extract(path);
+pub fn parse(path: &PathBuf) -> Result<ParserWrapper, ChilonError> {
+    let (stream, file_stem) = extract(path)?;
     let path_stem = Path::new(file_stem);
     let ext = path_stem.extension().or_else(|| path.extension());
 
     if let Some(ext) = ext {
         if ext == "nt" {
             let parser = NTriplesParser::new().lenient().for_reader(stream);
-            return ParserWrapper::NTriples(NTWrapper {
+            return Ok(ParserWrapper::NTriples(NTWrapper {
                 prefixes: Default::default(),
                 parser,
-            });
+            }));
         }
         if ext == "nq" {
             let parser = NQuadsParser::new().lenient().for_reader(stream);
-            return ParserWrapper::NQuads(NQWrapper {
+            return Ok(ParserWrapper::NQuads(NQWrapper {
                 prefixes: Default::default(),
                 parser,
-            });
+            }));
         }
     }
     let parser = TurtleParser::new().lenient().for_reader(stream);
-    ParserWrapper::Turtle(parser)
+    Ok(ParserWrapper::Turtle(parser))
 }
 
 #[cfg(test)]
@@ -94,7 +97,7 @@ mod tests {
             "test.ttl",
             "@prefix ex: <http://ex.org/> .\nex:s ex:p ex:o .\n",
         );
-        let parser = parse(&path);
+        let parser = parse(&path).unwrap();
         assert!(matches!(parser, ParserWrapper::Turtle(_)));
     }
 
@@ -106,7 +109,7 @@ mod tests {
             "test.nt",
             "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
         );
-        let parser = parse(&path);
+        let parser = parse(&path).unwrap();
         assert!(matches!(parser, ParserWrapper::NTriples(_)));
     }
 
@@ -118,7 +121,7 @@ mod tests {
             "test.nq",
             "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> <http://ex.org/g> .\n",
         );
-        let parser = parse(&path);
+        let parser = parse(&path).unwrap();
         assert!(matches!(parser, ParserWrapper::NQuads(_)));
     }
 
@@ -130,7 +133,7 @@ mod tests {
             "test.xyz",
             "<http://ex.org/s> <http://ex.org/p> <http://ex.org/o> .\n",
         );
-        let parser = parse(&path);
+        let parser = parse(&path).unwrap();
         assert!(matches!(parser, ParserWrapper::Turtle(_)));
     }
 }

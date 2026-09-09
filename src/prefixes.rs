@@ -1,5 +1,6 @@
 pub mod community;
 
+use crate::error::ChilonError;
 use crate::meta_info::{InferHK, InferHKTask, Task, TaskType};
 use crate::ns_trie::{gen_alias, NamespaceSource, NamespaceTrie};
 use crate::parse::{parse, ParserWrapper};
@@ -11,7 +12,6 @@ use crate::{
 };
 use log::{debug, error, info, trace};
 use oxrdf::{NamedOrBlankNode, Term, Triple};
-use oxttl::TurtleParseError;
 use std::collections::BTreeMap;
 use std::fs::metadata;
 use std::path::Path;
@@ -49,7 +49,7 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
-        err: TurtleParseError,
+        err: ChilonError,
     },
 }
 
@@ -91,7 +91,13 @@ pub fn build_iri_trie(
                 .unwrap();
 
                 info!("Parsing {:?} ({}/{running})", path, index + 1);
-                let mut graph = parse(path);
+                let mut graph = match parse(path) {
+                    Ok(g) => g,
+                    Err(err) => {
+                        tx.send(Message::FatalError { err }).unwrap();
+                        return;
+                    }
+                };
                 proc_triples(&mut graph, path, &tx);
             });
         }
@@ -352,7 +358,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             Err(err) => {
                 let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
-                tx.send(Message::FatalError { err }).unwrap();
+                tx.send(Message::FatalError { err: err.into() }).unwrap();
                 return 0;
             }
         };
@@ -435,9 +441,7 @@ fn normalize_iri(iri: &str) -> String {
             if rest.starts_with(&format!("{}://", url.scheme())) {
                 let auth_start = url.scheme().len() + 3; // "://"
                 let remainder = &rest[auth_start..];
-                let auth_len = remainder
-                    .find(['/', '?', '#'])
-                    .map_or(remainder.len(), |i| i);
+                let auth_len = remainder.find(['/', '?', '#']).unwrap_or(remainder.len());
                 let prefix_len = auth_start + auth_len;
                 if prefix_len >= IRI_MAX_LENGTH {
                     UnicodeSegmentation::graphemes(rest, true)

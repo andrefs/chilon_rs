@@ -7,6 +7,8 @@ use std::io::{BufRead, Error};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
+use crate::error::ChilonError;
+
 #[allow(clippy::large_enum_variant)]
 pub enum ReaderWrapper {
     Plain(BufReader<File>),
@@ -42,9 +44,8 @@ impl BufRead for ReaderWrapper {
     }
 }
 
-pub fn extract(path: &PathBuf) -> (ReaderWrapper, &OsStr) {
-    let file = File::open(path)
-        .unwrap_or_else(|e| panic!("Could not open file {}: {e}", path.to_string_lossy()));
+pub fn extract(path: &PathBuf) -> Result<(ReaderWrapper, &OsStr), ChilonError> {
+    let file = File::open(path).map_err(ChilonError::Io)?;
     let buf_reader = BufReader::new(file);
 
     let extension = path.extension();
@@ -53,16 +54,16 @@ pub fn extract(path: &PathBuf) -> (ReaderWrapper, &OsStr) {
     if extension.is_some() && extension.unwrap() == "bz2" {
         debug!("extracting bz2 file {:?}", path);
         let stream = ReaderWrapper::Bz2(BufReader::new(BzDecoder::new(buf_reader)));
-        return (stream, file_stem.unwrap_or(path.as_os_str()));
+        return Ok((stream, file_stem.unwrap_or(path.as_os_str())));
     }
     if extension.is_some() && extension.unwrap() == "gz" {
         debug!("extracting gz file {:?}", path);
         let stream = ReaderWrapper::Gz(BufReader::new(GzDecoder::new(buf_reader)));
-        (stream, file_stem.unwrap_or(path.as_os_str()))
+        Ok((stream, file_stem.unwrap_or(path.as_os_str())))
     } else {
         debug!("extracting plain file {:?}", path);
         let stream = ReaderWrapper::Plain(buf_reader);
-        (stream, file_stem.unwrap_or(path.as_os_str()))
+        Ok((stream, file_stem.unwrap_or(path.as_os_str())))
     }
 }
 
@@ -80,7 +81,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "hello world").unwrap();
 
-        let (reader, stem) = extract(&file_path);
+        let (reader, stem) = extract(&file_path).unwrap();
         assert_eq!(stem, std::ffi::OsStr::new("test"));
         assert!(matches!(reader, ReaderWrapper::Plain(_)));
     }
@@ -92,7 +93,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         write!(file, "H4sIAAAAAAAAA0wtSgBAAPQBvVCEAAAA").unwrap();
 
-        let (reader, stem) = extract(&file_path);
+        let (reader, stem) = extract(&file_path).unwrap();
         assert_eq!(stem, std::ffi::OsStr::new("test.txt"));
         assert!(matches!(reader, ReaderWrapper::Gz(_)));
     }
@@ -104,15 +105,14 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         write!(file, "QlpoOTFBWSZTWY/MlgAA/AFAgAKgRAAQ").unwrap();
 
-        let (reader, stem) = extract(&file_path);
+        let (reader, stem) = extract(&file_path).unwrap();
         assert_eq!(stem, std::ffi::OsStr::new("test.txt"));
         assert!(matches!(reader, ReaderWrapper::Bz2(_)));
     }
 
     #[test]
-    #[should_panic(expected = "Could not open file")]
     fn test_extract_nonexistent() {
         let nonexistent = std::path::PathBuf::from("/this/file/does/not/exist.txt");
-        extract(&nonexistent);
+        assert!(extract(&nonexistent).is_err());
     }
 }
