@@ -289,7 +289,8 @@ pub fn render_vis(data: &VisData, outf: &str) -> PathBuf {
     )])
     .unwrap();
     let mut ctx = Context::new();
-    ctx.insert("data", &data);
+    let data_json = serde_json::to_string_pretty(&data).unwrap();
+    ctx.insert("data_json", &data_json);
 
     let data_path = render_dir.join("src").join("data").join("raw-data.ts");
 

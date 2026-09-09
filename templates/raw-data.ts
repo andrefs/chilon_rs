@@ -93,4 +93,4 @@ export class SimData {
   }
 }
 
-export const initData = new SimData({{ data | json_encode(pretty = true) | safe }});
+export const initData = new SimData({{ data_json | safe }});
