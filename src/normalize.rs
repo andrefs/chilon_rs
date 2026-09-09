@@ -57,6 +57,7 @@ impl TripleFreqFns for TripleFreq {
 }
 
 const CHANNEL_BUFFER: usize = 100;
+const PROGRESS_LOG_INTERVAL: usize = 1_000_000;
 
 #[derive(Debug)]
 pub enum Message {
@@ -233,7 +234,7 @@ fn handle_loop(
 
     loop {
         msg_c.inc();
-        if msg_c.cur % 1_000_000 == 1 {
+        if msg_c.cur % PROGRESS_LOG_INTERVAL == 1 {
             restart_timers(start, msg_c, trip_c, ignore_unknown, total_triples);
         }
         if *running == 0 {
@@ -389,7 +390,7 @@ fn proc_triples(
     for result in graph.by_ref() {
         i += 1;
 
-        if i % 1_000_000 == 1 && !start.elapsed().is_zero() {
+        if i % PROGRESS_LOG_INTERVAL == 1 && !start.elapsed().is_zero() {
             let elapsed = start.elapsed().as_millis();
             let rate = ((i - last_i) as u128)
                 .checked_div(elapsed)
@@ -430,7 +431,7 @@ fn proc_triples(
     if tx
         .send(Message::Finished {
             path: path.to_string_lossy().to_string(),
-            triples: i as usize,
+            triples: i,
             iris: iri_c,
             blanks: blank_c,
             literals: literal_c,

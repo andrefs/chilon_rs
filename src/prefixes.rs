@@ -31,6 +31,7 @@ pub enum Position {
 const CHANNEL_BUFFER: usize = 100;
 const IRI_TRIE_SIZE: usize = 1_000_000;
 const IRI_MAX_LENGTH: usize = 200;
+const PROGRESS_LOG_INTERVAL: usize = 1_000_000;
 
 pub enum Message {
     Started {
@@ -168,7 +169,7 @@ fn handle_loop(
                 }
                 res_c.inc();
 
-                if res_c.cur % 1_000_000 == 1 {
+                if res_c.cur % PROGRESS_LOG_INTERVAL == 1 {
                     let it_c = iri_trie.count();
                     let it_n = iri_trie.count_nodes();
                     let nst_ct = ns_trie.count_terminals();
@@ -352,7 +353,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
 
     for result in graph.by_ref() {
         trip_c += 1;
-        if trip_c % 1_000_000 == 1 {
+        if trip_c % PROGRESS_LOG_INTERVAL == 1 {
             let elapsed = start.elapsed().as_millis();
             let rate = ((trip_c - last_trip_c) as u128)
                 .checked_div(elapsed)
@@ -380,7 +381,7 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
         };
         let (blanks, literals, iris) = match proc_triple(t, &tx) {
             Ok(counts) => counts,
-            Err(()) => return trip_c as usize,
+            Err(()) => return trip_c,
         };
         iri_c += iris;
         blank_c += blanks;
@@ -396,13 +397,13 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             .is_err()
         {
             warn!("Channel disconnected, aborting file {:?}", path);
-            return trip_c as usize;
+            return trip_c;
         }
     }
     if tx
         .send(Message::Finished {
             path: path.to_string_lossy().to_string(),
-            triples: trip_c as usize,
+            triples: trip_c,
             iris: iri_c,
             blanks: blank_c,
             literals: literal_c,
@@ -410,10 +411,10 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
         .is_err()
     {
         warn!("Channel disconnected, aborting file {:?}", path);
-        return trip_c as usize;
+        return trip_c;
     }
 
-    trip_c as usize
+    trip_c
 }
 
 fn proc_triple(t: Triple, tx: &SyncSender<Message>) -> Result<(usize, usize, usize), ()> {

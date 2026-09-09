@@ -1,9 +1,10 @@
 use chilon_rs::parse::parse;
-
 use clap::Parser;
 use log::{debug, info};
 use simplelog::*;
 use std::path::PathBuf;
+
+const PROGRESS_LOG_INTERVAL: usize = 1_000_000;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -39,7 +40,7 @@ fn main() {
                 panic!("Error testing file {}: {}", path.to_string_lossy(), err);
             });
             i += 1;
-            if i % 1_000_000 == 0 {
+            if i % PROGRESS_LOG_INTERVAL == 0 {
                 debug!("Read {} triples so far", i);
             }
             println!("{}", t);
