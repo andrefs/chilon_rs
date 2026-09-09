@@ -1,6 +1,6 @@
 [package]
 name = "chilon-cli"
-version = "1.3.2"
+version = "2.0.0"
 edition = "2021"
 
 [[bin]]
@@ -16,7 +16,7 @@ name = "test-files"
 path = "src/bin/test-files.rs"
 
 [dependencies]
-chilon_rs = { path = "..", version = "1.3.2" }
+chilon_rs = { path = "..", version = "2.0.0" }
 clap = { version = "4.1", features = ["derive"] }
 num_cpus = "1.13.1"
 log = "0.4.0"

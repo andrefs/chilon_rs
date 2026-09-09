@@ -4,6 +4,7 @@
 
 [![Rust](https://github.com/andrefs/chilon_rs/actions/workflows/rust.yml/badge.svg)](https://github.com/andrefs/chilon_rs/actions/workflows/rust.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust 1.77+](https://img.shields.io/badge/rust-1.77+-blue.svg)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/crates/v/chilon_rs.svg)](https://crates.io/crates/chilon_rs)
 
 [![oxigraph](https://img.shields.io/crates/v/oxigraph?label=oxigraph)](https://crates.io/crates/oxigraph)
