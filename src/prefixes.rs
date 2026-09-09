@@ -53,6 +53,7 @@ pub enum Message {
         literals: usize,
     },
     FatalError {
+        path: String,
         err: ChilonError,
     },
 }
@@ -105,7 +106,13 @@ pub fn build_iri_trie(
                 let mut graph = match parse(path) {
                     Ok(g) => g,
                     Err(err) => {
-                        if tx.send(Message::FatalError { err }).is_err() {
+                        if tx
+                            .send(Message::FatalError {
+                                path: path.to_string_lossy().to_string(),
+                                err,
+                            })
+                            .is_err()
+                        {
                             warn!("Channel disconnected, aborting file {:?}", path);
                         }
                         return;
@@ -205,8 +212,8 @@ fn handle_loop(
                 *running -= 1;
                 trace!("Running: {running}");
             }
-            Message::FatalError { err } => {
-                error!("Fatal error: {err}");
+            Message::FatalError { path, err } => {
+                error!("Fatal error in {}: {err}", path);
                 *running -= 1;
             }
         }
@@ -373,7 +380,13 @@ fn proc_triples(graph: &mut ParserWrapper, path: &Path, tx: &SyncSender<Message>
             Err(err) => {
                 let msg = format!("Error processing file {}: {}", path.to_string_lossy(), err);
                 error!("{}", msg);
-                if tx.send(Message::FatalError { err: err.into() }).is_err() {
+                if tx
+                    .send(Message::FatalError {
+                        path: path.to_string_lossy().to_string(),
+                        err: err.into(),
+                    })
+                    .is_err()
+                {
                     warn!("Channel disconnected, aborting file {:?}", path);
                 }
                 return 0;
