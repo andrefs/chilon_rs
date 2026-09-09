@@ -1,6 +1,9 @@
 use chilon_rs::args::Cli;
+use chilon_rs::error::ChilonError;
 use chilon_rs::iri_trie::IriTrieExt;
-use chilon_rs::meta_info::{MetaInfo, MetaInfoInference, MetaInfoNormalization, MetaInfoVisualization, StageTask};
+use chilon_rs::meta_info::{
+    MetaInfo, MetaInfoInference, MetaInfoNormalization, MetaInfoVisualization, StageTask,
+};
 use chilon_rs::normalize::{normalize_triples, save_normalized_triples};
 use chilon_rs::ns_trie::{InferredNamespaces, NamespaceTrie, SaveTrie};
 use chilon_rs::prefixes::{build_iri_trie, community};
@@ -17,7 +20,7 @@ use std::str;
 
 use simplelog::*;
 
-fn main() {
+fn main() -> Result<(), ChilonError> {
     /**********************
      * Initializing stuff *
      **********************/
@@ -119,7 +122,7 @@ fn main() {
         cli.ignore_unknown,
         outf,
         total_triples,
-    );
+    )?;
 
     norm_t.add_tasks(tasks);
     norm_t.namespaces = used_groups.namespaces.len();
@@ -147,6 +150,7 @@ fn main() {
     meta.visualization = Some(vis_t);
     meta.save();
     //vis_dev_server(render_dir);
+    Ok(())
 }
 
 fn init_log(outf: &str) {

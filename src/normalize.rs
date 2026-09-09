@@ -154,12 +154,15 @@ pub fn normalize_triples(
     ignore_unknown: bool,
     outf: &str,
     total_triples: usize,
-) -> (TripleFreq, Groups, BTreeMap<String, Task>) {
+) -> Result<(TripleFreq, Groups, BTreeMap<String, Task>), ChilonError> {
     let mut triples = TripleFreq::new();
     let mut used_groups: Groups = Default::default();
 
     if n_workers < 2 {
-        panic!("Number of workers must be at least 2");
+        return Err(ChilonError::InvalidInput(format!(
+            "Number of workers must be at least 2, got {}",
+            n_workers
+        )));
     }
     info!("Creating pool with {n_workers} threads");
 
@@ -215,7 +218,7 @@ pub fn normalize_triples(
         );
     });
 
-    (triples, used_groups, tasks)
+    Ok((triples, used_groups, tasks))
 }
 
 #[allow(clippy::too_many_arguments)]
