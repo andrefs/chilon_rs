@@ -55,6 +55,10 @@ fn main() -> Result<(), ChilonError> {
         str::from_utf8(&output.stdout).unwrap().trim()
     );
 
+    // log command line
+    let args: Vec<String> = std::env::args().collect();
+    info!("Command: {}", args.join(" "));
+
     let cli = Cli::parse();
 
     /**********************
